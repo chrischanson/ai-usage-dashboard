@@ -1,0 +1,15 @@
+# .bazelrc
+# Uploads build & test results to BuildBuddy for browser inspection.
+# HOST_IP is substituted by setup.sh at deploy time.
+# Results UI: http://10.0.0.201:8080
+
+build --bes_results_url=http://10.0.0.201:8080/invocation/
+build --bes_backend=grpc://10.0.0.201:1985
+build --remote_cache=grpc://10.0.0.201:1985
+
+# Show test output for failures only
+test --test_output=errors
+
+# Use Clang as the default C++ compiler
+build --action_env=CC=clang
+build --action_env=CXX=clang++
