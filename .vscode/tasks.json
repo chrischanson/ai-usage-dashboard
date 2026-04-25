@@ -1,0 +1,40 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Bazel Build",
+      "type": "shell",
+      "command": "bazel build //...",
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "Bazel Run",
+      "type": "shell",
+      "command": "bazel run //${input:target}",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Bazel Test",
+      "type": "shell",
+      "command": "bazel test //...",
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "Bazel Clean",
+      "type": "shell",
+      "command": "bazel clean --expunge",
+      "group": "build",
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "target",
+      "type": "promptString",
+      "description": "Bazel target to run (e.g. //src:main)"
+    }
+  ]
+}

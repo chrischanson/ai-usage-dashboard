@@ -1,2 +1,23 @@
+# Bazel
 bazel-*
-.vscode/
+
+# IDE / Editor
+.vscode/settings.json
+.idea/
+*.swp
+
+# Compilation database (generated, large)
+compile_commands.json
+.cache/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# macOS
+.DS_Store
+
+# Secrets
+*.pub

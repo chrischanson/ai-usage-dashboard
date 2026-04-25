@@ -16,5 +16,8 @@ cc_binary(
 cc_test(
     name = "hello_test",
     srcs = ["hello_test.cc"],
-    deps = [":hello_lib"],
+    deps = [
+        ":hello_lib",
+        "@googletest//:gtest_main",
+    ],
 )

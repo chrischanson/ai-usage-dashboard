@@ -1,0 +1,123 @@
+# docker-compose.yml
+# Orchestrates three services on the always-on host:
+#   dev        — Linux dev container (Antigravity/Windsurf connect here via SSH)
+#   gitea      — Self-hosted Git remote
+#   buildbuddy — Bazel test results browser
+#
+# Prerequisites:
+#   1. Copy .env.example to .env and fill in your API keys
+#   2. Place client SSH public keys in ./ssh-keys/ (one .pub file per client)
+#
+# Start everything:  docker compose up -d
+# Stop everything:   docker compose down
+# Rebuild dev image: docker compose build dev && docker compose up -d dev
+
+services:
+
+  # ── Dev container ──────────────────────────────────────────────
+  dev:
+    build:
+      context: ./dev-container
+    container_name: dev
+    hostname: dev
+    environment:
+      # AI agent API keys — read from .env file
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:?Set OPENROUTER_API_KEY in .env}
+      # Route Claude Code through OpenRouter (Official Guide)
+      - ANTHROPIC_BASE_URL=https://openrouter.ai/api
+      - ANTHROPIC_AUTH_TOKEN=${OPENROUTER_API_KEY}
+      - ANTHROPIC_API_KEY=""
+      # Map Claude Code internal agents to a free OpenRouter model
+      - ANTHROPIC_DEFAULT_SONNET_MODEL=minimax/minimax-m2.5:free
+      - ANTHROPIC_DEFAULT_HAIKU_MODEL=minimax/minimax-m2.5:free
+      - CLAUDE_CODE_SUBAGENT_MODEL=minimax/minimax-m2.5:free
+      # Route OpenCode to OpenRouter
+      - OPENAI_API_BASE=https://openrouter.ai/api/v1
+      - OPENAI_API_KEY=${OPENROUTER_API_KEY}
+      # OpenCode Zen — optional
+      - OPENCODE_API_KEY=${OPENCODE_ZEN_API_KEY:-}
+      - OPENCODE_ZEN_API_KEY=${OPENCODE_ZEN_API_KEY:-}
+    volumes:
+      # Workspace persists across container rebuilds
+      - dev-workspace:/home/dev/workspace
+      # Mount public keys — one file per client.
+      # Add each client's public key as a separate file in ./ssh-keys/
+      #
+      # Example:
+      #   cp ~/.ssh/id_ed25519.pub ./ssh-keys/macbook.pub
+      #   scp user@linux-vm:~/.ssh/id_ed25519.pub ./ssh-keys/linux-vm.pub
+      - ./ssh-keys:/etc/ssh-keys:ro
+    ports:
+      - "2220:22"     # SSH — Antigravity/Windsurf connect here
+    networks:
+      - devnet
+    healthcheck:
+      test: ["CMD-SHELL", "ssh -o BatchMode=yes -o ConnectTimeout=2 -p 22 dev@localhost echo ok 2>/dev/null || pgrep -x sshd > /dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    depends_on:
+      gitea:
+        condition: service_healthy
+      buildbuddy:
+        condition: service_started
+
+  # ── Git remote ─────────────────────────────────────────────────
+  gitea:
+    image: gitea/gitea:latest
+    container_name: gitea
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      # Database
+      - GITEA__database__DB_TYPE=sqlite3
+      # Server
+      - GITEA__server__APP_NAME=Dev Gitea
+      - GITEA__server__ROOT_URL=http://gitea:3000/
+      - GITEA__server__SSH_DOMAIN=gitea
+      - GITEA__server__SSH_PORT=22
+      # Skip the web installer — configuration is done via env vars
+      - GITEA__security__INSTALL_LOCK=true
+      # Disable registration (admin-only user creation)
+      - GITEA__service__DISABLE_REGISTRATION=true
+    volumes:
+      - ./gitea/data:/data
+    ports:
+      - "3000:3000"   # web UI
+      - "2222:22"     # git over SSH
+    networks:
+      - devnet
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsSL http://localhost:3000/api/v1/version || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # ── Bazel test results ─────────────────────────────────────────
+  buildbuddy:
+    image: gcr.io/flame-public/buildbuddy-app-onprem:latest
+    container_name: buildbuddy
+    volumes:
+      - ./buildbuddy/data:/data
+    ports:
+      - "8080:8080"   # web UI — browse test results here
+      - "8081:8081"   # gRPC-web (used internally by UI)
+      - "1985:1985"   # gRPC — Bazel uploads results here
+    networks:
+      - devnet
+    restart: unless-stopped
+
+networks:
+  # Explicit network for inter-container communication.
+  # Services can reach each other by container name (e.g., grpc://buildbuddy:1985).
+  devnet:
+    driver: bridge
+
+volumes:
+  # Named volume keeps workspace data when the dev container is rebuilt.
+  # Backup: docker run --rm -v dev-workspace:/data -v $(pwd):/backup busybox tar czf /backup/workspace-backup.tar.gz -C /data .
+  dev-workspace:

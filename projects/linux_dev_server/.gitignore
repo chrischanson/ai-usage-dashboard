@@ -1,0 +1,12 @@
+# Secrets
+.env
+
+# SSH public keys (contain client identities)
+ssh-keys/*.pub
+
+# Persistent data directories (managed by Docker)
+gitea/data/
+buildbuddy/data/
+
+# macOS
+.DS_Store
