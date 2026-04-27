@@ -65,7 +65,7 @@ RUN mkdir -p /var/run/sshd \
     && echo "PermitRootLogin no"            >> /etc/ssh/sshd_config.d/dev.conf \
     && echo "PermitEmptyPasswords no"       >> /etc/ssh/sshd_config.d/dev.conf \
     # Allow Antigravity Server and agents to receive env vars over SSH
-    && echo "AcceptEnv LANG LC_* BAZEL_* OPENROUTER_API_KEY ANTHROPIC_API_KEY ANTHROPIC_BASE_URL OPENCODE_ZEN_API_KEY OPENCODE_API_KEY OPENAI_API_KEY OPENAI_BASE_URL" \
+    && echo "AcceptEnv LANG LC_* BAZEL_* OPENROUTER_API_KEY ANTHROPIC_API_KEY ANTHROPIC_BASE_URL OPENCODE_ZEN_API_KEY OPENCODE_API_KEY OPENAI_API_KEY OPENAI_BASE_URL CODEX_API_KEY" \
        >> /etc/ssh/sshd_config.d/dev.conf
 
 # ── Dev user ───────────────────────────────────────────────────

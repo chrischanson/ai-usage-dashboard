@@ -45,6 +45,8 @@ export OPENAI_API_BASE="${OPENAI_API_BASE}"
 export OPENAI_API_KEY="${OPENAI_API_KEY}"
 export OPENCODE_API_KEY="${OPENCODE_API_KEY}"
 export OPENCODE_ZEN_API_KEY="${OPENCODE_ZEN_API_KEY}"
+export CODEX_API_KEY="${CODEX_API_KEY}"
+export OPENAI_BASE_URL="${OPENAI_BASE_URL}"
 EOF
 
 # Also write to ~/.bashrc so non-login interactive shells (VS Code terminal,
@@ -66,6 +68,8 @@ export OPENAI_API_BASE="${OPENAI_API_BASE}"
 export OPENAI_API_KEY="${OPENAI_API_KEY}"
 export OPENCODE_API_KEY="${OPENCODE_API_KEY}"
 export OPENCODE_ZEN_API_KEY="${OPENCODE_ZEN_API_KEY}"
+export CODEX_API_KEY="${CODEX_API_KEY}"
+export OPENAI_BASE_URL="${OPENAI_BASE_URL}"
 # <<< ai-keys <<<
 EOF
     chown dev:dev "$BASHRC"

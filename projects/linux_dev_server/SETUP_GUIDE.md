@@ -47,22 +47,27 @@ You should see "Hello from Docker!" in the output.
 
 ---
 
-## Step 2: Copy the project to the host
+## Step 2: Deploy the project to the host
 
-> **Run on:** MacBook (or wherever this repo lives)
+> **Run on:** Linux host
 
-Copy the project files to your Linux host:
+The project includes a `deploy.sh` script that clones from Gitea and syncs
+the files into the target directory (alongside your other compose stacks).
 
 ```bash
-# Replace <HOST_USER> and <HOST_IP> with your values
-scp -r ~/dev/projects/linux_dev_server <HOST_USER>@<HOST_IP>:~/dev-services
+# First time — clone the repo and deploy to ~/dev-services (default)
+cd /tmp && git clone http://localhost:3000/dev/linux_dev_server.git
+cd linux_dev_server && ./deploy.sh
+
+# Subsequent updates — just re-run deploy.sh (it pulls latest first)
+~/dev-services/.repos/linux_dev_server/deploy.sh
 ```
 
-Or, if you prefer Git:
+Or manually:
 
 ```bash
 # On the Linux host
-git clone <your-repo-url> ~/dev-services
+git clone http://localhost:3000/dev/linux_dev_server.git ~/dev-services
 ```
 
 ---

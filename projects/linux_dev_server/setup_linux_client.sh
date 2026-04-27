@@ -65,7 +65,7 @@ Host devserver
   User dev
   IdentityFile ${SSH_KEY}
   # Forward env vars so AI agents pick up API keys from your local shell
-  SendEnv OPENROUTER_API_KEY OPENCODE_ZEN_API_KEY ANTHROPIC_API_KEY
+  SendEnv OPENROUTER_API_KEY OPENCODE_ZEN_API_KEY ANTHROPIC_API_KEY CODEX_API_KEY
 EOF
     echo "Added SSH config entry for 'devserver'"
 fi
