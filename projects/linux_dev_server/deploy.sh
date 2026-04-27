@@ -53,6 +53,7 @@ mkdir -p "$TARGET_DIR"
 # allows self-update to run from an existing clone.
 if [[ -d "$CLONE_DIR/.git" ]]; then
     echo "==> Pulling latest changes..."
+    git -C "$CLONE_DIR" sparse-checkout set "$REPO_SUBDIR" "projects/docker-standalone-to-compose"
     git -C "$CLONE_DIR" pull --ff-only || {
         echo "  WARNING: git pull failed — using existing clone"
     }
@@ -65,7 +66,7 @@ else
         exit 1
     fi
     git -C "$CLONE_DIR" sparse-checkout init --cone
-    git -C "$CLONE_DIR" sparse-checkout set "$REPO_SUBDIR"
+    git -C "$CLONE_DIR" sparse-checkout set "$REPO_SUBDIR" "projects/docker-standalone-to-compose"
     git -C "$CLONE_DIR" checkout
 fi
 
@@ -125,10 +126,15 @@ fi
 # Make scripts executable
 chmod +x "$TARGET_DIR/setup.sh" "$TARGET_DIR/setup_linux_client.sh" 2>/dev/null || true
 
-# ── Copy docker-update.sh if not present ──────────────────────
-if [[ ! -f "$TARGET_DIR/docker-update.sh" ]]; then
-    echo "  NOTE: docker-update.sh not found in ${TARGET_DIR}/"
-    echo "  Copy it there manually or clone the docker-standalone-to-compose repo."
+# ── Copy docker-update.sh ──────────────────────
+if [[ -f "$CLONE_DIR/projects/docker-standalone-to-compose/docker-update.sh" ]]; then
+    cp "$CLONE_DIR/projects/docker-standalone-to-compose/docker-update.sh" "$TARGET_DIR/docker-update.sh"
+    chmod +x "$TARGET_DIR/docker-update.sh"
+else
+    if [[ ! -f "$TARGET_DIR/docker-update.sh" ]]; then
+        echo "  NOTE: docker-update.sh not found in ${TARGET_DIR}/"
+        echo "  Copy it there manually or clone the docker-standalone-to-compose repo."
+    fi
 fi
 
 echo ""
