@@ -20,10 +20,10 @@
 set -euo pipefail
 
 TARGET_DIR="$(pwd)"
-GITEA_URL="http://localhost:3000"
-REPO_NAME="linux_dev_server"
-REPO_REMOTE="${GITEA_URL}/dev/${REPO_NAME}.git"
-CLONE_DIR="${TARGET_DIR}/.repos/${REPO_NAME}"
+GITEA_URL="http://10.0.0.201:3000"
+REPO_REMOTE="${GITEA_URL}/admin/projects.git"
+REPO_SUBDIR="projects/linux_dev_server"
+CLONE_DIR="${TARGET_DIR}/.repos/projects"
 
 # ── Self-update ───────────────────────────────────────────────
 # Pull the latest repo first, then check if deploy.sh itself changed.
@@ -31,7 +31,7 @@ CLONE_DIR="${TARGET_DIR}/.repos/${REPO_NAME}"
 # runs with the newest logic.
 self_update() {
     local self="$TARGET_DIR/deploy.sh"
-    local repo_copy="$CLONE_DIR/deploy.sh"
+    local repo_copy="$CLONE_DIR/$REPO_SUBDIR/deploy.sh"
 
     if [[ ! -f "$repo_copy" ]]; then
         return 0  # No deploy.sh in repo yet — skip
@@ -49,13 +49,24 @@ self_update() {
 mkdir -p "$TARGET_DIR"
 
 # ── Clone or pull the repo ────────────────────────────────────
+# We do NOT use set -e for this section so that a failed pull still
+# allows self-update to run from an existing clone.
 if [[ -d "$CLONE_DIR/.git" ]]; then
     echo "==> Pulling latest changes..."
-    git -C "$CLONE_DIR" pull --ff-only
+    git -C "$CLONE_DIR" pull --ff-only || {
+        echo "  WARNING: git pull failed — using existing clone"
+    }
 else
-    echo "==> Cloning ${REPO_REMOTE}..."
+    echo "==> Cloning ${REPO_REMOTE} (sparse: ${REPO_SUBDIR})..."
     mkdir -p "$(dirname "$CLONE_DIR")"
-    git clone "$REPO_REMOTE" "$CLONE_DIR"
+    if ! git clone --filter=blob:none --no-checkout "$REPO_REMOTE" "$CLONE_DIR"; then
+        echo "  ERROR: git clone failed. Check REPO_REMOTE and network." >&2
+        echo "  REPO_REMOTE=${REPO_REMOTE}" >&2
+        exit 1
+    fi
+    git -C "$CLONE_DIR" sparse-checkout init --cone
+    git -C "$CLONE_DIR" sparse-checkout set "$REPO_SUBDIR"
+    git -C "$CLONE_DIR" checkout
 fi
 
 # ── Check for self-update (after pull, before sync) ───────────
@@ -77,15 +88,15 @@ self_update "$@"
 #     setup.sh
 #     setup_linux_client.sh
 #     SETUP_GUIDE.md
-#     .repos/linux_dev_server/ ← clone (source of truth)
+#     .repos/projects/         ← sparse clone (source of truth)
 
 echo "==> Syncing files to ${TARGET_DIR}..."
 
 # Compose file — always copy (this is what docker-update.sh scans)
-cp "$CLONE_DIR/server.yml" "$TARGET_DIR/server.yml"
+cp "$CLONE_DIR/$REPO_SUBDIR/server.yml" "$TARGET_DIR/server.yml"
 
 # Build context — must be a subdirectory referenced by server.yml
-rsync -a --delete "$CLONE_DIR/dev-container/" "$TARGET_DIR/dev-container/"
+rsync -a --delete "$CLONE_DIR/$REPO_SUBDIR/dev-container/" "$TARGET_DIR/dev-container/"
 
 # Data directories — only create if missing (preserve existing data)
 for d in gitea buildbuddy ssh-keys; do
@@ -94,15 +105,15 @@ done
 
 # Scripts and docs — always copy
 for f in setup.sh setup_linux_client.sh SETUP_GUIDE.md .env.example .gitignore; do
-    if [[ -f "$CLONE_DIR/$f" ]]; then
-        cp "$CLONE_DIR/$f" "$TARGET_DIR/$f"
+    if [[ -f "$CLONE_DIR/$REPO_SUBDIR/$f" ]]; then
+        cp "$CLONE_DIR/$REPO_SUBDIR/$f" "$TARGET_DIR/$f"
     fi
 done
 
 # .env — never overwrite (contains secrets)
 if [[ ! -f "$TARGET_DIR/.env" ]]; then
-    if [[ -f "$CLONE_DIR/.env.example" ]]; then
-        cp "$CLONE_DIR/.env.example" "$TARGET_DIR/.env"
+    if [[ -f "$CLONE_DIR/$REPO_SUBDIR/.env.example" ]]; then
+        cp "$CLONE_DIR/$REPO_SUBDIR/.env.example" "$TARGET_DIR/.env"
         echo ""
         echo "  ⚠ Created .env from .env.example — EDIT IT with your API keys:"
         echo "    nano ${TARGET_DIR}/.env"
