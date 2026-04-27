@@ -1,26 +1,49 @@
 #!/usr/bin/env bash
 # deploy.sh
-# Deploys the linux_dev_server project to the host machine.
+# Deploys the linux_dev_server project to the CURRENT directory.
 #
 # Clones (or pulls) the repo from Gitea, then syncs the project files
-# into the target directory alongside other compose stacks.
+# into the current directory alongside other compose stacks.
+#
+# On each run, this script first checks for an updated version of itself
+# from the repo. If a newer deploy.sh is found, it re-executes itself
+# with the updated copy.
 #
 # The dev-container/ subdirectory is preserved (needed for image builds),
 # but the compose file (server.yml) sits at the top level so docker-update.sh
 # discovers it alongside other .yml stacks.
 #
 # Usage:
-#   ./deploy.sh                          # Deploy to ~/dev-services (default)
-#   ./deploy.sh /opt/docker-services     # Deploy to a custom directory
+#   cd ~/dev-services && ./deploy.sh
 #
-# Prerequisites: git, access to Gitea at localhost:3000
+# Prerequisites: git, rsync, access to Gitea at localhost:3000
 set -euo pipefail
 
-TARGET_DIR="${1:-$HOME/dev-services}"
+TARGET_DIR="$(pwd)"
 GITEA_URL="http://localhost:3000"
 REPO_NAME="linux_dev_server"
 REPO_REMOTE="${GITEA_URL}/dev/${REPO_NAME}.git"
 CLONE_DIR="${TARGET_DIR}/.repos/${REPO_NAME}"
+
+# ── Self-update ───────────────────────────────────────────────
+# Pull the latest repo first, then check if deploy.sh itself changed.
+# If it did, replace ourselves and re-exec so the rest of the script
+# runs with the newest logic.
+self_update() {
+    local self="$TARGET_DIR/deploy.sh"
+    local repo_copy="$CLONE_DIR/deploy.sh"
+
+    if [[ ! -f "$repo_copy" ]]; then
+        return 0  # No deploy.sh in repo yet — skip
+    fi
+
+    if ! cmp -s "$self" "$repo_copy"; then
+        echo "==> deploy.sh has been updated — restarting with new version..."
+        cp "$repo_copy" "$self"
+        chmod +x "$self"
+        exec "$self" "$@"
+    fi
+}
 
 # ── Ensure target directory exists ────────────────────────────
 mkdir -p "$TARGET_DIR"
@@ -35,22 +58,26 @@ else
     git clone "$REPO_REMOTE" "$CLONE_DIR"
 fi
 
+# ── Check for self-update (after pull, before sync) ───────────
+self_update "$@"
+
 # ── Sync files into target directory ──────────────────────────
-# Structure on host:
-#   ~/dev-services/
+# Structure on host (current directory):
+#   ./
 #     server.yml              ← compose file (top-level for docker-update.sh)
-#     .env                     ← secrets (never overwritten if it exists)
-#     .env.example             ← template
+#     deploy.sh               ← this script (self-updating)
+#     .env                    ← secrets (never overwritten if it exists)
+#     .env.example            ← template
 #     .gitignore
-#     docker-update.sh         ← shared update script
-#     dev-container/           ← build context for the dev service
-#     gitea/                   ← persistent data
-#     buildbuddy/              ← persistent data
-#     ssh-keys/                ← client public keys
+#     docker-update.sh        ← shared update script
+#     dev-container/          ← build context for the dev service
+#     gitea/                  ← persistent data
+#     buildbuddy/             ← persistent data
+#     ssh-keys/               ← client public keys
 #     setup.sh
 #     setup_linux_client.sh
 #     SETUP_GUIDE.md
-#     .repos/linux_dev_server/ ← bare clone (source of truth)
+#     .repos/linux_dev_server/ ← clone (source of truth)
 
 echo "==> Syncing files to ${TARGET_DIR}..."
 
@@ -97,5 +124,6 @@ echo ""
 echo "==> Deploy complete. Files in ${TARGET_DIR}/:"
 ls -1 "$TARGET_DIR"/*.yml "$TARGET_DIR"/*.sh 2>/dev/null || true
 echo ""
-echo "  To set up for the first time:  cd ${TARGET_DIR} && ./setup.sh"
-echo "  To update later:              cd ${TARGET_DIR} && ./docker-update.sh"
+echo "  To set up for the first time:  ./setup.sh"
+echo "  To rebuild dev container:      ./docker-update.sh --build dev"
+echo "  To update all services:        ./docker-update.sh"
