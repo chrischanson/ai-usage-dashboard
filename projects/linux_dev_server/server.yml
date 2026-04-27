@@ -1,4 +1,4 @@
-# docker-compose.yml
+# server.yml
 # Orchestrates three services on the always-on host:
 #   dev        — Linux dev container (Antigravity/Windsurf connect here via SSH)
 #   gitea      — Self-hosted Git remote
@@ -8,9 +8,9 @@
 #   1. Copy .env.example to .env and fill in your API keys
 #   2. Place client SSH public keys in ./ssh-keys/ (one .pub file per client)
 #
-# Start everything:  docker compose up -d
-# Stop everything:   docker compose down
-# Rebuild dev image: docker compose build dev && docker compose up -d dev
+# Start everything:  docker compose -f server.yml up -d
+# Stop everything:   docker compose -f server.yml down
+# Rebuild dev image: docker compose -f server.yml build dev && docker compose -f server.yml up -d dev
 
 services:
 
@@ -37,6 +37,10 @@ services:
       # OpenCode Zen — optional
       - OPENCODE_API_KEY=${OPENCODE_ZEN_API_KEY:-}
       - OPENCODE_ZEN_API_KEY=${OPENCODE_ZEN_API_KEY:-}
+      # Codex CLI — uses OPENAI_API_KEY by default.
+      # If CODEX_OPENAI_API_KEY is set in .env, it takes priority (real OpenAI key).
+      # Otherwise falls back to OpenRouter via OPENAI_API_KEY above.
+      - OPENAI_BASE_URL=${CODEX_OPENAI_BASE_URL:-https://openrouter.ai/api/v1}
     volumes:
       # Workspace persists across container rebuilds
       - dev-workspace:/home/dev/workspace

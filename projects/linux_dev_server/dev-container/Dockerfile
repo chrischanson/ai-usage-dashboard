@@ -1,7 +1,7 @@
 # dev-container/Dockerfile
 # Linux dev environment for remote Antigravity/Windsurf development.
 # Contains: SSH server, Bazelisk, Clang/LLVM, Python, Node.js, Git,
-#           Claude Code CLI, OpenCode.
+#           Claude Code CLI, OpenCode, Codex CLI.
 FROM ubuntu:24.04
 
 ARG USERNAME=dev
@@ -44,6 +44,11 @@ RUN npm install -g @anthropic-ai/claude-code
 RUN OPENCODE_INSTALL_DIR=/usr/local/bin curl -fsSL https://opencode.ai/install | bash || \
     echo "WARNING: OpenCode install failed — skipping (can install later)"
 
+# ── OpenAI Codex CLI ───────────────────────────────────────────
+# Terminal-native AI coding agent by OpenAI.
+# Uses OPENAI_API_KEY (can be pointed at OpenRouter via OPENAI_BASE_URL)
+RUN npm install -g @openai/codex
+
 # ── Bazelisk (manages Bazel versions automatically) ────────────
 # Bazelisk downloads the correct Bazel version based on .bazelversion
 # in each project. Falls back to the latest LTS if no file exists.
@@ -60,7 +65,7 @@ RUN mkdir -p /var/run/sshd \
     && echo "PermitRootLogin no"            >> /etc/ssh/sshd_config.d/dev.conf \
     && echo "PermitEmptyPasswords no"       >> /etc/ssh/sshd_config.d/dev.conf \
     # Allow Antigravity Server and agents to receive env vars over SSH
-    && echo "AcceptEnv LANG LC_* BAZEL_* OPENROUTER_API_KEY ANTHROPIC_API_KEY ANTHROPIC_BASE_URL OPENCODE_ZEN_API_KEY OPENCODE_API_KEY" \
+    && echo "AcceptEnv LANG LC_* BAZEL_* OPENROUTER_API_KEY ANTHROPIC_API_KEY ANTHROPIC_BASE_URL OPENCODE_ZEN_API_KEY OPENCODE_API_KEY OPENAI_API_KEY OPENAI_BASE_URL" \
        >> /etc/ssh/sshd_config.d/dev.conf
 
 # ── Dev user ───────────────────────────────────────────────────

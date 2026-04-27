@@ -43,7 +43,7 @@ ssh "${HOST_USER}@${HOST_IP}" "mkdir -p ${SERVICES_DIR}/ssh-keys"
 scp "${SSH_KEY}.pub" "${HOST_USER}@${HOST_IP}:${SERVICES_DIR}/ssh-keys/linux-vm.pub"
 
 echo "Restarting dev container to load new key..."
-ssh "${HOST_USER}@${HOST_IP}" "cd ${SERVICES_DIR} && docker compose restart dev"
+ssh "${HOST_USER}@${HOST_IP}" "cd ${SERVICES_DIR} && docker compose -f server.yml restart dev"
 echo "Waiting for container to come back up..."
 sleep 5
 

@@ -186,14 +186,14 @@ Start BuildBuddy first since the dev container depends on it:
 
 ```bash
 cd ~/dev-services
-docker compose up -d buildbuddy
+docker compose -f server.yml up -d buildbuddy
 ```
 
 **Verify:**
 
 ```bash
 # Check it is running
-docker compose ps | grep buildbuddy
+docker compose -f server.yml ps | grep buildbuddy
 # Should show "Up"
 
 # Wait a few seconds, then test the web UI
@@ -211,7 +211,7 @@ You can also open `http://<HOST_IP>:8080` in your browser to see the BuildBuddy 
 
 ```bash
 cd ~/dev-services
-docker compose up -d gitea
+docker compose -f server.yml up -d gitea
 ```
 
 **Verify:**
@@ -274,8 +274,8 @@ Open `http://<HOST_IP>:3000/dev/main` in your browser — you should see the emp
 
 ```bash
 cd ~/dev-services
-docker compose build dev
-docker compose up -d dev
+docker compose -f server.yml build dev
+docker compose -f server.yml up -d dev
 ```
 
 This will take a few minutes the first time (downloading Ubuntu, Node.js, Bazelisk, etc.).
@@ -288,7 +288,7 @@ docker inspect --format='{{.State.Health.Status}}' dev
 # Should say: healthy
 
 # Check all three are running
-docker compose ps
+docker compose -f server.yml ps
 ```
 
 You should see all three containers with status `Up` and `(healthy)`.
@@ -400,16 +400,16 @@ Or follow the same manual steps as Steps 4 and 12 above, adapting for the VM.
 
 ```bash
 # --- All services ---
-docker compose up -d          # Start all
-docker compose down           # Stop all
-docker compose ps             # Status
-docker compose logs -f        # Follow logs (all services)
-docker compose logs -f dev    # Follow logs (dev only)
+docker compose -f server.yml up -d          # Start all
+docker compose -f server.yml down           # Stop all
+docker compose -f server.yml ps             # Status
+docker compose -f server.yml logs -f        # Follow logs (all services)
+docker compose -f server.yml logs -f dev    # Follow logs (dev only)
 
 # --- Dev container ---
-docker compose build dev                   # Rebuild after Dockerfile changes
-docker compose up -d dev                   # Restart dev
-docker compose restart dev                 # Restart (e.g., after adding SSH keys)
+docker compose -f server.yml build dev                   # Rebuild after Dockerfile changes
+docker compose -f server.yml up -d dev                   # Restart dev
+docker compose -f server.yml restart dev                 # Restart (e.g., after adding SSH keys)
 docker exec -it dev bash                   # Shell into the container
 
 # --- Backup ---
@@ -424,15 +424,15 @@ docker run --rm \
 
 # --- Adding a new SSH key later ---
 cp new-client.pub ~/dev-services/ssh-keys/client-name.pub
-cd ~/dev-services && docker compose restart dev
+cd ~/dev-services && docker compose -f server.yml restart dev
 ```
 
 ### Troubleshooting
 
 | Problem | Solution |
 |---------|----------|
-| Can't SSH into dev container | Check `ssh-keys/` has your `.pub` file, then `docker compose restart dev` |
+| Can't SSH into dev container | Check `ssh-keys/` has your `.pub` file, then `docker compose -f server.yml restart dev` |
 | Gitea healthcheck failing | `docker logs gitea` — usually just needs more startup time |
-| Bazel can't reach BuildBuddy | Check `.bazelrc` has the correct host IP, and `docker compose ps` shows buildbuddy running |
+| Bazel can't reach BuildBuddy | Check `.bazelrc` has the correct host IP, and `docker compose -f server.yml ps` shows buildbuddy running |
 | Dev container keeps restarting | `docker logs dev` — likely SSH key or sshd config issue |
 | Permission denied on data dirs | `sudo chown -R 1000:1000 gitea/ buildbuddy/` |

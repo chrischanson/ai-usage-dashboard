@@ -70,7 +70,7 @@ if [ "$KEY_COUNT" -eq 0 ]; then
     echo "  To add a key:"
     echo "    cp ~/.ssh/id_ed25519.pub $SSH_KEYS_DIR/macbook.pub"
     echo "    scp user@linux-vm:~/.ssh/id_ed25519.pub $SSH_KEYS_DIR/linux-vm.pub"
-    echo "  Then restart: docker compose restart dev"
+    echo "  Then restart: docker compose -f server.yml restart dev"
     echo ""
 else
     echo "  Found $KEY_COUNT public key(s):"
@@ -102,8 +102,8 @@ fi
 echo ""
 echo "=== [4/6] Build & start containers ==="
 cd "$SCRIPT_DIR"
-docker compose build dev
-docker compose up -d
+docker compose -f server.yml build dev
+docker compose -f server.yml up -d
 
 # ── [5/6] Wait for services to be healthy ────────────────────
 echo ""
@@ -142,7 +142,7 @@ wait_for_healthy "gitea" 60
 wait_for_healthy "dev" 60
 
 echo ""
-docker compose ps
+docker compose -f server.yml ps
 
 # ── [6/6] Configure Gitea + Git inside dev container ─────────
 echo ""
@@ -218,13 +218,13 @@ echo "  See that script for full instructions."
 echo ""
 echo "── Adding SSH keys later ───────────────────────────────"
 echo "  cp <new-key>.pub $SSH_KEYS_DIR/<client-name>.pub"
-echo "  docker compose restart dev"
+echo "  docker compose -f server.yml restart dev"
 echo ""
 echo "── Day-to-day commands ─────────────────────────────────"
-echo "  Stop all:      docker compose down"
-echo "  Start all:     docker compose up -d"
-echo "  Rebuild dev:   docker compose build dev && docker compose up -d dev"
-echo "  View logs:     docker compose logs -f <service>"
+echo "  Stop all:      docker compose -f server.yml down"
+echo "  Start all:     docker compose -f server.yml up -d"
+echo "  Rebuild dev:   docker compose -f server.yml build dev && docker compose -f server.yml up -d dev"
+echo "  View logs:     docker compose -f server.yml logs -f <service>"
 echo ""
 echo "── Backup ──────────────────────────────────────────────"
 echo "  Gitea + BB:    tar czf backup-data.tar.gz gitea/ buildbuddy/"
