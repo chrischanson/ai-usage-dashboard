@@ -190,3 +190,7 @@ if [[ ${#FAILED[@]} -gt 0 ]]; then
   exit 1
 fi
 echo "==============================="
+
+echo ""
+echo "==> Removing dangling images..."
+docker image prune -f
