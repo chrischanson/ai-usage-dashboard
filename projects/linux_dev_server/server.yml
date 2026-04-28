@@ -52,6 +52,8 @@ services:
       #   cp ~/.ssh/id_ed25519.pub ./ssh-keys/macbook.pub
       #   scp user@linux-vm:~/.ssh/id_ed25519.pub ./ssh-keys/linux-vm.pub
       - ./ssh-keys:/etc/ssh-keys:ro
+      # Persist SSH host keys to avoid fingerprint changes on rebuild
+      - ./ssh-host-keys:/etc/ssh-host-keys
     ports:
       - "2220:22"     # SSH — Antigravity/Windsurf connect here
     networks:

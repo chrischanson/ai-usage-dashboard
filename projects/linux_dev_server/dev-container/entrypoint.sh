@@ -8,8 +8,19 @@ AUTH_KEYS="/home/dev/.ssh/authorized_keys"
 KEYS_DIR="/etc/ssh-keys"
 
 # ── SSH host keys ──────────────────────────────────────────────
-# Generate host keys if they don't exist (first boot of a fresh container)
+HOST_KEYS_DIR="/etc/ssh-host-keys"
+
+# 1. Restore keys from persistent volume if they exist
+if ls "$HOST_KEYS_DIR"/ssh_host_*_key >/dev/null 2>&1; then
+    cp -a "$HOST_KEYS_DIR"/ssh_host_*_key* /etc/ssh/
+    chmod 600 /etc/ssh/ssh_host_*_key 2>/dev/null || true
+fi
+
+# 2. Generate host keys if they don't exist (first boot of a fresh container)
 ssh-keygen -A 2>/dev/null
+
+# 3. Save a copy of the keys back to the persistent volume
+cp -a /etc/ssh/ssh_host_*_key* "$HOST_KEYS_DIR/"
 
 # ── Client public keys ────────────────────────────────────────
 mkdir -p /home/dev/.ssh

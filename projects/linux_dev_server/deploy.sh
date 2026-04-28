@@ -116,7 +116,7 @@ if [[ -n "$RSYNC_OUT" ]]; then
 fi
 
 # Data directories — only create if missing (preserve existing data)
-for d in gitea buildbuddy ssh-keys; do
+for d in gitea buildbuddy ssh-keys ssh-host-keys; do
     mkdir -p "$TARGET_DIR/$d"
 done
 
