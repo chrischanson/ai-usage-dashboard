@@ -98,6 +98,7 @@ RUN cd /home/$USERNAME/workspace/main \
     && git config --global user.email "dev@localhost" \
     && git config --global init.defaultBranch main \
     && git config --global push.autoSetupRemote true \
+    && git config --global credential.helper 'store --file /home/dev/workspace/.git-credentials' \
     && git init
 
 # ── Entrypoint (must run as root for sshd) ─────────────────────

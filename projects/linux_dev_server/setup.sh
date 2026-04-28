@@ -190,7 +190,10 @@ docker exec dev bash -c "
     else
         git remote add origin http://gitea:3000/${GITEA_ADMIN_USER}/${GITEA_REPO}.git
     fi && \
-    echo 'Git remote set to: http://gitea:3000/${GITEA_ADMIN_USER}/${GITEA_REPO}.git'
+    echo "http://${GITEA_ADMIN_USER}:${GITEA_ADMIN_PASSWORD}@gitea:3000" > ~/workspace/.git-credentials && \
+    chmod 600 ~/workspace/.git-credentials && \
+    echo 'Git remote set to: http://gitea:3000/${GITEA_ADMIN_USER}/${GITEA_REPO}.git' && \
+    echo 'Git credentials stored in: ~/workspace/.git-credentials'
 "
 
 # ── Done ──────────────────────────────────────────────────────
