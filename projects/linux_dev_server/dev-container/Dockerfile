@@ -7,9 +7,12 @@ FROM ubuntu:24.04
 ARG USERNAME=dev
 ARG USER_UID=1000
 ARG USER_GID=1000
+ 
+# Avoid interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
 
 # ── Base packages ──────────────────────────────────────────────
-RUN apt-get update -q && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+RUN apt-get update -q && apt-get install -y --no-install-recommends \
     apt-utils \
     # SSH server (required for Antigravity/Windsurf Remote SSH)
     openssh-server \
@@ -38,7 +41,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Claude Code CLI ────────────────────────────────────────────
-RUN npm install -g npm@latest \
+# Note: npm upgrade can be flaky in Docker; using corepack or a forced install
+RUN npm install -g npm@latest --force \
     && npm install -g @anthropic-ai/claude-code
 
 # ── OpenCode (OpenRouter TUI agent) ────────────────────────────
