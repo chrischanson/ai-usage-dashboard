@@ -41,8 +41,10 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Claude Code CLI ────────────────────────────────────────────
-# Note: npm upgrade can be flaky in Docker; using corepack or a forced install
-RUN npm install -g npm@latest --force \
+# NodeSource .deb ships a broken npm (missing promise-retry); use corepack
+# to upgrade npm instead of the broken npm trying to upgrade itself.
+RUN corepack enable \
+    && corepack prepare npm@latest --activate \
     && npm install -g @anthropic-ai/claude-code
 
 # ── OpenCode (OpenRouter TUI agent) ────────────────────────────
