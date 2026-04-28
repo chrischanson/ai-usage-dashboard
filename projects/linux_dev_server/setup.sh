@@ -55,6 +55,12 @@ fi
 docker --version
 docker compose version
 
+# Ensure Docker buildx plugin is installed to avoid compose warnings
+if ! docker buildx version &>/dev/null; then
+    echo "Installing Docker Buildx plugin..."
+    sudo apt-get update -q && sudo apt-get install -y docker-buildx-plugin || true
+fi
+
 # ── [2/6] SSH keys ────────────────────────────────────────────
 echo ""
 echo "=== [2/6] SSH keys ==="

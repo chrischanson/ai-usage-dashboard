@@ -9,7 +9,8 @@ ARG USER_UID=1000
 ARG USER_GID=1000
 
 # ── Base packages ──────────────────────────────────────────────
-RUN apt-get update -q && apt-get install -y --no-install-recommends \
+RUN apt-get update -q && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    apt-utils \
     # SSH server (required for Antigravity/Windsurf Remote SSH)
     openssh-server \
     # Build tools
@@ -37,11 +38,13 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Claude Code CLI ────────────────────────────────────────────
-RUN npm install -g @anthropic-ai/claude-code
+RUN npm install -g npm@latest \
+    && npm install -g @anthropic-ai/claude-code
 
 # ── OpenCode (OpenRouter TUI agent) ────────────────────────────
 # Install globally so all users can access it
-RUN OPENCODE_INSTALL_DIR=/usr/local/bin curl -fsSL https://opencode.ai/install | bash || \
+RUN curl -fsSL https://opencode.ai/install | bash \
+    && mv /root/.opencode/bin/opencode /usr/local/bin/ || \
     echo "WARNING: OpenCode install failed — skipping (can install later)"
 
 # ── OpenAI Codex CLI ───────────────────────────────────────────
@@ -71,7 +74,7 @@ RUN mkdir -p /var/run/sshd \
 # ── Dev user ───────────────────────────────────────────────────
 # Ubuntu 24.04 includes a default 'ubuntu' user at UID 1000.
 # Remove it first so we can reuse UID/GID 1000 for our dev user.
-RUN userdel -r ubuntu || true
+RUN userdel -r ubuntu 2>/dev/null || true
 
 RUN groupadd --gid $USER_GID $USERNAME \
     && useradd --uid $USER_UID --gid $USER_GID -m -s /bin/bash $USERNAME \
@@ -87,11 +90,11 @@ COPY --chown=$USERNAME:$USERNAME bazelrc.template /home/$USERNAME/workspace/main
 COPY --chown=$USERNAME:$USERNAME tasks.json      /home/$USERNAME/workspace/main/.vscode/tasks.json
 
 RUN cd /home/$USERNAME/workspace/main \
-    && git init \
     && git config --global user.name "Dev User" \
     && git config --global user.email "dev@localhost" \
     && git config --global init.defaultBranch main \
-    && git config --global push.autoSetupRemote true
+    && git config --global push.autoSetupRemote true \
+    && git init
 
 # ── Entrypoint (must run as root for sshd) ─────────────────────
 USER root
