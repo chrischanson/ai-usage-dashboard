@@ -41,6 +41,7 @@ self_update() {
         echo "==> deploy.sh has been updated — restarting with new version..."
         cp "$repo_copy" "$self"
         chmod +x "$self"
+        export DEPLOY_SH_UPDATED=1
         exec "$self" "$@"
     fi
 }
@@ -88,13 +89,31 @@ self_update "$@"
 #     ssh-keys/               ← client public keys
 #     .repos/projects/         ← sparse clone (source of truth)
 
+# ── Setup tracking for updated files ──────────────────────────
+UPDATED_FILES=()
+if [[ "${DEPLOY_SH_UPDATED:-0}" == "1" ]]; then
+    UPDATED_FILES+=("deploy.sh")
+fi
+
+copy_if_changed() {
+    local src="$1"
+    local dest="$2"
+    if [[ ! -f "$dest" ]] || ! cmp -s "$src" "$dest"; then
+        cp "$src" "$dest"
+        UPDATED_FILES+=("${dest#$TARGET_DIR/}")
+    fi
+}
+
 echo "==> Syncing files to ${TARGET_DIR}..."
 
 # Compose file — always copy (this is what docker-update.sh scans)
-cp "$CLONE_DIR/$REPO_SUBDIR/server.yml" "$TARGET_DIR/server.yml"
+copy_if_changed "$CLONE_DIR/$REPO_SUBDIR/server.yml" "$TARGET_DIR/server.yml"
 
 # Build context — must be a subdirectory referenced by server.yml
-rsync -a --delete "$CLONE_DIR/$REPO_SUBDIR/dev-container/" "$TARGET_DIR/dev-container/"
+RSYNC_OUT=$(rsync -ai --delete "$CLONE_DIR/$REPO_SUBDIR/dev-container/" "$TARGET_DIR/dev-container/")
+if [[ -n "$RSYNC_OUT" ]]; then
+    UPDATED_FILES+=("dev-container/ (contents changed)")
+fi
 
 # Data directories — only create if missing (preserve existing data)
 for d in gitea buildbuddy ssh-keys; do
@@ -104,7 +123,7 @@ done
 # Scripts and docs — always copy
 for f in .env.example .gitignore; do
     if [[ -f "$CLONE_DIR/$REPO_SUBDIR/$f" ]]; then
-        cp "$CLONE_DIR/$REPO_SUBDIR/$f" "$TARGET_DIR/$f"
+        copy_if_changed "$CLONE_DIR/$REPO_SUBDIR/$f" "$TARGET_DIR/$f"
     fi
 done
 
@@ -112,6 +131,7 @@ done
 if [[ ! -f "$TARGET_DIR/.env" ]]; then
     if [[ -f "$CLONE_DIR/$REPO_SUBDIR/.env.example" ]]; then
         cp "$CLONE_DIR/$REPO_SUBDIR/.env.example" "$TARGET_DIR/.env"
+        UPDATED_FILES+=(".env (created from example)")
         echo ""
         echo "  ⚠ Created .env from .env.example — EDIT IT with your API keys:"
         echo "    nano ${TARGET_DIR}/.env"
@@ -124,7 +144,7 @@ fi
 
 # ── Copy docker-update.sh ──────────────────────
 if [[ -f "$CLONE_DIR/projects/docker-standalone-to-compose/docker-update.sh" ]]; then
-    cp "$CLONE_DIR/projects/docker-standalone-to-compose/docker-update.sh" "$TARGET_DIR/docker-update.sh"
+    copy_if_changed "$CLONE_DIR/projects/docker-standalone-to-compose/docker-update.sh" "$TARGET_DIR/docker-update.sh"
     chmod +x "$TARGET_DIR/docker-update.sh"
 else
     if [[ ! -f "$TARGET_DIR/docker-update.sh" ]]; then
@@ -134,7 +154,18 @@ else
 fi
 
 echo ""
-echo "==> Deploy complete. Files in ${TARGET_DIR}/:"
+echo "==> Deploy complete."
+if [[ ${#UPDATED_FILES[@]} -gt 0 ]]; then
+    echo "  Updated files in this run:"
+    for f in "${UPDATED_FILES[@]}"; do
+        echo "    - $f"
+    done
+else
+    echo "  No files were updated in this run."
+fi
+
+echo ""
+echo "  Files in ${TARGET_DIR}/:"
 ls -1 "$TARGET_DIR"/*.yml "$TARGET_DIR"/*.sh 2>/dev/null || true
 echo ""
 echo "  To rebuild dev container:      ./docker-update.sh --build dev"
