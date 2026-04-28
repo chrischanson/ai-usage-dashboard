@@ -86,9 +86,6 @@ self_update "$@"
 #     gitea/                  ← persistent data
 #     buildbuddy/             ← persistent data
 #     ssh-keys/               ← client public keys
-#     setup.sh
-#     setup_linux_client.sh
-#     SETUP_GUIDE.md
 #     .repos/projects/         ← sparse clone (source of truth)
 
 echo "==> Syncing files to ${TARGET_DIR}..."
@@ -105,7 +102,7 @@ for d in gitea buildbuddy ssh-keys; do
 done
 
 # Scripts and docs — always copy
-for f in setup.sh setup_linux_client.sh SETUP_GUIDE.md .env.example .gitignore; do
+for f in .env.example .gitignore; do
     if [[ -f "$CLONE_DIR/$REPO_SUBDIR/$f" ]]; then
         cp "$CLONE_DIR/$REPO_SUBDIR/$f" "$TARGET_DIR/$f"
     fi
@@ -123,8 +120,7 @@ else
     echo "  .env already exists — not overwritten (secrets preserved)"
 fi
 
-# Make scripts executable
-chmod +x "$TARGET_DIR/setup.sh" "$TARGET_DIR/setup_linux_client.sh" 2>/dev/null || true
+
 
 # ── Copy docker-update.sh ──────────────────────
 if [[ -f "$CLONE_DIR/projects/docker-standalone-to-compose/docker-update.sh" ]]; then
@@ -141,6 +137,5 @@ echo ""
 echo "==> Deploy complete. Files in ${TARGET_DIR}/:"
 ls -1 "$TARGET_DIR"/*.yml "$TARGET_DIR"/*.sh 2>/dev/null || true
 echo ""
-echo "  To set up for the first time:  ./setup.sh"
 echo "  To rebuild dev container:      ./docker-update.sh --build dev"
 echo "  To update all services:        ./docker-update.sh"
