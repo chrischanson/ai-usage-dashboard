@@ -37,10 +37,10 @@ services:
       # OpenCode Zen — optional
       - OPENCODE_API_KEY=${OPENCODE_ZEN_API_KEY:-}
       - OPENCODE_ZEN_API_KEY=${OPENCODE_ZEN_API_KEY:-}
-      # Codex CLI — uses OPENAI_API_KEY by default.
-      # If CODEX_API_KEY is set in .env, it takes priority over OPENAI_API_KEY.
-      # OPENAI_BASE_URL defaults to OpenRouter; override in .env to use real OpenAI.
-      - CODEX_API_KEY=${CODEX_API_KEY:-}
+      # Codex CLI — OPENAI_API_KEY from .env takes priority over the
+      # OpenRouter key. OPENAI_BASE_URL defaults to OpenRouter; override
+      # CODEX_OPENAI_BASE_URL in .env to use real OpenAI.
+      - CODEX_API_KEY=${OPENAI_API_KEY:-}
       - OPENAI_BASE_URL=${CODEX_OPENAI_BASE_URL:-https://openrouter.ai/api/v1}
     volumes:
       # Workspace persists across container rebuilds
