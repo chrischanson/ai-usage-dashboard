@@ -43,8 +43,8 @@ services:
       - CODEX_API_KEY=${OPENAI_API_KEY:-}
       - OPENAI_BASE_URL=${CODEX_OPENAI_BASE_URL:-https://openrouter.ai/api/v1}
     volumes:
-      # Workspace persists across container rebuilds
-      - dev-workspace:/home/dev/workspace
+      # Home directory persists across container rebuilds
+      - dev-home:/home/dev
       # Mount public keys — one file per client.
       # Add each client's public key as a separate file in ./ssh-keys/
       #
@@ -126,5 +126,5 @@ networks:
 
 volumes:
   # Named volume keeps workspace data when the dev container is rebuilt.
-  # Backup: docker run --rm -v dev-workspace:/data -v $(pwd):/backup busybox tar czf /backup/workspace-backup.tar.gz -C /data .
-  dev-workspace:
+  # Backup: docker run --rm -v dev-home:/data -v $(pwd):/backup busybox tar czf /backup/workspace-backup.tar.gz -C /data .
+  dev-home:

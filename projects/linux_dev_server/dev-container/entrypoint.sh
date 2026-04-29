@@ -66,13 +66,18 @@ fi
 EOF
 
 # Also write to ~/.bashrc so non-login interactive shells (VS Code terminal,
-# docker exec bash) have access. Use a marker so we can append on restart.
+# docker exec bash) have access. Use markers so we can replace on restart.
 BASHRC="/home/dev/.bashrc"
-MARKER="# >>> ai-keys >>>"
-if ! grep -q "$MARKER" "$BASHRC" 2>/dev/null; then
-    cat <<EOF >> "$BASHRC"
+START_MARKER="# >>> ai-keys >>>"
+END_MARKER="# <<< ai-keys <<<"
 
-$MARKER
+# Remove the existing block if it exists
+if [ -f "$BASHRC" ]; then
+    sed -i "/^$START_MARKER/,/^$END_MARKER/d" "$BASHRC"
+fi
+
+cat <<EOF >> "$BASHRC"
+$START_MARKER
 export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
 export ANTHROPIC_BASE_URL="${ANTHROPIC_BASE_URL}"
 export ANTHROPIC_AUTH_TOKEN="${ANTHROPIC_AUTH_TOKEN}"
@@ -88,13 +93,12 @@ export CODEX_API_KEY="${CODEX_API_KEY}"
 export OPENAI_BASE_URL="${OPENAI_BASE_URL}"
 # When Codex is pointed at real OpenAI, make OPENAI_API_KEY match
 # CODEX_API_KEY so Codex picks up the right key.
-if [ -n "${CODEX_API_KEY}" ] && [ "${OPENAI_BASE_URL}" != "https://openrouter.ai/api/v1" ]; then
-  export OPENAI_API_KEY="${CODEX_API_KEY}"
+if [ -n "\${CODEX_API_KEY}" ] && [ "\${OPENAI_BASE_URL}" != "https://openrouter.ai/api/v1" ]; then
+  export OPENAI_API_KEY="\${CODEX_API_KEY}"
 fi
-# <<< ai-keys <<<
+$END_MARKER
 EOF
-    chown dev:dev "$BASHRC"
-fi
+chown dev:dev "$BASHRC"
 
 # ── Startup banner ────────────────────────────────────────────
 echo ""

@@ -423,7 +423,7 @@ tar czf backup-data.tar.gz gitea/ buildbuddy/
 
 # Dev workspace (named Docker volume)
 docker run --rm \
-    -v dev-workspace:/data \
+    -v dev-home:/data \
     -v $(pwd):/backup \
     busybox tar czf /backup/workspace-backup.tar.gz -C /data .
 
