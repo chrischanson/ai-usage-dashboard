@@ -1,0 +1,630 @@
+#!/usr/bin/env bash
+#
+# rip-compressor-codex.sh
+#
+# Compress DVD/Blu-ray rips while preserving the rip structure:
+#   - Video: AV1 via SVT-AV1.
+#   - Audio: mono/stereo/unknown -> FLAC, surround -> Opus.
+#   - Subtitles, attachments, data streams, chapters, and metadata are copied.
+#   - No crop, resize, deinterlace, scale, or other video filters are applied.
+#
+# The script defaults to dry-run mode. Add --wet-run to encode for real.
+# If --wet-run is used and the system ffmpeg is missing the required encoders,
+# a static BtbN ffmpeg build is downloaded automatically.
+
+set -Eeuo pipefail
+
+SCRIPT_NAME="$(basename "$0")"
+
+CRF=24
+PRESET=6
+TRY_MODE=false
+TRY_DURATION=300
+TRY_START=0
+WET_RUN=false
+OVERWRITE=false
+AUTO_BOOTSTRAP=true
+FORCE_BOOTSTRAP=false
+INPUT=""
+OUTPUT=""
+OUT_DIR=""
+
+FFMPEG_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/rip-compressor-codex/ffmpeg"
+FFMPEG=""
+FFPROBE=""
+
+VIDEO_EXTS=(
+  mkv mp4 m4v avi mov m2ts mts ts vob mpg mpeg wmv flv webm iso
+)
+
+usage() {
+  cat <<EOF
+Usage:
+  $SCRIPT_NAME [OPTIONS] <file-or-directory>
+
+Options:
+  --wet-run              Execute the encode. Default is dry-run.
+  --try                  Encode a short preview sample.
+  --try-duration <sec>   Preview duration. Default: 300.
+  --try-start <sec>      Preview start offset. Default: 0.
+  --crf <0-63>           SVT-AV1 CRF quality. Default: 24.
+  --preset <0-13>        SVT-AV1 speed preset. Default: 6.
+  --output <path>        Single-file output path.
+  --out-dir <path>       Output directory. Directory inputs preserve structure.
+  --overwrite            Replace existing output files.
+  --bootstrap            Download/install the static ffmpeg now. With an input,
+                         install first and then continue.
+  --no-auto-bootstrap    Do not auto-download ffmpeg during --wet-run.
+  --ffmpeg-dir <path>    Install/use static ffmpeg from this directory.
+  --help, -h             Show this help.
+
+Behavior:
+  Video is encoded to AV1, audio is encoded per stream by channel count,
+  subtitles/attachments/data streams are copied, and MKV output is used.
+EOF
+}
+
+die() {
+  printf 'ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+warn() {
+  printf 'WARN: %s\n' "$*" >&2
+}
+
+log() {
+  printf '[INFO] %s\n' "$*"
+}
+
+need_value() {
+  local opt="$1"
+  local count="$2"
+  (( count >= 2 )) || die "$opt requires a value"
+}
+
+is_uint() {
+  [[ "$1" =~ ^[0-9]+$ ]]
+}
+
+validate_numeric_options() {
+  is_uint "$CRF" || die "--crf must be an integer"
+  is_uint "$PRESET" || die "--preset must be an integer"
+  is_uint "$TRY_DURATION" || die "--try-duration must be an integer"
+  is_uint "$TRY_START" || die "--try-start must be an integer"
+
+  (( CRF >= 0 && CRF <= 63 )) || die "--crf must be in range 0-63"
+  (( PRESET >= 0 && PRESET <= 13 )) || die "--preset must be in range 0-13"
+  (( TRY_DURATION > 0 )) || die "--try-duration must be greater than 0"
+}
+
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --wet-run)
+        WET_RUN=true
+        shift
+        ;;
+      --try)
+        TRY_MODE=true
+        shift
+        ;;
+      --try-duration)
+        need_value "$1" "$#"
+        TRY_DURATION="$2"
+        shift 2
+        ;;
+      --try-start)
+        need_value "$1" "$#"
+        TRY_START="$2"
+        shift 2
+        ;;
+      --crf)
+        need_value "$1" "$#"
+        CRF="$2"
+        shift 2
+        ;;
+      --preset)
+        need_value "$1" "$#"
+        PRESET="$2"
+        shift 2
+        ;;
+      --output)
+        need_value "$1" "$#"
+        OUTPUT="$2"
+        shift 2
+        ;;
+      --out-dir|--output-root)
+        need_value "$1" "$#"
+        OUT_DIR="$2"
+        shift 2
+        ;;
+      --overwrite)
+        OVERWRITE=true
+        shift
+        ;;
+      --bootstrap)
+        FORCE_BOOTSTRAP=true
+        shift
+        ;;
+      --no-auto-bootstrap)
+        AUTO_BOOTSTRAP=false
+        shift
+        ;;
+      --ffmpeg-dir)
+        need_value "$1" "$#"
+        FFMPEG_DIR="$2"
+        shift 2
+        ;;
+      --help|-h)
+        usage
+        exit 0
+        ;;
+      -*)
+        die "Unknown option: $1"
+        ;;
+      *)
+        if [[ -n "$INPUT" ]]; then
+          die "Only one input path is supported"
+        fi
+        INPUT="$1"
+        shift
+        ;;
+    esac
+  done
+}
+
+command_exists() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+abs_path() {
+  local path="$1"
+  if command_exists realpath; then
+    realpath -m -- "$path"
+    return
+  fi
+
+  local dir base
+  dir="$(dirname -- "$path")"
+  base="$(basename -- "$path")"
+  if [[ -d "$dir" ]]; then
+    printf '%s/%s\n' "$(cd "$dir" && pwd -P)" "$base"
+  elif [[ "$path" == /* ]]; then
+    printf '%s\n' "$path"
+  else
+    printf '%s/%s\n' "$(pwd -P)" "$path"
+  fi
+}
+
+encoder_exists_in_list() {
+  local encoders="$1"
+  local name="$2"
+  awk -v name="$name" '$2 == name { found=1 } END { exit found ? 0 : 1 }' <<< "$encoders"
+}
+
+missing_toolchain_items() {
+  local ff="$1"
+  local fp="$2"
+  local encoders=""
+
+  if [[ ! -x "$ff" ]]; then
+    printf '%s\n' "ffmpeg binary"
+  else
+    encoders="$("$ff" -hide_banner -encoders 2>/dev/null || true)"
+    encoder_exists_in_list "$encoders" "libsvtav1" || printf '%s\n' "libsvtav1 encoder"
+    encoder_exists_in_list "$encoders" "flac" || printf '%s\n' "flac encoder"
+    encoder_exists_in_list "$encoders" "libopus" || printf '%s\n' "libopus encoder"
+  fi
+
+  if [[ ! -x "$fp" ]]; then
+    printf '%s\n' "ffprobe binary"
+  fi
+}
+
+toolchain_ok() {
+  [[ -z "$(missing_toolchain_items "$1" "$2")" ]]
+}
+
+print_missing_toolchain() {
+  local missing="$1"
+  while IFS= read -r item; do
+    [[ -n "$item" ]] && printf '  - %s\n' "$item" >&2
+  done <<< "$missing"
+}
+
+download_file() {
+  local url="$1"
+  local dest="$2"
+
+  if command_exists curl; then
+    curl -fL --progress-bar -o "$dest" "$url"
+  elif command_exists wget; then
+    wget -O "$dest" "$url"
+  else
+    die "curl or wget is required to download ffmpeg"
+  fi
+}
+
+bootstrap_ffmpeg() {
+  local arch platform url tmpdir tarball ffmpeg_src ffprobe_src
+  arch="$(uname -m)"
+
+  case "$arch" in
+    x86_64|amd64)
+      platform="linux64"
+      ;;
+    aarch64|arm64)
+      platform="linuxarm64"
+      ;;
+    *)
+      die "Unsupported architecture for static ffmpeg: $arch"
+      ;;
+  esac
+
+  command_exists tar || die "tar is required to install static ffmpeg"
+  command_exists find || die "find is required to install static ffmpeg"
+  command_exists install || die "install is required to install static ffmpeg"
+
+  url="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-${platform}-gpl.tar.xz"
+  tmpdir="$(mktemp -d)"
+  tarball="${tmpdir}/ffmpeg.tar.xz"
+  trap 'rm -rf "$tmpdir"' RETURN
+
+  log "Downloading static ffmpeg:"
+  log "  $url"
+  download_file "$url" "$tarball"
+
+  log "Extracting static ffmpeg"
+  tar -xf "$tarball" -C "$tmpdir"
+
+  ffmpeg_src="$(find "$tmpdir" -type f -path '*/bin/ffmpeg' | head -n 1 || true)"
+  ffprobe_src="$(find "$tmpdir" -type f -path '*/bin/ffprobe' | head -n 1 || true)"
+
+  [[ -n "$ffmpeg_src" ]] || die "Downloaded archive did not contain ffmpeg"
+  [[ -n "$ffprobe_src" ]] || die "Downloaded archive did not contain ffprobe"
+
+  mkdir -p "$FFMPEG_DIR"
+  install -m 0755 "$ffmpeg_src" "${FFMPEG_DIR}/ffmpeg"
+  install -m 0755 "$ffprobe_src" "${FFMPEG_DIR}/ffprobe"
+
+  FFMPEG="${FFMPEG_DIR}/ffmpeg"
+  FFPROBE="${FFMPEG_DIR}/ffprobe"
+
+  local missing
+  missing="$(missing_toolchain_items "$FFMPEG" "$FFPROBE")"
+  if [[ -n "$missing" ]]; then
+    printf 'ERROR: Downloaded ffmpeg is missing required support:\n' >&2
+    print_missing_toolchain "$missing"
+    exit 1
+  fi
+
+  log "Installed ffmpeg to ${FFMPEG_DIR}"
+  trap - RETURN
+  rm -rf "$tmpdir"
+}
+
+resolve_ffmpeg() {
+  local allow_download="$1"
+  local cached_ff="${FFMPEG_DIR}/ffmpeg"
+  local cached_fp="${FFMPEG_DIR}/ffprobe"
+  local missing=""
+
+  if toolchain_ok "$cached_ff" "$cached_fp"; then
+    FFMPEG="$cached_ff"
+    FFPROBE="$cached_fp"
+    log "Using static ffmpeg: $FFMPEG"
+    return
+  fi
+
+  if command_exists ffmpeg && command_exists ffprobe; then
+    local system_ff system_fp
+    system_ff="$(command -v ffmpeg)"
+    system_fp="$(command -v ffprobe)"
+    if toolchain_ok "$system_ff" "$system_fp"; then
+      FFMPEG="$system_ff"
+      FFPROBE="$system_fp"
+      log "Using system ffmpeg: $FFMPEG"
+      return
+    fi
+
+    missing="$(missing_toolchain_items "$system_ff" "$system_fp")"
+    warn "System ffmpeg is not suitable:"
+    print_missing_toolchain "$missing"
+  else
+    warn "System ffmpeg/ffprobe not found"
+  fi
+
+  if [[ "$AUTO_BOOTSTRAP" == "true" && "$allow_download" == "true" ]]; then
+    bootstrap_ffmpeg
+    return
+  fi
+
+  printf 'ERROR: No suitable ffmpeg toolchain found.\n' >&2
+  printf 'Install one with:\n' >&2
+  printf '  %s --bootstrap\n' "$SCRIPT_NAME" >&2
+  if [[ "$WET_RUN" != "true" ]]; then
+    printf 'Dry-run will not auto-download ffmpeg; --wet-run can auto-bootstrap when enabled.\n' >&2
+  fi
+  exit 1
+}
+
+is_video_path() {
+  local lower="${1,,}"
+  local ext
+  for ext in "${VIDEO_EXTS[@]}"; do
+    [[ "$lower" == *".${ext}" ]] && return 0
+  done
+  return 1
+}
+
+collect_directory_inputs() {
+  local root="$1"
+  local exclude_root="$2"
+  local -n out_ref="$3"
+  local file file_abs
+
+  while IFS= read -r -d '' file; do
+    file_abs="$(abs_path "$file")"
+    if [[ -n "$exclude_root" ]]; then
+      [[ "$file_abs" == "$exclude_root" || "$file_abs" == "${exclude_root}/"* ]] && continue
+    fi
+    out_ref+=("$file_abs")
+  done < <(
+    find "$root" -type f \( \
+      -iname '*.mkv' -o -iname '*.mp4' -o -iname '*.m4v' -o \
+      -iname '*.avi' -o -iname '*.mov' -o -iname '*.m2ts' -o \
+      -iname '*.mts' -o -iname '*.ts' -o -iname '*.vob' -o \
+      -iname '*.mpg' -o -iname '*.mpeg' -o -iname '*.wmv' -o \
+      -iname '*.flv' -o -iname '*.webm' -o -iname '*.iso' \
+    \) ! -iname '*-compressed.mkv' ! -iname '*-compressed-try.mkv' -print0 | sort -z
+  )
+}
+
+probe_video_field() {
+  local input="$1"
+  local field="$2"
+  "$FFPROBE" -v error -select_streams v:0 \
+    -show_entries "stream=${field}" \
+    -of default=noprint_wrappers=1:nokey=1 \
+    "$input" 2>/dev/null | head -n 1 || true
+}
+
+add_color_args() {
+  local input="$1"
+  local -n cmd_ref="$2"
+  local prim trc space
+
+  prim="$(probe_video_field "$input" color_primaries)"
+  trc="$(probe_video_field "$input" color_transfer)"
+  space="$(probe_video_field "$input" color_space)"
+
+  [[ -n "$prim" && "$prim" != "unknown" && "$prim" != "N/A" ]] && cmd_ref+=(-color_primaries "$prim")
+  [[ -n "$trc" && "$trc" != "unknown" && "$trc" != "N/A" ]] && cmd_ref+=(-color_trc "$trc")
+  [[ -n "$space" && "$space" != "unknown" && "$space" != "N/A" ]] && cmd_ref+=(-colorspace "$space")
+}
+
+opus_bitrate_for_channels() {
+  local channels="$1"
+  if (( channels <= 4 )); then
+    printf '256k\n'
+  elif (( channels <= 6 )); then
+    printf '384k\n'
+  else
+    printf '512k\n'
+  fi
+}
+
+add_audio_args() {
+  local input="$1"
+  local -n cmd_ref="$2"
+  local channels idx bitrate
+  idx=0
+
+  while IFS= read -r channels; do
+    [[ -n "$channels" ]] || continue
+
+    if [[ "$channels" =~ ^[0-9]+$ && "$channels" -gt 2 ]]; then
+      bitrate="$(opus_bitrate_for_channels "$channels")"
+      cmd_ref+=(-c:a:"$idx" libopus -b:a:"$idx" "$bitrate" -vbr:a:"$idx" on)
+    else
+      cmd_ref+=(-c:a:"$idx" flac -compression_level:a:"$idx" 8)
+    fi
+
+    ((idx += 1))
+  done < <(
+    "$FFPROBE" -v error -select_streams a \
+      -show_entries stream=channels \
+      -of csv=p=0 "$input" 2>/dev/null || true
+  )
+}
+
+build_command() {
+  local input="$1"
+  local output="$2"
+  local cmd_name="$3"
+  local -n cmd_ref="$cmd_name"
+
+  cmd_ref=("$FFMPEG" -hide_banner)
+  if [[ "$OVERWRITE" == "true" ]]; then
+    cmd_ref+=(-y)
+  else
+    cmd_ref+=(-n)
+  fi
+
+  if [[ "$TRY_MODE" == "true" ]]; then
+    (( TRY_START > 0 )) && cmd_ref+=(-ss "$TRY_START")
+    cmd_ref+=(-t "$TRY_DURATION")
+  fi
+
+  cmd_ref+=(
+    -i "$input"
+    -map 0
+    -map_metadata 0
+    -map_chapters 0
+    -c:v libsvtav1
+    -crf "$CRF"
+    -preset "$PRESET"
+    -svtav1-params "tune=0:film-grain=0"
+    -c:s copy
+    -c:t copy
+    -c:d copy
+    -max_muxing_queue_size 4096
+  )
+
+  add_color_args "$input" "$cmd_name"
+  add_audio_args "$input" "$cmd_name"
+
+  cmd_ref+=("$output")
+}
+
+print_cmd() {
+  local arg
+  for arg in "$@"; do
+    printf '%q ' "$arg"
+  done
+  printf '\n'
+}
+
+output_for_file() {
+  local input="$1"
+  local input_root="$2"
+  local output_root="$3"
+  local suffix="-compressed"
+  local stem rel out_dir
+
+  [[ "$TRY_MODE" == "true" ]] && suffix="-compressed-try"
+
+  if [[ -n "$OUTPUT" ]]; then
+    printf '%s\n' "$(abs_path "$OUTPUT")"
+    return
+  fi
+
+  stem="$(basename "${input%.*}")"
+
+  if [[ -z "$output_root" ]]; then
+    printf '%s/%s%s.mkv\n' "$(dirname -- "$input")" "$stem" "$suffix"
+    return
+  fi
+
+  if [[ -n "$input_root" ]]; then
+    rel="${input#"${input_root}/"}"
+    out_dir="${output_root}/$(dirname -- "$rel")"
+    [[ "$(dirname -- "$rel")" == "." ]] && out_dir="$output_root"
+  else
+    out_dir="$output_root"
+  fi
+
+  printf '%s/%s%s.mkv\n' "$out_dir" "$stem" "$suffix"
+}
+
+process_one() {
+  local input="$1"
+  local output="$2"
+  local -a cmd
+  local input_real output_real
+
+  input_real="$(abs_path "$input")"
+  output_real="$(abs_path "$output")"
+
+  if [[ "$input_real" == "$output_real" ]]; then
+    warn "Skipping because output would overwrite input: $input"
+    return 0
+  fi
+
+  if [[ -e "$output" && "$OVERWRITE" != "true" ]]; then
+    warn "Skipping existing output: $output"
+    return 0
+  fi
+
+  build_command "$input" "$output" cmd
+
+  printf '\n'
+  log "Input:  $input"
+  log "Output: $output"
+  if [[ "$TRY_MODE" == "true" ]]; then
+    log "Mode:   TRY (${TRY_DURATION}s from ${TRY_START}s)"
+  else
+    log "Mode:   FULL"
+  fi
+
+  if [[ "$WET_RUN" != "true" ]]; then
+    printf 'DRY-RUN:\n'
+    print_cmd "${cmd[@]}"
+    return 0
+  fi
+
+  mkdir -p "$(dirname -- "$output")"
+  printf 'WET-RUN:\n'
+  print_cmd "${cmd[@]}"
+  "${cmd[@]}"
+}
+
+main() {
+  parse_args "$@"
+  validate_numeric_options
+
+  [[ -n "$OUTPUT" && -n "$OUT_DIR" ]] && die "--output and --out-dir cannot be used together"
+
+  if [[ "$FORCE_BOOTSTRAP" == "true" ]]; then
+    bootstrap_ffmpeg
+    if [[ -z "$INPUT" ]]; then
+      exit 0
+    fi
+  fi
+
+  [[ -n "$INPUT" ]] || die "No input specified. Use --help for usage."
+  [[ -e "$INPUT" ]] || die "Input path not found: $INPUT"
+
+  if [[ -d "$INPUT" && -n "$OUTPUT" ]]; then
+    die "--output is only valid for a single input file; use --out-dir for directories"
+  fi
+
+  resolve_ffmpeg "$WET_RUN"
+
+  local input_abs output_root="" exclude_root="" root_for_rel=""
+  local -a inputs=()
+
+  input_abs="$(abs_path "$INPUT")"
+
+  if [[ -f "$input_abs" ]]; then
+    if ! is_video_path "$input_abs"; then
+      warn "Input extension is not in the usual video list; ffmpeg will decide whether it is valid"
+    fi
+    inputs+=("$input_abs")
+    if [[ -n "$OUT_DIR" ]]; then
+      [[ "$WET_RUN" == "true" ]] && mkdir -p "$OUT_DIR"
+      output_root="$(abs_path "$OUT_DIR")"
+    fi
+  elif [[ -d "$input_abs" ]]; then
+    if [[ -n "$OUT_DIR" ]]; then
+      [[ "$WET_RUN" == "true" ]] && mkdir -p "$OUT_DIR"
+      output_root="$(abs_path "$OUT_DIR")"
+    else
+      output_root="${input_abs}/compressed"
+    fi
+    exclude_root="$(abs_path "$output_root")"
+    root_for_rel="$input_abs"
+    collect_directory_inputs "$input_abs" "$exclude_root" inputs
+  else
+    die "Input is neither a regular file nor a directory: $INPUT"
+  fi
+
+  (( ${#inputs[@]} > 0 )) || die "No video files found"
+
+  log "ffmpeg:  $FFMPEG"
+  log "ffprobe: $FFPROBE"
+  log "Files:   ${#inputs[@]}"
+  [[ "$WET_RUN" != "true" ]] && log "Dry-run enabled. Add --wet-run to encode."
+
+  local item output
+  for item in "${inputs[@]}"; do
+    output="$(output_for_file "$item" "$root_for_rel" "$output_root")"
+    process_one "$item" "$output"
+  done
+
+  printf '\n'
+  log "Done"
+}
+
+main "$@"
