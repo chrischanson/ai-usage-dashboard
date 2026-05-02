@@ -1,0 +1,20 @@
+app:
+  build_buddy_url: "http://HOST_IP_PLACEHOLDER:8080"
+  events_api_url: "grpc://HOST_IP_PLACEHOLDER:1985"
+  cache_api_url: "grpc://HOST_IP_PLACEHOLDER:1985"
+
+database:
+  data_source: "sqlite3:///data/buildbuddy.db"
+
+storage:
+  ttl_seconds: 2592000
+  chunk_file_size_bytes: 3000000
+  disk:
+    root_directory: /data/storage
+
+cache:
+  cas_ttl: 14d
+  action_cache_ttl: 14d
+  max_size_bytes: 10000000000
+  disk:
+    root_directory: /data/cache
