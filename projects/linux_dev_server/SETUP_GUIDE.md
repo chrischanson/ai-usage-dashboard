@@ -181,6 +181,22 @@ build --bes_backend=grpc://192.168.1.100:1985
 build --remote_cache=grpc://192.168.1.100:1985
 ```
 
+BuildBuddy also uses `buildbuddy.config.yaml` for its UI, invocation metadata,
+blob storage, and remote cache. `setup.sh` substitutes the same host IP there:
+
+```
+app:
+  build_buddy_url: "http://192.168.1.100:8080"
+database:
+  data_source: "sqlite3:///data/buildbuddy.db"
+storage:
+  disk:
+    root_directory: /data/storage
+cache:
+  disk:
+    root_directory: /data/cache
+```
+
 ---
 
 ## Step 7: Start BuildBuddy

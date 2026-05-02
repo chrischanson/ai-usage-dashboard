@@ -12,7 +12,11 @@
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
-            "preLaunchTask": "Bazel Build"
+            "miDebuggerPath": "/usr/bin/gdb",
+            "sourceFileMap": {
+                "/proc/self/cwd": "${workspaceFolder}"
+            },
+            "preLaunchTask": "Bazel Build Debug hello_test"
         },
         {
             "name": "Debug hello_world",
@@ -25,7 +29,11 @@
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
-            "preLaunchTask": "Bazel Build"
+            "miDebuggerPath": "/usr/bin/gdb",
+            "sourceFileMap": {
+                "/proc/self/cwd": "${workspaceFolder}"
+            },
+            "preLaunchTask": "Bazel Build Debug hello_world"
         }
     ]
 }

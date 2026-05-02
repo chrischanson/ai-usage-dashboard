@@ -9,6 +9,20 @@
       "problemMatcher": []
     },
     {
+      "label": "Bazel Build Debug hello_test",
+      "type": "shell",
+      "command": "bazel build -c dbg --strip=never //projects/hello_world:hello_test",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Bazel Build Debug hello_world",
+      "type": "shell",
+      "command": "bazel build -c dbg --strip=never //projects/hello_world:hello_world",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
       "label": "Bazel Run",
       "type": "shell",
       "command": "bazel run //${input:target}",

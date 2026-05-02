@@ -109,6 +109,7 @@ services:
     image: gcr.io/flame-public/buildbuddy-app-onprem:latest
     container_name: buildbuddy
     volumes:
+      - ./buildbuddy.config.yaml:/config.yaml:ro
       - ./buildbuddy/data:/data
     ports:
       - "8080:8080"   # web UI — browse test results here

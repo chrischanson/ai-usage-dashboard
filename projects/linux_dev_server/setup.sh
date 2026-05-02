@@ -91,18 +91,19 @@ echo "=== [3/6] Prepare configuration ==="
 mkdir -p "$SCRIPT_DIR/gitea/data"
 mkdir -p "$SCRIPT_DIR/buildbuddy/data"
 
-# Substitute host IP into .bazelrc template (only if placeholder still present)
-BAZELRC="$SCRIPT_DIR/dev-container/bazelrc.template"
-if grep -q "HOST_IP_PLACEHOLDER" "$BAZELRC" 2>/dev/null; then
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        sed -i '' "s|HOST_IP_PLACEHOLDER|${HOST_IP}|g" "$BAZELRC"
+# Substitute host IP into config templates (only if placeholder still present)
+for CONFIG_FILE in "$SCRIPT_DIR/dev-container/bazelrc.template" "$SCRIPT_DIR/buildbuddy.config.yaml"; do
+    if grep -q "HOST_IP_PLACEHOLDER" "$CONFIG_FILE" 2>/dev/null; then
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' "s|HOST_IP_PLACEHOLDER|${HOST_IP}|g" "$CONFIG_FILE"
+        else
+            sed -i "s|HOST_IP_PLACEHOLDER|${HOST_IP}|g" "$CONFIG_FILE"
+        fi
+        echo "  Substituted HOST_IP=$HOST_IP into ${CONFIG_FILE#$SCRIPT_DIR/}"
     else
-        sed -i "s|HOST_IP_PLACEHOLDER|${HOST_IP}|g" "$BAZELRC"
+        echo "  ${CONFIG_FILE#$SCRIPT_DIR/} already configured (no placeholder found)"
     fi
-    echo "  Substituted HOST_IP=$HOST_IP into .bazelrc"
-else
-    echo "  .bazelrc already configured (no placeholder found)"
-fi
+done
 
 # ── [4/6] Build and start containers ─────────────────────────
 echo ""

@@ -108,6 +108,7 @@ echo "==> Syncing files to ${TARGET_DIR}..."
 
 # Compose file — always copy (this is what docker-update.sh scans)
 copy_if_changed "$CLONE_DIR/$REPO_SUBDIR/server.yml" "$TARGET_DIR/server.yml"
+copy_if_changed "$CLONE_DIR/$REPO_SUBDIR/buildbuddy.config.yaml" "$TARGET_DIR/buildbuddy.config.yaml"
 
 # Build context — must be a subdirectory referenced by server.yml
 RSYNC_OUT=$(rsync -ai --delete "$CLONE_DIR/$REPO_SUBDIR/dev-container/" "$TARGET_DIR/dev-container/")
