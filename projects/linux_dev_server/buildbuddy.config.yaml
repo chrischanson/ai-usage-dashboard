@@ -2,6 +2,14 @@ app:
   build_buddy_url: "http://HOST_IP_PLACEHOLDER:8080"
   events_api_url: "grpc://HOST_IP_PLACEHOLDER:1985"
   cache_api_url: "grpc://HOST_IP_PLACEHOLDER:1985"
+  # Fix: Explicitly define ports and enable default org behavior
+  grpc_port: 1985
+  grpc_web_port: 8081
+  add_user_to_org: true
+
+auth:
+  # Fix: Enable anonymous usage to show the history dashboard for unauthenticated builds
+  enable_anonymous_usage: true
 
 database:
   data_source: "sqlite3:///data/buildbuddy.db"
