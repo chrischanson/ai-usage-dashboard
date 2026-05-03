@@ -9,7 +9,7 @@
 #   - DVD navigation/data packets are omitted because MKV cannot mux them.
 #   - No crop, resize, deinterlace, scale, or other video filters are applied.
 #
-# The script defaults to dry-run mode. Add --wet-run to encode for real.
+# Full encodes default to dry-run mode. Try-mode defaults to wet-run.
 # If --wet-run is used and the system ffmpeg is missing the required encoders,
 # a static BtbN ffmpeg build is downloaded automatically.
 
@@ -23,6 +23,7 @@ TRY_MODE=false
 TRY_DURATION=300
 TRY_START=0
 WET_RUN=false
+RUN_MODE_EXPLICIT=false
 OVERWRITE=false
 AUTO_BOOTSTRAP=true
 FORCE_BOOTSTRAP=false
@@ -45,8 +46,9 @@ Usage:
   $SCRIPT_NAME [OPTIONS] <file-or-directory>
 
 Options:
-  --wet-run              Execute the encode. Default is dry-run.
-  --try                  Encode a short preview sample.
+  --wet-run              Execute the encode. Full encodes default to dry-run.
+  --dry-run              Print commands only. Useful to preview --try.
+  --try                  Encode a short preview sample. Defaults to wet-run.
   --try-duration <sec>   Preview duration. Default: 300.
   --try-start <sec>      Preview start offset. Default: 0.
   --crf <0-63>           SVT-AV1 CRF quality. Default: 24.
@@ -108,6 +110,12 @@ parse_args() {
     case "$1" in
       --wet-run)
         WET_RUN=true
+        RUN_MODE_EXPLICIT=true
+        shift
+        ;;
+      --dry-run)
+        WET_RUN=false
+        RUN_MODE_EXPLICIT=true
         shift
         ;;
       --try)
@@ -644,6 +652,9 @@ process_one() {
 
 main() {
   parse_args "$@"
+  if [[ "$TRY_MODE" == "true" && "$RUN_MODE_EXPLICIT" != "true" ]]; then
+    WET_RUN=true
+  fi
   validate_numeric_options
 
   [[ -n "$OUTPUT" && -n "$OUT_DIR" ]] && die "--output and --out-dir cannot be used together"
