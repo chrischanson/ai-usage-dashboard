@@ -5,7 +5,8 @@
 # Compress DVD/Blu-ray rips while preserving the rip structure:
 #   - Video: AV1 via SVT-AV1.
 #   - Audio: mono/stereo/unknown -> FLAC, surround -> Opus.
-#   - Subtitles, attachments, data streams, chapters, and metadata are copied.
+#   - Subtitles, attachments, chapters, and metadata are copied.
+#   - DVD navigation/data packets are omitted because MKV cannot mux them.
 #   - No crop, resize, deinterlace, scale, or other video filters are applied.
 #
 # The script defaults to dry-run mode. Add --wet-run to encode for real.
@@ -63,7 +64,8 @@ Options:
 
 Behavior:
   Video is encoded to AV1, audio is encoded per stream by channel count,
-  subtitles/attachments/data streams are copied, and MKV output is used.
+  subtitles/attachments are copied, DVD navigation data is omitted, and MKV
+  output is used.
 EOF
 }
 
@@ -512,7 +514,10 @@ build_command() {
 
   cmd_ref+=(
     -i "$input"
-    -map 0
+    -map "0:v?"
+    -map "0:a?"
+    -map "0:s?"
+    -map "0:t?"
     -map_metadata 0
     -map_chapters 0
     -c:v libsvtav1
@@ -521,7 +526,6 @@ build_command() {
     -svtav1-params "tune=0:film-grain=0"
     -c:s copy
     -c:t copy
-    -c:d copy
     -max_muxing_queue_size 4096
   )
 
