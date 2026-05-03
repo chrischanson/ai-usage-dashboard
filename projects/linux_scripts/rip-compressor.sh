@@ -452,6 +452,24 @@ probe_video_field() {
     "$input" 2>/dev/null | head -n 1 || true
 }
 
+is_known_color_value() {
+  [[ -n "$1" && "$1" != "unknown" && "$1" != "unspecified" && "$1" != "reserved" && "$1" != "N/A" ]]
+}
+
+normalize_color_transfer() {
+  case "$1" in
+    bt470bg)
+      printf '%s\n' "gamma28"
+      ;;
+    bt470m)
+      printf '%s\n' "gamma22"
+      ;;
+    *)
+      printf '%s\n' "$1"
+      ;;
+  esac
+}
+
 add_color_args() {
   local input="$1"
   local -n cmd_ref="$2"
@@ -460,10 +478,11 @@ add_color_args() {
   prim="$(probe_video_field "$input" color_primaries)"
   trc="$(probe_video_field "$input" color_transfer)"
   space="$(probe_video_field "$input" color_space)"
+  trc="$(normalize_color_transfer "$trc")"
 
-  [[ -n "$prim" && "$prim" != "unknown" && "$prim" != "N/A" ]] && cmd_ref+=(-color_primaries "$prim")
-  [[ -n "$trc" && "$trc" != "unknown" && "$trc" != "N/A" ]] && cmd_ref+=(-color_trc "$trc")
-  [[ -n "$space" && "$space" != "unknown" && "$space" != "N/A" ]] && cmd_ref+=(-colorspace "$space")
+  is_known_color_value "$prim" && cmd_ref+=(-color_primaries "$prim")
+  is_known_color_value "$trc" && cmd_ref+=(-color_trc "$trc")
+  is_known_color_value "$space" && cmd_ref+=(-colorspace "$space")
 }
 
 opus_bitrate_for_channels() {
