@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# rip-compressor-codex.sh
+# rip-compressor.sh
 #
 # Compress DVD/Blu-ray rips while preserving the rip structure:
 #   - Video: AV1 via SVT-AV1.
@@ -32,7 +32,7 @@ INPUT=""
 OUTPUT=""
 OUT_DIR=""
 
-FFMPEG_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/rip-compressor-codex/ffmpeg"
+FFMPEG_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/rip-compressor/ffmpeg"
 FFMPEG=""
 FFPROBE=""
 

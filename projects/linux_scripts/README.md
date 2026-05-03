@@ -37,10 +37,10 @@ Generates reports on media file types (RAW, DNG, JPEG, Video) and sizes. Include
 Scans for discrepancies between file system timestamps and embedded EXIF data. Can optionally "fix" the file system time to match the EXIF capture time.
 - **Usage**: `./verify-exif-timestamps.sh [directory] [options]`
 
-### [rip-compressor-codex.sh](./rip-compressor-codex.sh)
+### [rip-compressor.sh](./rip-compressor.sh)
 **High-efficiency DVD/Blu-ray rip compressor.**
 Encodes video to AV1 (SVT-AV1), preserves audio (FLAC for 1-2ch, Opus for surround), and copies all other streams. Supports auto-merging of DVD VOB chunks and automatic toolchain bootstrapping.
-- **Usage**: `./rip-compressor-codex.sh [OPTIONS] <file-or-directory>`
+- **Usage**: `./rip-compressor.sh [OPTIONS] <file-or-directory>`
 
 ### [large-dir-audit.sh](./large-dir-audit.sh)
 **Storage analysis tool.**
