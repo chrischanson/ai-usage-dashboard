@@ -18,8 +18,9 @@ A zero-downtime, bulk update utility that safely pulls new images and restarts a
 
 **Features:**
 - **Dependency Checking:** Automatically verifies `docker` and `docker compose` prerequisites.
-- **Conflict Resolution:** Intelligently parses your YAML files using Python to find defined container names, and forcefully cleans up any conflicting standalone containers that might block the compose startup.
+- **Conflict Resolution:** Detects container name conflicts and forcefully cleans up any conflicting standalone containers that might block the compose startup.
 - **Visual Summary Output:** Provides a clear success/failure summary table for all processed stacks at the end of the run.
+- **Automatic Upgrade:** On each run, the script checks GitHub for a newer version. If one is found, you're prompted to upgrade — no extra commands needed. Requires only `curl` or `wget` (most systems have at least one). The check is silent when offline or when neither tool is available.
 
 ## 🚀 Usage
 
@@ -48,4 +49,10 @@ To fetch the latest images and refresh deployments:
 
 # Force recreate even if images haven't changed
 ./docker-update.sh --force ddns
+
+# Show current version / help
+./docker-update.sh --version
+./docker-update.sh --help
 ```
+
+> **Automatic upgrades:** When a newer version is available on GitHub, the script will prompt you before proceeding. The upgrade is atomic (temp file + move) and preserves file permissions. If you decline, the script continues normally.

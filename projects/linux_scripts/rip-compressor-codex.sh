@@ -25,6 +25,7 @@ WET_RUN=false
 OVERWRITE=false
 AUTO_BOOTSTRAP=true
 FORCE_BOOTSTRAP=false
+DVD_MERGE_VOBS=true
 INPUT=""
 OUTPUT=""
 OUT_DIR=""
@@ -55,6 +56,8 @@ Options:
   --bootstrap            Download/install the static ffmpeg now. With an input,
                          install first and then continue.
   --no-auto-bootstrap    Do not auto-download ffmpeg during --wet-run.
+  --no-dvd-merge         Treat DVD VOB chunks as separate files instead of
+                         merging VTS_nn_1.VOB, VTS_nn_2.VOB, etc.
   --ffmpeg-dir <path>    Install/use static ffmpeg from this directory.
   --help, -h             Show this help.
 
@@ -149,6 +152,10 @@ parse_args() {
         ;;
       --no-auto-bootstrap)
         AUTO_BOOTSTRAP=false
+        shift
+        ;;
+      --no-dvd-merge)
+        DVD_MERGE_VOBS=false
         shift
         ;;
       --ffmpeg-dir)
@@ -358,6 +365,51 @@ is_video_path() {
   return 1
 }
 
+is_dvd_vob_part() {
+  local base
+  base="$(basename -- "$1")"
+  [[ "$base" =~ ^VTS_[0-9][0-9]_[1-9][0-9]*\.[Vv][Oo][Bb]$ ]]
+}
+
+is_dvd_menu_vob() {
+  local base
+  base="$(basename -- "$1")"
+  [[ "$base" =~ ^VTS_[0-9][0-9]_0\.[Vv][Oo][Bb]$ ]]
+}
+
+dvd_vob_title_id() {
+  local base
+  base="$(basename -- "$1")"
+  if [[ "$base" =~ ^(VTS_[0-9][0-9])_[0-9]+\.[Vv][Oo][Bb]$ ]]; then
+    printf '%s\n' "${BASH_REMATCH[1]}"
+    return 0
+  fi
+  return 1
+}
+
+escape_concat_path() {
+  local path="$1"
+  path="${path//\\/\\\\}"
+  path="${path//|/\\|}"
+  printf '%s\n' "$path"
+}
+
+concat_input_for_files() {
+  local -n files_ref="$1"
+  local joined="" file escaped
+
+  for file in "${files_ref[@]}"; do
+    escaped="$(escape_concat_path "$file")"
+    if [[ -z "$joined" ]]; then
+      joined="$escaped"
+    else
+      joined="${joined}|${escaped}"
+    fi
+  done
+
+  printf 'concat:%s\n' "$joined"
+}
+
 collect_directory_inputs() {
   local root="$1"
   local exclude_root="$2"
@@ -441,8 +493,9 @@ add_audio_args() {
 
 build_command() {
   local input="$1"
-  local output="$2"
-  local cmd_name="$3"
+  local probe_input="$2"
+  local output="$3"
+  local cmd_name="$4"
   local -n cmd_ref="$cmd_name"
 
   cmd_ref=("$FFMPEG" -hide_banner)
@@ -472,8 +525,8 @@ build_command() {
     -max_muxing_queue_size 4096
   )
 
-  add_color_args "$input" "$cmd_name"
-  add_audio_args "$input" "$cmd_name"
+  add_color_args "$probe_input" "$cmd_name"
+  add_audio_args "$probe_input" "$cmd_name"
 
   cmd_ref+=("$output")
 }
@@ -518,18 +571,43 @@ output_for_file() {
   printf '%s/%s%s.mkv\n' "$out_dir" "$stem" "$suffix"
 }
 
+output_for_dvd_group() {
+  local first_file="$1"
+  local input_root="$2"
+  local output_root="$3"
+  local title_id="$4"
+  local suffix="-compressed"
+  local rel out_dir
+
+  [[ "$TRY_MODE" == "true" ]] && suffix="-compressed-try"
+
+  if [[ -z "$output_root" ]]; then
+    out_dir="$(dirname -- "$first_file")"
+  else
+    rel="${first_file#"${input_root}/"}"
+    out_dir="${output_root}/$(dirname -- "$rel")"
+    [[ "$(dirname -- "$rel")" == "." ]] && out_dir="$output_root"
+  fi
+
+  printf '%s/%s%s.mkv\n' "$out_dir" "$title_id" "$suffix"
+}
+
 process_one() {
   local input="$1"
-  local output="$2"
+  local probe_input="$2"
+  local output="$3"
+  local label="$4"
   local -a cmd
   local input_real output_real
 
-  input_real="$(abs_path "$input")"
-  output_real="$(abs_path "$output")"
+  if [[ "$input" != concat:* ]]; then
+    input_real="$(abs_path "$input")"
+    output_real="$(abs_path "$output")"
 
-  if [[ "$input_real" == "$output_real" ]]; then
-    warn "Skipping because output would overwrite input: $input"
-    return 0
+    if [[ "$input_real" == "$output_real" ]]; then
+      warn "Skipping because output would overwrite input: $input"
+      return 0
+    fi
   fi
 
   if [[ -e "$output" && "$OVERWRITE" != "true" ]]; then
@@ -537,10 +615,10 @@ process_one() {
     return 0
   fi
 
-  build_command "$input" "$output" cmd
+  build_command "$input" "$probe_input" "$output" cmd
 
   printf '\n'
-  log "Input:  $input"
+  log "Input:  $label"
   log "Output: $output"
   if [[ "$TRY_MODE" == "true" ]]; then
     log "Mode:   TRY (${TRY_DURATION}s from ${TRY_START}s)"
@@ -583,7 +661,12 @@ main() {
   resolve_ffmpeg "$WET_RUN"
 
   local input_abs output_root="" exclude_root="" root_for_rel=""
-  local -a inputs=()
+  local -a source_files=()
+  local -a item_inputs=()
+  local -a item_probes=()
+  local -a item_outputs=()
+  local -a item_labels=()
+  local dvd_group_count=0 skipped_dvd_menus=0
 
   input_abs="$(abs_path "$INPUT")"
 
@@ -591,11 +674,14 @@ main() {
     if ! is_video_path "$input_abs"; then
       warn "Input extension is not in the usual video list; ffmpeg will decide whether it is valid"
     fi
-    inputs+=("$input_abs")
     if [[ -n "$OUT_DIR" ]]; then
       [[ "$WET_RUN" == "true" ]] && mkdir -p "$OUT_DIR"
       output_root="$(abs_path "$OUT_DIR")"
     fi
+    item_inputs+=("$input_abs")
+    item_probes+=("$input_abs")
+    item_outputs+=("$(output_for_file "$input_abs" "" "$output_root")")
+    item_labels+=("$input_abs")
   elif [[ -d "$input_abs" ]]; then
     if [[ -n "$OUT_DIR" ]]; then
       [[ "$WET_RUN" == "true" ]] && mkdir -p "$OUT_DIR"
@@ -605,22 +691,86 @@ main() {
     fi
     exclude_root="$(abs_path "$output_root")"
     root_for_rel="$input_abs"
-    collect_directory_inputs "$input_abs" "$exclude_root" inputs
+    collect_directory_inputs "$input_abs" "$exclude_root" source_files
+
+    if [[ "$DVD_MERGE_VOBS" == "true" ]]; then
+      declare -A dvd_groups=()
+      declare -A dvd_titles=()
+      local -a normal_files=()
+      local file title_id dvd_dir dvd_key
+
+      for file in "${source_files[@]}"; do
+        if is_dvd_vob_part "$file"; then
+          title_id="$(dvd_vob_title_id "$file")"
+          dvd_dir="$(dirname -- "$file")"
+          dvd_key="${dvd_dir}"$'\t'"${title_id}"
+          dvd_groups["$dvd_key"]+="${file}"$'\n'
+          dvd_titles["$dvd_key"]="$title_id"
+        elif is_dvd_menu_vob "$file"; then
+          ((skipped_dvd_menus += 1))
+        else
+          normal_files+=("$file")
+        fi
+      done
+
+      source_files=("${normal_files[@]}")
+
+      if (( ${#dvd_groups[@]} > 0 )); then
+        while IFS= read -r dvd_key; do
+          local group_text group_file concat_input output first_file label
+          local -a group_files=()
+
+          group_text="${dvd_groups[$dvd_key]}"
+          while IFS= read -r group_file; do
+            [[ -n "$group_file" ]] && group_files+=("$group_file")
+          done <<< "$group_text"
+
+          (( ${#group_files[@]} > 0 )) || continue
+          mapfile -t group_files < <(printf '%s\n' "${group_files[@]}" | sort -V)
+
+          title_id="${dvd_titles[$dvd_key]}"
+          first_file="${group_files[0]}"
+          concat_input="$(concat_input_for_files group_files)"
+          output="$(output_for_dvd_group "$first_file" "$root_for_rel" "$output_root" "$title_id")"
+          label="DVD ${title_id} ($(basename -- "$(dirname -- "$first_file")"), ${#group_files[@]} VOB chunks)"
+
+          item_inputs+=("$concat_input")
+          item_probes+=("$first_file")
+          item_outputs+=("$output")
+          item_labels+=("$label")
+          ((dvd_group_count += 1))
+        done < <(printf '%s\n' "${!dvd_groups[@]}" | sort)
+      fi
+    fi
+
+    local file output
+    for file in "${source_files[@]}"; do
+      output="$(output_for_file "$file" "$root_for_rel" "$output_root")"
+      item_inputs+=("$file")
+      item_probes+=("$file")
+      item_outputs+=("$output")
+      item_labels+=("$file")
+    done
   else
     die "Input is neither a regular file nor a directory: $INPUT"
   fi
 
-  (( ${#inputs[@]} > 0 )) || die "No video files found"
+  (( ${#item_inputs[@]} > 0 )) || die "No video files found"
 
   log "ffmpeg:  $FFMPEG"
   log "ffprobe: $FFPROBE"
-  log "Files:   ${#inputs[@]}"
+  log "Files:   ${#item_inputs[@]}"
+  if (( dvd_group_count > 0 )); then
+    log "DVD VOB groups: ${dvd_group_count} merged title set(s)"
+  fi
+  if (( skipped_dvd_menus > 0 )); then
+    log "DVD menu VOBs skipped: ${skipped_dvd_menus}"
+  fi
   [[ "$WET_RUN" != "true" ]] && log "Dry-run enabled. Add --wet-run to encode."
 
-  local item output
-  for item in "${inputs[@]}"; do
-    output="$(output_for_file "$item" "$root_for_rel" "$output_root")"
-    process_one "$item" "$output"
+  local i
+  for i in "${!item_inputs[@]}"; do
+    process_one "${item_inputs[$i]}" "${item_probes[$i]}" "${item_outputs[$i]}" "${item_labels[$i]}"
   done
 
   printf '\n'
