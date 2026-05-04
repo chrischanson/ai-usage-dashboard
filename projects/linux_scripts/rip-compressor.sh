@@ -31,6 +31,8 @@ DVD_MERGE_VOBS=true
 INPUT=""
 OUTPUT=""
 OUT_DIR=""
+DVD_PROBESIZE=500M
+DVD_ANALYZE_DURATION=300M
 
 FFMPEG_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/rip-compressor/ffmpeg"
 FFMPEG=""
@@ -67,7 +69,7 @@ Options:
 Behavior:
   Video is encoded to AV1, audio is encoded per stream by channel count,
   subtitles/attachments are copied, DVD navigation data is omitted, and MKV
-  output is used.
+  output is used. Detected subtitle streams are reported before each encode.
 EOF
 }
 
@@ -446,10 +448,64 @@ collect_directory_inputs() {
 probe_video_field() {
   local input="$1"
   local field="$2"
-  "$FFPROBE" -v error -select_streams v:0 \
+  local -a cmd=("$FFPROBE" -v error)
+
+  add_probe_options "$input" "$input" cmd
+  cmd+=(-select_streams v:0 \
     -show_entries "stream=${field}" \
     -of default=noprint_wrappers=1:nokey=1 \
-    "$input" 2>/dev/null | head -n 1 || true
+    "$input")
+
+  "${cmd[@]}" 2>/dev/null | head -n 1 || true
+}
+
+needs_deep_probe() {
+  local input="$1"
+  local probe_input="$2"
+  local probe_lower="${probe_input,,}"
+
+  [[ "$input" == concat:* || "$probe_lower" == *.vob ]]
+}
+
+add_probe_options() {
+  local input="$1"
+  local probe_input="$2"
+  local -n args_ref="$3"
+
+  if needs_deep_probe "$input" "$probe_input"; then
+    args_ref+=(-probesize "$DVD_PROBESIZE" -analyzeduration "$DVD_ANALYZE_DURATION")
+  fi
+}
+
+subtitle_stream_report() {
+  local input="$1"
+  local -a cmd=("$FFPROBE" -v error)
+
+  add_probe_options "$input" "$input" cmd
+  cmd+=(-select_streams s \
+    -show_entries stream=index,codec_name:stream_tags=language,title \
+    -of compact=p=0:nk=0 \
+    "$input")
+
+  "${cmd[@]}" 2>/dev/null || true
+}
+
+report_subtitles() {
+  local input="$1"
+  local report count
+
+  report="$(subtitle_stream_report "$input")"
+  count="$(printf '%s\n' "$report" | sed '/^$/d' | wc -l | tr -d ' ')"
+
+  if [[ "$count" == "0" ]]; then
+    warn "Subtitles: none detected by ffprobe; output will not contain subtitles"
+    return
+  fi
+
+  log "Subtitles: ${count} stream(s) detected"
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && log "  subtitle stream: $line"
+  done <<< "$report"
 }
 
 is_known_color_value() {
@@ -499,8 +555,14 @@ opus_bitrate_for_channels() {
 add_audio_args() {
   local input="$1"
   local -n cmd_ref="$2"
+  local -a probe_cmd=("$FFPROBE" -v error)
   local channels idx bitrate
   idx=0
+
+  add_probe_options "$input" "$input" probe_cmd
+  probe_cmd+=(-select_streams a \
+    -show_entries stream=channels \
+    -of csv=p=0 "$input")
 
   while IFS= read -r channels; do
     [[ -n "$channels" ]] || continue
@@ -513,11 +575,7 @@ add_audio_args() {
     fi
 
     ((idx += 1))
-  done < <(
-    "$FFPROBE" -v error -select_streams a \
-      -show_entries stream=channels \
-      -of csv=p=0 "$input" 2>/dev/null || true
-  )
+  done < <("${probe_cmd[@]}" 2>/dev/null || true)
 }
 
 build_command() {
@@ -538,6 +596,8 @@ build_command() {
     (( TRY_START > 0 )) && cmd_ref+=(-ss "$TRY_START")
     cmd_ref+=(-t "$TRY_DURATION")
   fi
+
+  add_probe_options "$input" "$probe_input" "$cmd_name"
 
   cmd_ref+=(
     -i "$input"
@@ -646,8 +706,6 @@ process_one() {
     return 0
   fi
 
-  build_command "$input" "$probe_input" "$output" cmd
-
   printf '\n'
   log "Input:  $label"
   log "Output: $output"
@@ -656,6 +714,9 @@ process_one() {
   else
     log "Mode:   FULL"
   fi
+  report_subtitles "$input"
+
+  build_command "$input" "$probe_input" "$output" cmd
 
   if [[ "$WET_RUN" != "true" ]]; then
     printf 'DRY-RUN:\n'
