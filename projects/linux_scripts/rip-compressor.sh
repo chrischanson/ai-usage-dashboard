@@ -477,35 +477,114 @@ add_probe_options() {
   fi
 }
 
-subtitle_stream_report() {
-  local input="$1"
+# ─── Stream probing and media-summary table ─────────────────────────────────
+
+# Probe all streams of a file; outputs ffprobe compact key=value lines.
+probe_all_streams() {
+  local probe_input="$1"
   local -a cmd=("$FFPROBE" -v error)
-
-  add_probe_options "$input" "$input" cmd
-  cmd+=(-select_streams s \
-    -show_entries stream=index,codec_name:stream_tags=language,title \
-    -of compact=p=0:nk=0 \
-    "$input")
-
+  if needs_deep_probe "$probe_input" "$probe_input"; then
+    cmd+=(-probesize "$DVD_PROBESIZE" -analyzeduration "$DVD_ANALYZE_DURATION")
+  fi
+  cmd+=(
+    -show_entries \
+      "stream=index,codec_type,codec_name,width,height,r_frame_rate,channels,sample_rate,pix_fmt:stream_tags=language,title"
+    -of compact=p=0:nk=0
+    "$probe_input"
+  )
   "${cmd[@]}" 2>/dev/null || true
 }
 
-report_subtitles() {
-  local input="$1"
-  local report count
+# Extract the value of a named field from one compact ffprobe line.
+_stream_field() {
+  local line="$1" key="$2"
+  printf '%s\n' "$line" | awk -F'|' -v k="$key" '{
+    for (i = 1; i <= NF; i++) {
+      eq = index($i, "=")
+      if (eq > 0 && substr($i, 1, eq - 1) == k) {
+        v = substr($i, eq + 1)
+        if (v != "N/A" && v != "") print v
+        exit
+      }
+    }
+  }'
+}
 
-  report="$(subtitle_stream_report "$input")"
-  count="$(printf '%s\n' "$report" | sed '/^$/d' | wc -l | tr -d ' ')"
-
-  if [[ "$count" == "0" ]]; then
-    warn "Subtitles: none detected by ffprobe; output will not contain subtitles"
-    return
+# Convert a "num/den" frame-rate fraction to a 3-decimal string.
+_fps_decimal() {
+  local num="${1%%/*}" den="${1##*/}"
+  if [[ -n "$den" && "$den" != "0" ]]; then
+    awk -v n="$num" -v d="$den" 'BEGIN { printf "%.3f", n / d }'
+  else
+    printf '%s' "$1"
   fi
+}
 
-  log "Subtitles: ${count} stream(s) detected"
+# Print a formatted media-summary table (video + audio + subtitles).
+print_media_summary() {
+  local probe_input="$1" label="$2" output="$3"
+  local streams
+  streams="$(probe_all_streams "$probe_input")"
+
+  local bar='──────────────────────────────────────────────────────────────'
+  printf '\n'
+  printf '  ┌%s\n' "$bar"
+  printf '  │  %-12s %s\n' "INPUT"  "$label"
+  printf '  │  %-12s %s\n' "OUTPUT" "$output"
+  printf '  ├%s\n' "$bar"
+
+  local video_idx=0 audio_idx=0 sub_idx=0 total=0
+  local line ctype cname width height fps ch sr pix lang title info
+
   while IFS= read -r line; do
-    [[ -n "$line" ]] && log "  subtitle stream: $line"
-  done <<< "$report"
+    [[ -n "$line" ]] || continue
+    ctype="$(_stream_field "$line" codec_type)"
+    cname="$(_stream_field "$line" codec_name)"
+    lang="$(_stream_field  "$line" "tag:language")"
+    title="$(_stream_field "$line" "tag:title")"
+
+    case "$ctype" in
+      video)
+        width="$(_stream_field "$line" width)"
+        height="$(_stream_field "$line" height)"
+        fps="$(_stream_field   "$line" r_frame_rate)"
+        pix="$(_stream_field   "$line" pix_fmt)"
+        [[ -n "$fps" ]] && fps="$(_fps_decimal "$fps")"
+        info="${cname:-?}"
+        [[ -n "$width" && -n "$height" ]] && info+="  ${width}×${height}"
+        [[ -n "$fps" ]] && info+="  ${fps} fps"
+        [[ -n "$pix" ]] && info+="  ${pix}"
+        printf '  │  %-12s %s\n' "VIDEO" "$info"
+        (( video_idx += 1 ))
+        (( total    += 1 ))
+        ;;
+      audio)
+        ch="$(_stream_field "$line" channels)"
+        sr="$(_stream_field "$line" sample_rate)"
+        info="${cname:-?}"
+        [[ -n "$ch"    ]] && info+="  ${ch}ch"
+        [[ -n "$sr"    ]] && info+="  ${sr} Hz"
+        [[ -n "$lang"  ]] && info+="  [${lang}]"
+        [[ -n "$title" ]] && info+=" ${title}"
+        printf '  │  %-12s %s\n' "AUDIO #${audio_idx}" "$info"
+        (( audio_idx += 1 ))
+        (( total     += 1 ))
+        ;;
+      subtitle)
+        info="${cname:-?}"
+        [[ -n "$lang"  ]] && info+="  [${lang}]"
+        [[ -n "$title" ]] && info+=" ${title}"
+        printf '  │  %-12s %s\n' "SUB #${sub_idx}" "$info"
+        (( sub_idx += 1 ))
+        (( total   += 1 ))
+        ;;
+    esac
+  done <<< "$streams"
+
+  if (( total == 0 )); then
+    printf '  │  %s\n' "(no streams detected by ffprobe)"
+  fi
+  printf '  └%s\n' "$bar"
 }
 
 is_known_color_value() {
@@ -714,7 +793,7 @@ process_one() {
   else
     log "Mode:   FULL"
   fi
-  report_subtitles "$input"
+  print_media_summary "$probe_input" "$label" "$output"
 
   build_command "$input" "$probe_input" "$output" cmd
 
