@@ -488,7 +488,7 @@ probe_all_streams() {
   fi
   cmd+=(
     -show_entries \
-      "stream=index,codec_type,codec_name,width,height,r_frame_rate,channels,sample_rate,pix_fmt:stream_tags=language,title"
+      "stream=index,codec_type,codec_name,width,height,r_frame_rate,channels,sample_rate:stream_tags=language,title"
     -of compact=p=0:nk=0
     "$probe_input"
   )
@@ -520,21 +520,60 @@ _fps_decimal() {
   fi
 }
 
-# Print a formatted media-summary table (video + audio + subtitles).
+# Given a VOB path, return the sibling IFO path (VTS_nn_0.IFO) if it exists.
+_ifo_for_vob() {
+  local vob="$1"
+  local base dir ifo
+  base="$(basename -- "$vob")"
+  dir="$(dirname  -- "$vob")"
+  # Match VTS_nn_k.VOB -> VTS_nn_0.IFO
+  if [[ "$base" =~ ^(VTS_[0-9]+)_[0-9]+\.[Vv][Oo][Bb]$ ]]; then
+    ifo="${dir}/${BASH_REMATCH[1]}_0.IFO"
+    # Also try lowercase extension
+    [[ -f "$ifo" ]] || ifo="${dir}/${BASH_REMATCH[1]}_0.ifo"
+    [[ -f "$ifo" ]] && printf '%s\n' "$ifo"
+  fi
+}
+
+# Probe subtitle streams from the IFO and return "index lang title" lines.
+_ifo_subtitle_langs() {
+  local ifo="$1"
+  "$FFPROBE" -v error \
+    -select_streams s \
+    -show_entries "stream=index:stream_tags=language,title" \
+    -of compact=p=0:nk=0 \
+    "$ifo" 2>/dev/null || true
+}
+
+# Print a concise media-summary table (video + audio + subtitles).
 print_media_summary() {
   local probe_input="$1" label="$2" output="$3"
   local streams
   streams="$(probe_all_streams "$probe_input")"
 
+  # Collect subtitle language tags from the sibling IFO when available.
+  local -a sub_langs=()
+  local ifo
+  ifo="$(_ifo_for_vob "$probe_input")"
+  if [[ -n "$ifo" ]]; then
+    local ifo_line ifo_lang ifo_title
+    while IFS= read -r ifo_line; do
+      [[ -n "$ifo_line" ]] || continue
+      ifo_lang="$(_stream_field "$ifo_line" "tag:language")"
+      ifo_title="$(_stream_field "$ifo_line" "tag:title")"
+      local tag=""
+      [[ -n "$ifo_lang"  ]] && tag="[${ifo_lang}]"
+      [[ -n "$ifo_title" ]] && tag+="${tag:+ }${ifo_title}"
+      sub_langs+=("${tag:-?}")
+    done < <(_ifo_subtitle_langs "$ifo")
+  fi
+
   local bar='──────────────────────────────────────────────────────────────'
-  printf '\n'
-  printf '  ┌%s\n' "$bar"
-  printf '  │  %-12s %s\n' "INPUT"  "$label"
-  printf '  │  %-12s %s\n' "OUTPUT" "$output"
-  printf '  ├%s\n' "$bar"
+  local sep='  │'
+  printf '%s\n' "$bar" | sed 's/^/  ├/'
 
   local video_idx=0 audio_idx=0 sub_idx=0 total=0
-  local line ctype cname width height fps ch sr pix lang title info
+  local line ctype cname width height fps ch sr lang title info
 
   while IFS= read -r line; do
     [[ -n "$line" ]] || continue
@@ -548,15 +587,13 @@ print_media_summary() {
         width="$(_stream_field "$line" width)"
         height="$(_stream_field "$line" height)"
         fps="$(_stream_field   "$line" r_frame_rate)"
-        pix="$(_stream_field   "$line" pix_fmt)"
         [[ -n "$fps" ]] && fps="$(_fps_decimal "$fps")"
         info="${cname:-?}"
         [[ -n "$width" && -n "$height" ]] && info+="  ${width}×${height}"
         [[ -n "$fps" ]] && info+="  ${fps} fps"
-        [[ -n "$pix" ]] && info+="  ${pix}"
-        printf '  │  %-12s %s\n' "VIDEO" "$info"
+        printf '%s  %-10s %s\n' "$sep" "VIDEO" "$info"
         (( video_idx += 1 ))
-        (( total    += 1 ))
+        (( total     += 1 ))
         ;;
       audio)
         ch="$(_stream_field "$line" channels)"
@@ -566,23 +603,33 @@ print_media_summary() {
         [[ -n "$sr"    ]] && info+="  ${sr} Hz"
         [[ -n "$lang"  ]] && info+="  [${lang}]"
         [[ -n "$title" ]] && info+=" ${title}"
-        printf '  │  %-12s %s\n' "AUDIO #${audio_idx}" "$info"
+        printf '%s  %-10s %s\n' "$sep" "AUDIO" "$info"
         (( audio_idx += 1 ))
         (( total     += 1 ))
         ;;
       subtitle)
-        info="${cname:-?}"
-        [[ -n "$lang"  ]] && info+="  [${lang}]"
-        [[ -n "$title" ]] && info+=" ${title}"
-        printf '  │  %-12s %s\n' "SUB #${sub_idx}" "$info"
+        # Subtitles: collect counts and languages; printed as one summary line after the loop
         (( sub_idx += 1 ))
         (( total   += 1 ))
         ;;
     esac
   done <<< "$streams"
 
+  # Print subtitles as a single consolidated line.
+  if (( sub_idx > 0 )); then
+    local sub_info="dvd_subtitle  ${sub_idx} track(s)"
+    if (( ${#sub_langs[@]} > 0 )); then
+      local lang_list
+      lang_list="$(printf '%s  ' "${sub_langs[@]}")"
+      sub_info+="  ${lang_list%  }"
+    else
+      sub_info+="  (no language tags in VOB; check IFO)"
+    fi
+    printf '%s  %-10s %s\n' "$sep" "SUBTITLES" "$sub_info"
+  fi
+
   if (( total == 0 )); then
-    printf '  │  %s\n' "(no streams detected by ffprobe)"
+    printf '%s  %s\n' "$sep" "(no streams detected by ffprobe)"
   fi
   printf '  └%s\n' "$bar"
 }
@@ -785,14 +832,15 @@ process_one() {
     return 0
   fi
 
+  local mode_str="FULL"
+  [[ "$TRY_MODE" == "true" ]] && mode_str="TRY (${TRY_DURATION}s from ${TRY_START}s)"
+
+  local bar='──────────────────────────────────────────────────────────────'
   printf '\n'
-  log "Input:  $label"
-  log "Output: $output"
-  if [[ "$TRY_MODE" == "true" ]]; then
-    log "Mode:   TRY (${TRY_DURATION}s from ${TRY_START}s)"
-  else
-    log "Mode:   FULL"
-  fi
+  printf '  ┌%s\n' "$bar"
+  printf '  │  %-10s %s\n' "INPUT"  "$label"
+  printf '  │  %-10s %s\n' "OUTPUT" "$output"
+  printf '  │  %-10s %s\n' "MODE"   "$mode_str"
   print_media_summary "$probe_input" "$label" "$output"
 
   build_command "$input" "$probe_input" "$output" cmd
