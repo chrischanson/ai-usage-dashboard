@@ -304,7 +304,7 @@ compose_up() {
   up_args+=("$@")
 
   local output exit_code
-  local max_retries=3 retry=0
+  local max_retries=5 retry=0
 
   while [[ $retry -le $max_retries ]]; do
     output=$("${up_args[@]}" 2>&1)
@@ -315,9 +315,41 @@ compose_up() {
       return 0
     fi
 
-    if echo "$output" | grep -q "The container name"; then
+    # Match both Docker Compose v1 ("The container name") and v2
+    # ("container ... already in use") conflict messages.
+    if echo "$output" | grep -qiE '(The container name|already in use by container)'; then
       local container_names
-      container_names=$(printf '%s\n' "$output" | sed -n 's/.*The container name "\/\([^"]*\)".*/\1/p' | sort -u)
+      # Extract container names from both message formats:
+      #   v1: The container name "/foo" is already in use…
+      #   v2: …container "foo" already exists
+      container_names=$(
+        printf '%s\n' "$output" \
+          | sed -n \
+              -e 's/.*[Tt]he container name ["\/]*\([^"/]*\)["\/]*.*/\1/p' \
+              -e 's/.*container name is already in use by container "\([^"]*\)".*/\1/p' \
+          | sed 's|^/||'   \
+          | sort -u
+      )
+
+      # Fallback: if we couldn't parse specific names, pre-stop every service
+      # defined in the compose file that is currently running.
+      if [[ -z "$container_names" ]]; then
+        warn "    Could not parse conflicting container names — stopping all compose services"
+        container_names=$(
+          docker compose -p "$project" -f "$f" config --services 2>/dev/null \
+            | while IFS= read -r svc; do
+                # Compose default container name: <project>-<service>-<index> or just <service>
+                # Try both naming schemes.
+                for candidate in "${project}-${svc}-1" "${project}_${svc}_1" "$svc"; do
+                  if docker ps -a --format '{{.Names}}' | grep -qx "$candidate"; then
+                    echo "$candidate"
+                    break
+                  fi
+                done
+              done
+        )
+      fi
+
       if [[ -n "$container_names" ]]; then
         local remove_failed=false
         while IFS= read -r cname; do
@@ -326,7 +358,10 @@ compose_up() {
             remove_failed=true
           fi
         done <<< "$container_names"
-        [[ "$remove_failed" == "false" ]] && { retry=$((retry + 1)); continue; }
+        if [[ "$remove_failed" == "false" ]]; then
+          retry=$((retry + 1))
+          continue
+        fi
       fi
     fi
 
