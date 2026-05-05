@@ -445,36 +445,6 @@ collect_directory_inputs() {
   )
 }
 
-probe_video_field() {
-  local input="$1"
-  local field="$2"
-  local -a cmd=("$FFPROBE" -v error)
-
-  add_probe_options "$input" "$input" cmd
-  cmd+=(-select_streams v:0 \
-    -show_entries "stream=${field}" \
-    -of default=noprint_wrappers=1:nokey=1 \
-    "$input")
-
-  "${cmd[@]}" 2>/dev/null | head -n 1 || true
-}
-
-probe_video_stream_count() {
-  local probe_input="$1"
-  local input="$2"
-  local -a cmd=("$FFPROBE" -v error)
-
-  add_probe_options "$input" "$probe_input" cmd
-  cmd+=(-select_streams v \
-    -show_entries "stream=index" \
-    -of csv=p=0 \
-    "$probe_input")
-
-  local count
-  count="$("${cmd[@]}" 2>/dev/null | wc -l)" || count=0
-  printf '%d\n' "$count"
-}
-
 needs_deep_probe() {
   local input="$1"
   local probe_input="$2"
@@ -496,15 +466,15 @@ add_probe_options() {
 # ─── Stream probing and media-summary table ─────────────────────────────────
 
 # Probe all streams of a file; outputs ffprobe compact key=value lines.
+# Includes color metadata for video streams so a single probe serves all needs.
 probe_all_streams() {
   local probe_input="$1"
+  local input="$2"
   local -a cmd=("$FFPROBE" -v error)
-  if needs_deep_probe "$probe_input" "$probe_input"; then
-    cmd+=(-probesize "$DVD_PROBESIZE" -analyzeduration "$DVD_ANALYZE_DURATION")
-  fi
+  add_probe_options "$input" "$probe_input" cmd
   cmd+=(
     -show_entries \
-      "stream=index,codec_type,codec_name,width,height,r_frame_rate,channels,sample_rate:stream_tags=language,title"
+      "stream=index,codec_type,codec_name,width,height,r_frame_rate,channels,sample_rate,color_primaries,color_transfer,color_space:stream_tags=language,title"
     -of compact=p=0:nk=0
     "$probe_input"
   )
@@ -536,6 +506,17 @@ _fps_decimal() {
   fi
 }
 
+_friendly_codec() {
+  case "$1" in
+    dvd_subtitle|hdmv_pgs_subtitle) printf 'pgs' ;;
+    dvb_subtitle)                   printf 'dvb' ;;
+    dvb_teletext)                   printf 'teletext' ;;
+    subrip)                         printf 'srt' ;;
+    ass|ssa)                        printf 'ass' ;;
+    *)                              printf '%s' "${1:-?}" ;;
+  esac
+}
+
 # Given a VOB path, return the sibling IFO path (VTS_nn_0.IFO) if it exists.
 _ifo_for_vob() {
   local vob="$1"
@@ -562,15 +543,20 @@ _ifo_subtitle_langs() {
 }
 
 # Print a concise media-summary table (video + audio + subtitles).
+# Accepts pre-probed stream data so the probe is done only once per file.
 print_media_summary() {
-  local probe_input="$1" label="$2" output="$3"
-  local streams
-  streams="$(probe_all_streams "$probe_input")"
+  local streams="$1"
+  local probe_input="$2"
 
-  # Collect subtitle language tags from the sibling IFO when available.
+  # Collect subtitle language tags.
+  # For VOB files, try the sibling IFO first ( richer metadata).
+  # Otherwise, extract languages directly from the stream data.
   local -a sub_langs=()
-  local ifo
-  ifo="$(_ifo_for_vob "$probe_input")"
+  local ifo=""
+  local probe_lower="${probe_input,,}"
+  if [[ "$probe_lower" == *.vob ]]; then
+    ifo="$(_ifo_for_vob "$probe_input")"
+  fi
   if [[ -n "$ifo" ]]; then
     local ifo_line ifo_lang ifo_title
     while IFS= read -r ifo_line; do
@@ -588,7 +574,7 @@ print_media_summary() {
   local sep='  │'
   printf '%s\n' "$bar" | sed 's/^/  ├/'
 
-  local video_idx=0 audio_idx=0 sub_idx=0 total=0
+  local video_idx=0 audio_idx=0 sub_idx=0 total=0 extra_video=0
   local line ctype cname width height fps ch sr lang title info
 
   while IFS= read -r line; do
@@ -600,21 +586,25 @@ print_media_summary() {
 
     case "$ctype" in
       video)
-        width="$(_stream_field "$line" width)"
-        height="$(_stream_field "$line" height)"
-        fps="$(_stream_field   "$line" r_frame_rate)"
-        [[ -n "$fps" ]] && fps="$(_fps_decimal "$fps")"
-        info="${cname:-?}"
-        [[ -n "$width" && -n "$height" ]] && info+="  ${width}×${height}"
-        [[ -n "$fps" ]] && info+="  ${fps} fps"
-        printf '%s  %-10s %s\n' "$sep" "VIDEO" "$info"
+        if (( video_idx == 0 )); then
+          width="$(_stream_field "$line" width)"
+          height="$(_stream_field "$line" height)"
+          fps="$(_stream_field   "$line" r_frame_rate)"
+          [[ -n "$fps" ]] && fps="$(_fps_decimal "$fps")"
+          info="$(_friendly_codec "$cname")"
+          [[ -n "$width" && -n "$height" ]] && info+="  ${width}×${height}"
+          [[ -n "$fps" ]] && info+="  ${fps} fps"
+          printf '%s  %-10s %s\n' "$sep" "VIDEO" "$info"
+        else
+          (( extra_video += 1 ))
+        fi
         (( video_idx += 1 ))
         (( total     += 1 ))
         ;;
       audio)
         ch="$(_stream_field "$line" channels)"
         sr="$(_stream_field "$line" sample_rate)"
-        info="${cname:-?}"
+        info="$(_friendly_codec "$cname")"
         [[ -n "$ch"    ]] && info+="  ${ch}ch"
         [[ -n "$sr"    ]] && info+="  ${sr} Hz"
         [[ -n "$lang"  ]] && info+="  [${lang}]"
@@ -624,22 +614,41 @@ print_media_summary() {
         (( total     += 1 ))
         ;;
       subtitle)
-        # Subtitles: collect counts and languages; printed as one summary line after the loop
+        # Collect subtitle languages from stream data if IFO didn't provide them
+        if (( ${#sub_langs[@]} == 0 )); then
+          local stag=""
+          [[ -n "$lang"  ]] && stag="[${lang}]"
+          [[ -n "$title" ]] && stag+="${stag:+ }${title}"
+          sub_langs+=("${stag:-?}")
+        fi
         (( sub_idx += 1 ))
         (( total   += 1 ))
         ;;
     esac
   done <<< "$streams"
 
+  if (( extra_video > 0 )); then
+    printf '%s  %-10s +%d additional video stream(s) skipped\n' "$sep" "" "$extra_video"
+  fi
+
   # Print subtitles as a single consolidated line.
   if (( sub_idx > 0 )); then
-    local sub_info="dvd_subtitle  ${sub_idx} track(s)"
+    local sub_codec=""
+    # Find the subtitle codec name from the stream data
+    while IFS= read -r line; do
+      [[ -n "$line" ]] || continue
+      ctype="$(_stream_field "$line" codec_type)"
+      if [[ "$ctype" == "subtitle" ]]; then
+        cname="$(_stream_field "$line" codec_name)"
+        sub_codec="$(_friendly_codec "$cname")"
+        break
+      fi
+    done <<< "$streams"
+    local sub_info="${sub_codec:-subtitle}  ${sub_idx} track(s)"
     if (( ${#sub_langs[@]} > 0 )); then
       local lang_list
       lang_list="$(printf '%s  ' "${sub_langs[@]}")"
       sub_info+="  ${lang_list%  }"
-    else
-      sub_info+="  (no language tags in VOB; check IFO)"
     fi
     printf '%s  %-10s %s\n' "$sep" "SUBTITLES" "$sub_info"
   fi
@@ -668,19 +677,25 @@ normalize_color_transfer() {
   esac
 }
 
-add_color_args() {
-  local input="$1"
+# Add color-metadata ffmpeg args from pre-probed stream data.
+_add_color_args_from_data() {
+  local streams="$1"
   local -n cmd_ref="$2"
-  local prim trc space
+  local line ctype prim trc space
 
-  prim="$(probe_video_field "$input" color_primaries)"
-  trc="$(probe_video_field "$input" color_transfer)"
-  space="$(probe_video_field "$input" color_space)"
-  trc="$(normalize_color_transfer "$trc")"
-
-  is_known_color_value "$prim" && cmd_ref+=(-color_primaries "$prim")
-  is_known_color_value "$trc" && cmd_ref+=(-color_trc "$trc")
-  is_known_color_value "$space" && cmd_ref+=(-colorspace "$space")
+  while IFS= read -r line; do
+    [[ -n "$line" ]] || continue
+    ctype="$(_stream_field "$line" codec_type)"
+    [[ "$ctype" == "video" ]] || continue
+    prim="$(_stream_field "$line" color_primaries)"
+    trc="$(_stream_field "$line" color_transfer)"
+    space="$(_stream_field "$line" color_space)"
+    trc="$(normalize_color_transfer "$trc")"
+    is_known_color_value "$prim" && cmd_ref+=(-color_primaries "$prim")
+    is_known_color_value "$trc" && cmd_ref+=(-color_trc "$trc")
+    is_known_color_value "$space" && cmd_ref+=(-colorspace "$space")
+    break
+  done <<< "$streams"
 }
 
 opus_bitrate_for_channels() {
@@ -694,20 +709,17 @@ opus_bitrate_for_channels() {
   fi
 }
 
-add_audio_args() {
-  local input="$1"
+# Add per-stream audio encoder args from pre-probed stream data.
+_add_audio_args_from_data() {
+  local streams="$1"
   local -n cmd_ref="$2"
-  local -a probe_cmd=("$FFPROBE" -v error)
-  local channels idx bitrate
-  idx=0
+  local idx=0 channels bitrate line ctype
 
-  add_probe_options "$input" "$input" probe_cmd
-  probe_cmd+=(-select_streams a \
-    -show_entries stream=channels \
-    -of csv=p=0 "$input")
-
-  while IFS= read -r channels; do
-    [[ -n "$channels" ]] || continue
+  while IFS= read -r line; do
+    [[ -n "$line" ]] || continue
+    ctype="$(_stream_field "$line" codec_type)"
+    [[ "$ctype" == "audio" ]] || continue
+    channels="$(_stream_field "$line" channels)"
 
     if [[ "$channels" =~ ^[0-9]+$ && "$channels" -gt 2 ]]; then
       bitrate="$(opus_bitrate_for_channels "$channels")"
@@ -717,7 +729,7 @@ add_audio_args() {
     fi
 
     ((idx += 1))
-  done < <("${probe_cmd[@]}" 2>/dev/null || true)
+  done <<< "$streams"
 }
 
 build_command() {
@@ -725,6 +737,7 @@ build_command() {
   local probe_input="$2"
   local output="$3"
   local cmd_name="$4"
+  local streams="$5"
   local -n cmd_ref="$cmd_name"
 
   cmd_ref=("$FFMPEG" -hide_banner)
@@ -758,15 +771,8 @@ build_command() {
     -max_muxing_queue_size 4096
   )
 
-  # Warn if the source contains multiple video streams (e.g. multi-program .ts).
-  local video_stream_count
-  video_stream_count="$(probe_video_stream_count "$probe_input" "$input")"
-  if [[ "$video_stream_count" -gt 1 ]]; then
-    warn "${video_stream_count} video streams detected; only the first will be encoded."
-  fi
-
-  add_color_args "$probe_input" "$cmd_name"
-  add_audio_args "$probe_input" "$cmd_name"
+  _add_color_args_from_data "$streams" "$cmd_name"
+  _add_audio_args_from_data "$streams" "$cmd_name"
 
   cmd_ref+=("$output")
 }
@@ -855,6 +861,10 @@ process_one() {
     return 0
   fi
 
+  # Single probe for the entire file — used for both display and command building.
+  local streams
+  streams="$(probe_all_streams "$probe_input" "$input")"
+
   local mode_str="FULL"
   [[ "$TRY_MODE" == "true" ]] && mode_str="TRY (${TRY_DURATION}s from ${TRY_START}s)"
 
@@ -864,9 +874,9 @@ process_one() {
   printf '  │  %-10s %s\n' "INPUT"  "$label"
   printf '  │  %-10s %s\n' "OUTPUT" "$output"
   printf '  │  %-10s %s\n' "MODE"   "$mode_str"
-  print_media_summary "$probe_input" "$label" "$output"
+  print_media_summary "$streams" "$probe_input"
 
-  build_command "$input" "$probe_input" "$output" cmd
+  build_command "$input" "$probe_input" "$output" cmd "$streams"
 
   if [[ "$WET_RUN" != "true" ]]; then
     printf 'DRY-RUN:\n'
