@@ -459,12 +459,28 @@ probe_video_field() {
   "${cmd[@]}" 2>/dev/null | head -n 1 || true
 }
 
+probe_video_stream_count() {
+  local probe_input="$1"
+  local input="$2"
+  local -a cmd=("$FFPROBE" -v error)
+
+  add_probe_options "$input" "$probe_input" cmd
+  cmd+=(-select_streams v \
+    -show_entries "stream=index" \
+    -of csv=p=0 \
+    "$probe_input")
+
+  local count
+  count="$("${cmd[@]}" 2>/dev/null | wc -l)" || count=0
+  printf '%d\n' "$count"
+}
+
 needs_deep_probe() {
   local input="$1"
   local probe_input="$2"
   local probe_lower="${probe_input,,}"
 
-  [[ "$input" == concat:* || "$probe_lower" == *.vob ]]
+  [[ "$input" == concat:* || "$probe_lower" == *.vob || "$probe_lower" == *.ts || "$probe_lower" == *.mts ]]
 }
 
 add_probe_options() {
@@ -727,7 +743,7 @@ build_command() {
 
   cmd_ref+=(
     -i "$input"
-    -map "0:v?"
+    -map "0:v:0"
     -map "0:a?"
     -map "0:s?"
     -map "0:t?"
@@ -741,6 +757,13 @@ build_command() {
     -c:t copy
     -max_muxing_queue_size 4096
   )
+
+  # Warn if the source contains multiple video streams (e.g. multi-program .ts).
+  local video_stream_count
+  video_stream_count="$(probe_video_stream_count "$probe_input" "$input")"
+  if [[ "$video_stream_count" -gt 1 ]]; then
+    warn "${video_stream_count} video streams detected; only the first will be encoded."
+  fi
 
   add_color_args "$probe_input" "$cmd_name"
   add_audio_args "$probe_input" "$cmd_name"
