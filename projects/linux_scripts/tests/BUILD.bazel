@@ -1,0 +1,11 @@
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
+
+sh_test(
+    name = "test-rip-compressor",
+    srcs = ["test-rip-compressor.sh"],
+    data = [
+        "//projects/linux_scripts:rip-compressor.sh",
+        "fakes/ffmpeg",
+        "fakes/ffprobe",
+    ],
+)

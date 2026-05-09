@@ -42,6 +42,22 @@ VIDEO_EXTS=(
   mkv mp4 m4v avi mov m2ts mts ts vob mpg mpeg wmv flv webm iso
 )
 
+if [[ -t 1 ]]; then
+  C_RESET=$'\033[0m'
+  C_BOLD=$'\033[1m'
+  C_DIM=$'\033[2m'
+  C_CYAN=$'\033[36m'
+  C_GREEN=$'\033[32m'
+  C_YELLOW=$'\033[33m'
+else
+  C_RESET=""
+  C_BOLD=""
+  C_DIM=""
+  C_CYAN=""
+  C_GREEN=""
+  C_YELLOW=""
+fi
+
 usage() {
   cat <<EOF
 Usage:
@@ -332,7 +348,6 @@ resolve_ffmpeg() {
   if toolchain_ok "$cached_ff" "$cached_fp"; then
     FFMPEG="$cached_ff"
     FFPROBE="$cached_fp"
-    log "Using static ffmpeg: $FFMPEG"
     return
   fi
 
@@ -343,7 +358,6 @@ resolve_ffmpeg() {
     if toolchain_ok "$system_ff" "$system_fp"; then
       FFMPEG="$system_ff"
       FFPROBE="$system_fp"
-      log "Using system ffmpeg: $FFMPEG"
       return
     fi
 
@@ -474,7 +488,7 @@ probe_all_streams() {
   add_probe_options "$input" "$probe_input" cmd
   cmd+=(
     -show_entries \
-      "stream=index,codec_type,codec_name,width,height,r_frame_rate,channels,sample_rate,color_primaries,color_transfer,color_space:stream_tags=language,title"
+      "stream=index,codec_type,codec_name,width,height,r_frame_rate,channels,channel_layout,sample_rate,color_primaries,color_transfer,color_space:stream_tags=language,title"
     -of compact=p=0:nk=0
     "$probe_input"
   )
@@ -508,7 +522,8 @@ _fps_decimal() {
 
 _friendly_codec() {
   case "$1" in
-    dvd_subtitle|hdmv_pgs_subtitle) printf 'pgs' ;;
+    dvd_subtitle)                    printf 'dvd' ;;
+    hdmv_pgs_subtitle)               printf 'pgs' ;;
     dvb_subtitle)                   printf 'dvb' ;;
     dvb_teletext)                   printf 'teletext' ;;
     subrip)                         printf 'srt' ;;
@@ -542,7 +557,7 @@ _ifo_subtitle_langs() {
     "$ifo" 2>/dev/null || true
 }
 
-# Print a concise media-summary table (video + audio + subtitles).
+# Print a concise media summary (video + audio + subtitles).
 # Accepts pre-probed stream data so the probe is done only once per file.
 print_media_summary() {
   local streams="$1"
@@ -555,7 +570,7 @@ print_media_summary() {
   local ifo=""
   local probe_lower="${probe_input,,}"
   if [[ "$probe_lower" == *.vob ]]; then
-    ifo="$(_ifo_for_vob "$probe_input")"
+    ifo="$(_ifo_for_vob "$probe_input" || true)"
   fi
   if [[ -n "$ifo" ]]; then
     local ifo_line ifo_lang ifo_title
@@ -570,12 +585,10 @@ print_media_summary() {
     done < <(_ifo_subtitle_langs "$ifo")
   fi
 
-  local bar='──────────────────────────────────────────────────────────────'
-  local sep='  │'
-  printf '%s\n' "$bar" | sed 's/^/  ├/'
-
-  local video_idx=0 audio_idx=0 sub_idx=0 total=0 extra_video=0
-  local line ctype cname width height fps ch sr lang title info
+  local video_idx=0 audio_idx=0 sub_idx=0 total=0 extra_video=0 extra_audio=0
+  local line ctype cname width height fps ch layout sr lang title info
+  local video_info=""
+  local -a audio_infos=()
 
   while IFS= read -r line; do
     [[ -n "$line" ]] || continue
@@ -594,7 +607,7 @@ print_media_summary() {
           info="$(_friendly_codec "$cname")"
           [[ -n "$width" && -n "$height" ]] && info+="  ${width}×${height}"
           [[ -n "$fps" ]] && info+="  ${fps} fps"
-          printf '%s  %-10s %s\n' "$sep" "VIDEO" "$info"
+          video_info="$info"
         else
           (( extra_video += 1 ))
         fi
@@ -603,13 +616,22 @@ print_media_summary() {
         ;;
       audio)
         ch="$(_stream_field "$line" channels)"
+        layout="$(_stream_field "$line" channel_layout)"
         sr="$(_stream_field "$line" sample_rate)"
         info="$(_friendly_codec "$cname")"
-        [[ -n "$ch"    ]] && info+="  ${ch}ch"
+        if [[ -n "$layout" ]]; then
+          info+="  ${layout}"
+        elif [[ -n "$ch" ]]; then
+          info+="  ${ch}ch"
+        fi
         [[ -n "$sr"    ]] && info+="  ${sr} Hz"
         [[ -n "$lang"  ]] && info+="  [${lang}]"
         [[ -n "$title" ]] && info+=" ${title}"
-        printf '%s  %-10s %s\n' "$sep" "AUDIO" "$info"
+        if (( ${#audio_infos[@]} < 2 )); then
+          audio_infos+=("$info")
+        else
+          (( extra_audio += 1 ))
+        fi
         (( audio_idx += 1 ))
         (( total     += 1 ))
         ;;
@@ -627,14 +649,22 @@ print_media_summary() {
     esac
   done <<< "$streams"
 
-  if (( extra_video > 0 )); then
-    printf '%s  %-10s +%d additional video stream(s) skipped\n' "$sep" "" "$extra_video"
+  if [[ -n "$video_info" ]]; then
+    printf '  %b%-10s%b %s' "$C_CYAN" "video" "$C_RESET" "$video_info"
+    (( extra_video > 0 )) && printf '  %b(+%d skipped)%b' "$C_DIM" "$extra_video" "$C_RESET"
+    printf '\n'
   fi
 
-  # Print subtitles as a single consolidated line.
+  if (( audio_idx > 0 )); then
+    local audio_line
+    audio_line="$(printf '%s; ' "${audio_infos[@]}")"
+    audio_line="${audio_line%; }"
+    (( extra_audio > 0 )) && audio_line+="  (+${extra_audio} more)"
+    printf '  %b%-10s%b %s\n' "$C_CYAN" "audio" "$C_RESET" "$audio_line"
+  fi
+
   if (( sub_idx > 0 )); then
     local sub_codec=""
-    # Find the subtitle codec name from the stream data
     while IFS= read -r line; do
       [[ -n "$line" ]] || continue
       ctype="$(_stream_field "$line" codec_type)"
@@ -650,13 +680,12 @@ print_media_summary() {
       lang_list="$(printf '%s  ' "${sub_langs[@]}")"
       sub_info+="  ${lang_list%  }"
     fi
-    printf '%s  %-10s %s\n' "$sep" "SUBTITLES" "$sub_info"
+    printf '  %b%-10s%b %s\n' "$C_CYAN" "subtitles" "$C_RESET" "$sub_info"
   fi
 
   if (( total == 0 )); then
-    printf '%s  %s\n' "$sep" "(no streams detected by ffprobe)"
+    printf '  %b%s%b\n' "$C_YELLOW" "(no streams detected by ffprobe)" "$C_RESET"
   fi
-  printf '  └%s\n' "$bar"
 }
 
 is_known_color_value() {
@@ -709,21 +738,33 @@ opus_bitrate_for_channels() {
   fi
 }
 
+opus_filter_for_layout() {
+  local channels="$1"
+  local layout="$2"
+
+  if [[ "$channels" == "6" && "$layout" == "5.1(side)" ]]; then
+    printf '%s\n' "pan=5.1|FL=FL|FR=FR|FC=FC|LFE=LFE|BL=SL|BR=SR"
+  fi
+}
+
 # Add per-stream audio encoder args from pre-probed stream data.
 _add_audio_args_from_data() {
   local streams="$1"
   local -n cmd_ref="$2"
-  local idx=0 channels bitrate line ctype
+  local idx=0 channels layout bitrate filter line ctype
 
   while IFS= read -r line; do
     [[ -n "$line" ]] || continue
     ctype="$(_stream_field "$line" codec_type)"
     [[ "$ctype" == "audio" ]] || continue
     channels="$(_stream_field "$line" channels)"
+    layout="$(_stream_field "$line" channel_layout)"
 
     if [[ "$channels" =~ ^[0-9]+$ && "$channels" -gt 2 ]]; then
       bitrate="$(opus_bitrate_for_channels "$channels")"
-      cmd_ref+=(-c:a:"$idx" libopus -b:a:"$idx" "$bitrate" -vbr:a:"$idx" on)
+      filter="$(opus_filter_for_layout "$channels" "$layout")"
+      [[ -n "$filter" ]] && cmd_ref+=(-filter:a:"$idx" "$filter")
+      cmd_ref+=(-c:a:"$idx" libopus -b:a:"$idx" "$bitrate" -vbr:a:"$idx" on -mapping_family:a:"$idx" 1)
     else
       cmd_ref+=(-c:a:"$idx" flac -compression_level:a:"$idx" 8)
     fi
@@ -783,6 +824,27 @@ print_cmd() {
     printf '%q ' "$arg"
   done
   printf '\n'
+}
+
+print_path_summary() {
+  local label="$1"
+  local output="$2"
+  local input_name="$label"
+  local input_dir=""
+  local output_name output_dir
+
+  if [[ "$label" == /* ]]; then
+    input_name="$(basename -- "$label")"
+    input_dir="$(dirname -- "$label")"
+  fi
+
+  output_name="$(basename -- "$output")"
+  output_dir="$(dirname -- "$output")"
+
+  printf '%b%s%b %s\n' "$C_BOLD" "input" "$C_RESET" "$input_name"
+  [[ -n "$input_dir" ]] && printf '  %bfrom%b %s\n' "$C_DIM" "$C_RESET" "$input_dir"
+  printf '%b%s%b %s\n' "$C_BOLD" "output" "$C_RESET" "$output_name"
+  printf '  %bto%b   %s\n' "$C_DIM" "$C_RESET" "$output_dir"
 }
 
 output_for_file() {
@@ -868,24 +930,21 @@ process_one() {
   local mode_str="FULL"
   [[ "$TRY_MODE" == "true" ]] && mode_str="TRY (${TRY_DURATION}s from ${TRY_START}s)"
 
-  local bar='──────────────────────────────────────────────────────────────'
   printf '\n'
-  printf '  ┌%s\n' "$bar"
-  printf '  │  %-10s %s\n' "INPUT"  "$label"
-  printf '  │  %-10s %s\n' "OUTPUT" "$output"
-  printf '  │  %-10s %s\n' "MODE"   "$mode_str"
+  printf '%b%s%b %s\n' "$C_GREEN" "==>" "$C_RESET" "$mode_str"
+  print_path_summary "$label" "$output"
   print_media_summary "$streams" "$probe_input"
 
   build_command "$input" "$probe_input" "$output" cmd "$streams"
 
   if [[ "$WET_RUN" != "true" ]]; then
-    printf 'DRY-RUN:\n'
+    printf '%b%s%b\n' "$C_YELLOW" "dry-run command:" "$C_RESET"
     print_cmd "${cmd[@]}"
     return 0
   fi
 
   mkdir -p "$(dirname -- "$output")"
-  printf 'WET-RUN:\n'
+  printf '%b%s%b\n' "$C_GREEN" "running:" "$C_RESET"
   print_cmd "${cmd[@]}"
   "${cmd[@]}"
 }
@@ -1012,16 +1071,16 @@ main() {
 
   (( ${#item_inputs[@]} > 0 )) || die "No video files found"
 
-  log "ffmpeg:  $FFMPEG"
-  log "ffprobe: $FFPROBE"
-  log "Files:   ${#item_inputs[@]}"
+  local mode_label="wet-run"
+  [[ "$WET_RUN" != "true" ]] && mode_label="dry-run"
+
+  log "Ready: ${#item_inputs[@]} file(s), ${mode_label}, ffmpeg=$(basename -- "$FFMPEG")"
   if (( dvd_group_count > 0 )); then
     log "DVD VOB groups: ${dvd_group_count} merged title set(s)"
   fi
   if (( skipped_dvd_menus > 0 )); then
     log "DVD menu VOBs skipped: ${skipped_dvd_menus}"
   fi
-  [[ "$WET_RUN" != "true" ]] && log "Dry-run enabled. Add --wet-run to encode."
 
   local i
   for i in "${!item_inputs[@]}"; do
