@@ -18,7 +18,7 @@ set -Eeuo pipefail
 SCRIPT_NAME="$(basename "$0")"
 
 CRF=24
-PRESET=6
+PRESET=8
 TRY_MODE=false
 TRY_DURATION=300
 TRY_START=0
@@ -70,7 +70,7 @@ Options:
   --try-duration <sec>   Preview duration. Default: 300.
   --try-start <sec>      Preview start offset. Default: 0.
   --crf <0-63>           SVT-AV1 CRF quality. Default: 24.
-  --preset <0-13>        SVT-AV1 speed preset. Default: 6.
+  --preset <0-13>        SVT-AV1 speed preset. Default: 8.
   --output <path>        Single-file output path.
   --out-dir <path>       Output directory. Directory inputs preserve structure.
   --overwrite            Replace existing output files.
