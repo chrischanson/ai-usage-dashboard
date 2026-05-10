@@ -488,7 +488,7 @@ probe_all_streams() {
   add_probe_options "$input" "$probe_input" cmd
   cmd+=(
     -show_entries \
-      "stream=index,codec_type,codec_name,width,height,r_frame_rate,channels,channel_layout,sample_rate,color_primaries,color_transfer,color_space:stream_tags=language,title"
+      "stream=index,codec_type,codec_name,width,height,r_frame_rate,channels,channel_layout,sample_rate,bit_rate,color_primaries,color_transfer,color_space:stream_tags=language,title"
     -of compact=p=0:nk=0
     "$probe_input"
   )
@@ -518,6 +518,26 @@ _fps_decimal() {
   else
     printf '%s' "$1"
   fi
+}
+
+_human_bitrate() {
+  local bits="$1"
+  [[ "$bits" =~ ^[0-9]+$ && "$bits" -gt 0 ]] || return 0
+
+  awk -v b="$bits" 'BEGIN {
+    if (b >= 1000000) printf "%.1f Mb/s", b / 1000000;
+    else printf "%.0f kb/s", b / 1000;
+  }'
+}
+
+_stream_suffix() {
+  local lang="$1"
+  local title="$2"
+  local out=""
+
+  [[ -n "$lang" ]] && out+=" [${lang}]"
+  [[ -n "$title" ]] && out+="${out:+ }${title}"
+  printf '%s' "$out"
 }
 
 _friendly_codec() {
@@ -557,134 +577,112 @@ _ifo_subtitle_langs() {
     "$ifo" 2>/dev/null || true
 }
 
-# Print a concise media summary (video + audio + subtitles).
+# Print a stream-by-stream encoding plan.
 # Accepts pre-probed stream data so the probe is done only once per file.
 print_media_summary() {
   local streams="$1"
   local probe_input="$2"
 
-  # Collect subtitle language tags.
-  # For VOB files, try the sibling IFO first ( richer metadata).
-  # Otherwise, extract languages directly from the stream data.
-  local -a sub_langs=()
-  local ifo=""
-  local probe_lower="${probe_input,,}"
+  local -a ifo_sub_langs=()
+  local -a ifo_sub_titles=()
+  local ifo="" probe_lower="${probe_input,,}"
   if [[ "$probe_lower" == *.vob ]]; then
     ifo="$(_ifo_for_vob "$probe_input" || true)"
   fi
   if [[ -n "$ifo" ]]; then
-    local ifo_line ifo_lang ifo_title
+    local ifo_line
     while IFS= read -r ifo_line; do
       [[ -n "$ifo_line" ]] || continue
-      ifo_lang="$(_stream_field "$ifo_line" "tag:language")"
-      ifo_title="$(_stream_field "$ifo_line" "tag:title")"
-      local tag=""
-      [[ -n "$ifo_lang"  ]] && tag="[${ifo_lang}]"
-      [[ -n "$ifo_title" ]] && tag+="${tag:+ }${ifo_title}"
-      sub_langs+=("${tag:-?}")
+      ifo_sub_langs+=("$(_stream_field "$ifo_line" "tag:language")")
+      ifo_sub_titles+=("$(_stream_field "$ifo_line" "tag:title")")
     done < <(_ifo_subtitle_langs "$ifo")
   fi
 
-  local video_idx=0 audio_idx=0 sub_idx=0 total=0 extra_video=0 extra_audio=0
-  local line ctype cname width height fps ch layout sr lang title info
-  local video_info=""
-  local -a audio_infos=()
+  local total=0 video_idx=0 audio_idx=0 sub_idx=0
+  local line ctype cname index width height fps ch layout sr bitrate lang title info out filter suffix
+
+  printf '  %b%s%b\n' "$C_CYAN" "streams" "$C_RESET"
 
   while IFS= read -r line; do
     [[ -n "$line" ]] || continue
     ctype="$(_stream_field "$line" codec_type)"
     cname="$(_stream_field "$line" codec_name)"
+    index="$(_stream_field "$line" index)"
     lang="$(_stream_field  "$line" "tag:language")"
     title="$(_stream_field "$line" "tag:title")"
+    ((total += 1))
 
     case "$ctype" in
       video)
+        width="$(_stream_field "$line" width)"
+        height="$(_stream_field "$line" height)"
+        fps="$(_stream_field "$line" r_frame_rate)"
+        bitrate="$(_human_bitrate "$(_stream_field "$line" bit_rate)")"
+        [[ -n "$fps" ]] && fps="$(_fps_decimal "$fps")"
+
+        info="$(_friendly_codec "$cname")"
+        [[ -n "$width" && -n "$height" ]] && info+=" ${width}×${height}"
+        [[ -n "$fps" ]] && info+=" ${fps}fps"
+        [[ -n "$bitrate" ]] && info+=" ${bitrate}"
+        suffix="$(_stream_suffix "$lang" "$title")"
+        [[ -n "$suffix" ]] && info+="$suffix"
+
         if (( video_idx == 0 )); then
-          width="$(_stream_field "$line" width)"
-          height="$(_stream_field "$line" height)"
-          fps="$(_stream_field   "$line" r_frame_rate)"
-          [[ -n "$fps" ]] && fps="$(_fps_decimal "$fps")"
-          info="$(_friendly_codec "$cname")"
-          [[ -n "$width" && -n "$height" ]] && info+="  ${width}×${height}"
-          [[ -n "$fps" ]] && info+="  ${fps} fps"
-          video_info="$info"
+          out="AV1 libsvtav1 crf=${CRF} preset=${PRESET}"
         else
-          (( extra_video += 1 ))
+          out="skipped"
         fi
-        (( video_idx += 1 ))
-        (( total     += 1 ))
+        printf '    %bvideo     #%s%b %s -> %s\n' "$C_DIM" "${index:-?}" "$C_RESET" "$info" "$out"
+        ((video_idx += 1))
         ;;
       audio)
         ch="$(_stream_field "$line" channels)"
         layout="$(_stream_field "$line" channel_layout)"
         sr="$(_stream_field "$line" sample_rate)"
+        bitrate="$(_human_bitrate "$(_stream_field "$line" bit_rate)")"
+
         info="$(_friendly_codec "$cname")"
         if [[ -n "$layout" ]]; then
-          info+="  ${layout}"
+          info+=" ${layout}"
         elif [[ -n "$ch" ]]; then
-          info+="  ${ch}ch"
+          info+=" ${ch}ch"
         fi
-        [[ -n "$sr"    ]] && info+="  ${sr} Hz"
-        [[ -n "$lang"  ]] && info+="  [${lang}]"
-        [[ -n "$title" ]] && info+=" ${title}"
-        if (( ${#audio_infos[@]} < 2 )); then
-          audio_infos+=("$info")
+        [[ -n "$sr" ]] && info+=" ${sr}Hz"
+        [[ -n "$bitrate" ]] && info+=" ${bitrate}"
+        suffix="$(_stream_suffix "$lang" "$title")"
+        [[ -n "$suffix" ]] && info+="$suffix"
+
+        if [[ "$ch" =~ ^[0-9]+$ && "$ch" -gt 2 ]]; then
+          out="Opus $(opus_bitrate_for_channels "$ch")"
+          filter="$(opus_filter_for_layout "$ch" "$layout")"
+          [[ -n "$filter" ]] && out+=" (layout normalized to 5.1)"
         else
-          (( extra_audio += 1 ))
+          out="FLAC lossless"
         fi
-        (( audio_idx += 1 ))
-        (( total     += 1 ))
+        printf '    %baudio     #%s%b %s -> %s\n' "$C_DIM" "${index:-?}" "$C_RESET" "$info" "$out"
+        ((audio_idx += 1))
         ;;
       subtitle)
-        # Collect subtitle languages from stream data if IFO didn't provide them
-        if (( ${#sub_langs[@]} == 0 )); then
-          local stag=""
-          [[ -n "$lang"  ]] && stag="[${lang}]"
-          [[ -n "$title" ]] && stag+="${stag:+ }${title}"
-          sub_langs+=("${stag:-?}")
+        if (( ${#ifo_sub_langs[@]} > sub_idx )); then
+          [[ -n "${ifo_sub_langs[$sub_idx]}" ]] && lang="${ifo_sub_langs[$sub_idx]}"
+          [[ -n "${ifo_sub_titles[$sub_idx]}" ]] && title="${ifo_sub_titles[$sub_idx]}"
         fi
-        (( sub_idx += 1 ))
-        (( total   += 1 ))
+
+        info="$(_friendly_codec "$cname")"
+        suffix="$(_stream_suffix "$lang" "$title")"
+        if [[ -n "$suffix" ]]; then
+          info+="$suffix"
+        else
+          info+=" [?]"
+        fi
+        printf '    %bsubtitle  #%s%b %s -> copy\n' "$C_DIM" "${index:-?}" "$C_RESET" "$info"
+        ((sub_idx += 1))
         ;;
     esac
   done <<< "$streams"
 
-  if [[ -n "$video_info" ]]; then
-    printf '  %b%-10s%b %s' "$C_CYAN" "video" "$C_RESET" "$video_info"
-    (( extra_video > 0 )) && printf '  %b(+%d skipped)%b' "$C_DIM" "$extra_video" "$C_RESET"
-    printf '\n'
-  fi
-
-  if (( audio_idx > 0 )); then
-    local audio_line
-    audio_line="$(printf '%s; ' "${audio_infos[@]}")"
-    audio_line="${audio_line%; }"
-    (( extra_audio > 0 )) && audio_line+="  (+${extra_audio} more)"
-    printf '  %b%-10s%b %s\n' "$C_CYAN" "audio" "$C_RESET" "$audio_line"
-  fi
-
-  if (( sub_idx > 0 )); then
-    local sub_codec=""
-    while IFS= read -r line; do
-      [[ -n "$line" ]] || continue
-      ctype="$(_stream_field "$line" codec_type)"
-      if [[ "$ctype" == "subtitle" ]]; then
-        cname="$(_stream_field "$line" codec_name)"
-        sub_codec="$(_friendly_codec "$cname")"
-        break
-      fi
-    done <<< "$streams"
-    local sub_info="${sub_codec:-subtitle}  ${sub_idx} track(s)"
-    if (( ${#sub_langs[@]} > 0 )); then
-      local lang_list
-      lang_list="$(printf '%s  ' "${sub_langs[@]}")"
-      sub_info+="  ${lang_list%  }"
-    fi
-    printf '  %b%-10s%b %s\n' "$C_CYAN" "subtitles" "$C_RESET" "$sub_info"
-  fi
-
   if (( total == 0 )); then
-    printf '  %b%s%b\n' "$C_YELLOW" "(no streams detected by ffprobe)" "$C_RESET"
+    printf '    %b%s%b\n' "$C_YELLOW" "(no streams detected by ffprobe)" "$C_RESET"
   fi
 }
 
@@ -826,25 +824,81 @@ print_cmd() {
   printf '\n'
 }
 
+common_dir() {
+  local left="$1"
+  local right="$2"
+  local common=""
+  local old_ifs="$IFS"
+  local -a left_parts=()
+  local -a right_parts=()
+  local i max
+
+  left="$(abs_path "$left")"
+  right="$(abs_path "$right")"
+  IFS='/' read -r -a left_parts <<< "${left#/}"
+  IFS='/' read -r -a right_parts <<< "${right#/}"
+  IFS="$old_ifs"
+
+  max="${#left_parts[@]}"
+  (( ${#right_parts[@]} < max )) && max="${#right_parts[@]}"
+
+  for ((i = 0; i < max; i++)); do
+    [[ "${left_parts[$i]}" == "${right_parts[$i]}" ]] || break
+    common+="/${left_parts[$i]}"
+  done
+
+  printf '%s\n' "${common:-/}"
+}
+
+relative_to_dir() {
+  local path="$1"
+  local root="$2"
+
+  path="$(abs_path "$path")"
+  root="$(abs_path "$root")"
+
+  if [[ "$root" == "/" ]]; then
+    printf '%s\n' "${path#/}"
+  elif [[ "$path" == "$root" ]]; then
+    printf '.\n'
+  elif [[ "$path" == "$root/"* ]]; then
+    printf '%s\n' "${path#"$root/"}"
+  else
+    printf '%s\n' "$path"
+  fi
+}
+
 print_path_summary() {
   local label="$1"
-  local output="$2"
+  local probe_input="$2"
+  local output="$3"
   local input_name="$label"
-  local input_dir=""
-  local output_name output_dir
+  local output_name output_dir root input_rel output_rel
 
   if [[ "$label" == /* ]]; then
     input_name="$(basename -- "$label")"
-    input_dir="$(dirname -- "$label")"
   fi
 
   output_name="$(basename -- "$output")"
   output_dir="$(dirname -- "$output")"
 
-  printf '%b%s%b %s\n' "$C_BOLD" "input" "$C_RESET" "$input_name"
-  [[ -n "$input_dir" ]] && printf '  %bfrom%b %s\n' "$C_DIM" "$C_RESET" "$input_dir"
-  printf '%b%s%b %s\n' "$C_BOLD" "output" "$C_RESET" "$output_name"
-  printf '  %bto%b   %s\n' "$C_DIM" "$C_RESET" "$output_dir"
+  if [[ "$probe_input" == /* ]]; then
+    root="$(common_dir "$(dirname -- "$probe_input")" "$output_dir")"
+    input_rel="$(relative_to_dir "$probe_input" "$root")"
+    output_rel="$(relative_to_dir "$output" "$root")"
+    printf '%b%s%b  %s\n' "$C_DIM" "root" "$C_RESET" "$root"
+    if [[ "$label" == /* ]]; then
+      printf '%b%s%b %s\n' "$C_BOLD" "input" "$C_RESET" "$input_rel"
+    else
+      printf '%b%s%b %s\n' "$C_BOLD" "input" "$C_RESET" "$input_name"
+      printf '  %bfirst chunk%b %s\n' "$C_DIM" "$C_RESET" "$input_rel"
+    fi
+    printf '%b%s%b %s\n' "$C_BOLD" "output" "$C_RESET" "$output_rel"
+  else
+    printf '%b%s%b %s\n' "$C_BOLD" "input" "$C_RESET" "$input_name"
+    printf '%b%s%b %s\n' "$C_BOLD" "output" "$C_RESET" "$output_name"
+    printf '  %bto%b   %s\n' "$C_DIM" "$C_RESET" "$output_dir"
+  fi
 }
 
 output_for_file() {
@@ -932,7 +986,7 @@ process_one() {
 
   printf '\n'
   printf '%b%s%b %s\n' "$C_GREEN" "==>" "$C_RESET" "$mode_str"
-  print_path_summary "$label" "$output"
+  print_path_summary "$label" "$probe_input" "$output"
   print_media_summary "$streams" "$probe_input"
 
   build_command "$input" "$probe_input" "$output" cmd "$streams"
