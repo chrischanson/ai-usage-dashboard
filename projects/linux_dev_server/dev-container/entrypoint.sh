@@ -42,16 +42,21 @@ chmod 600 "$AUTH_KEYS"
 chown -R dev:dev /home/dev/.ssh
 
 # ── Export environment variables for SSH sessions ─────────────
-# SSH strips Docker env vars upon login. We must explicitly write 
+# SSH strips Docker env vars upon login. We must explicitly write
 # the AI keys into a profile script so the dev user has access.
+# Model values are sourced from the mounted config file so they can
+# be changed at runtime without restarting the container.
 cat <<EOF > /etc/profile.d/ai-keys.sh
 export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
 export ANTHROPIC_BASE_URL="${ANTHROPIC_BASE_URL}"
 export ANTHROPIC_AUTH_TOKEN="${ANTHROPIC_AUTH_TOKEN}"
 export ANTHROPIC_API_KEY=""
-export ANTHROPIC_DEFAULT_SONNET_MODEL="${ANTHROPIC_DEFAULT_SONNET_MODEL}"
-export ANTHROPIC_DEFAULT_HAIKU_MODEL="${ANTHROPIC_DEFAULT_HAIKU_MODEL}"
-export CLAUDE_CODE_SUBAGENT_MODEL="${CLAUDE_CODE_SUBAGENT_MODEL}"
+# Source runtime model config (mounted from host, editable without restart)
+if [ -f /etc/claude-model.conf ]; then
+  set -a
+  . /etc/claude-model.conf
+  set +a
+fi
 export OPENAI_API_BASE="${OPENAI_API_BASE}"
 export OPENAI_API_KEY="${OPENAI_API_KEY}"
 export OPENCODE_API_KEY="${OPENCODE_API_KEY}"
@@ -82,9 +87,12 @@ export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
 export ANTHROPIC_BASE_URL="${ANTHROPIC_BASE_URL}"
 export ANTHROPIC_AUTH_TOKEN="${ANTHROPIC_AUTH_TOKEN}"
 export ANTHROPIC_API_KEY=""
-export ANTHROPIC_DEFAULT_SONNET_MODEL="${ANTHROPIC_DEFAULT_SONNET_MODEL}"
-export ANTHROPIC_DEFAULT_HAIKU_MODEL="${ANTHROPIC_DEFAULT_HAIKU_MODEL}"
-export CLAUDE_CODE_SUBAGENT_MODEL="${CLAUDE_CODE_SUBAGENT_MODEL}"
+# Source runtime model config (mounted from host, editable without restart)
+if [ -f /etc/claude-model.conf ]; then
+  set -a
+  . /etc/claude-model.conf
+  set +a
+fi
 export OPENAI_API_BASE="${OPENAI_API_BASE}"
 export OPENAI_API_KEY="${OPENAI_API_KEY}"
 export OPENCODE_API_KEY="${OPENCODE_API_KEY}"
@@ -99,6 +107,25 @@ fi
 $END_MARKER
 EOF
 chown dev:dev "$BASHRC"
+
+# ── Claude Code wrapper —──────────────────────────────────────
+# Create a wrapper that sources the runtime model config before
+# every claude invocation. This covers docker exec, cron, and
+# any non-shell context where .bashrc is not sourced.
+# The guard checks for claude.real (created once) to stay idempotent.
+if [ -f /usr/local/bin/claude ] && [ ! -f /usr/local/bin/claude.real ]; then
+    mv /usr/local/bin/claude /usr/local/bin/claude.real
+    cat > /usr/local/bin/claude <<'WRAPPER'
+#!/usr/bin/env bash
+if [ -f /etc/claude-model.conf ]; then
+  set -a
+  . /etc/claude-model.conf
+  set +a
+fi
+exec /usr/local/bin/claude.real "$@"
+WRAPPER
+    chmod +x /usr/local/bin/claude
+fi
 
 # ── Startup banner ────────────────────────────────────────────
 echo ""

@@ -27,10 +27,6 @@ services:
       - ANTHROPIC_BASE_URL=https://openrouter.ai/api
       - ANTHROPIC_AUTH_TOKEN=${OPENROUTER_API_KEY}
       - ANTHROPIC_API_KEY=""
-      # Map Claude Code internal agents to a free OpenRouter model
-      - ANTHROPIC_DEFAULT_SONNET_MODEL=minimax/minimax-m2.5:free
-      - ANTHROPIC_DEFAULT_HAIKU_MODEL=minimax/minimax-m2.5:free
-      - CLAUDE_CODE_SUBAGENT_MODEL=minimax/minimax-m2.5:free
       # Route OpenCode to OpenRouter
       - OPENAI_API_BASE=https://openrouter.ai/api/v1
       - OPENAI_API_KEY=${OPENROUTER_API_KEY}
@@ -45,6 +41,8 @@ services:
     volumes:
       # Home directory persists across container rebuilds
       - dev-home:/home/dev
+      # Runtime model config — edit to change Claude Code model without restart
+      - ./dev-container/claude-model.conf:/etc/claude-model.conf:ro
       # Mount public keys — one file per client.
       # Add each client's public key as a separate file in ./ssh-keys/
       #
