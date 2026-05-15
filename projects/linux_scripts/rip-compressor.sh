@@ -25,6 +25,7 @@ TRY_START=0
 WET_RUN=false
 RUN_MODE_EXPLICIT=false
 OVERWRITE=false
+DEBUG=false
 AUTO_BOOTSTRAP=true
 FORCE_BOOTSTRAP=false
 DVD_MERGE_VOBS=true
@@ -80,6 +81,7 @@ Options:
   --no-dvd-merge         Treat DVD VOB chunks as separate files instead of
                          merging VTS_nn_1.VOB, VTS_nn_2.VOB, etc.
   --ffmpeg-dir <path>    Install/use static ffmpeg from this directory.
+  --debug                Print ffmpeg's full output during encoding (verbose).
   --help, -h             Show this help.
 
 Behavior:
@@ -190,6 +192,10 @@ parse_args() {
         need_value "$1" "$#"
         FFMPEG_DIR="$2"
         shift 2
+        ;;
+      --debug)
+        DEBUG=true
+        shift
         ;;
       --help|-h)
         usage
@@ -479,6 +485,33 @@ add_probe_options() {
 
 # ─── Stream probing and media-summary table ─────────────────────────────────
 
+# Deduplicate ffprobe compact-output stream lines by stream index.
+# Multi-program transport streams (e.g. DVB broadcast .ts files) cause ffprobe
+# to emit the same elementary stream once per program/service that references
+# it.  We keep the LAST occurrence of each index so that the richer per-program
+# metadata (e.g. language tags present in the second PMT entry) wins over the
+# first, tag-free listing.  Without this, -map 0:a? would encode the same
+# audio track once per program, producing duplicate output tracks.
+dedup_streams_by_index() {
+  awk -F'|' '
+  {
+    idx = ""
+    for (i = 1; i <= NF; i++) {
+      eq = index($i, "=")
+      if (eq > 0 && substr($i, 1, eq - 1) == "index") {
+        idx = substr($i, eq + 1)
+        break
+      }
+    }
+    if (idx == "") { print; next }
+    if (!(idx in seen)) order[n++] = idx
+    seen[idx] = $0
+  }
+  END {
+    for (i = 0; i < n; i++) print seen[order[i]]
+  }'
+}
+
 # Probe all streams of a file; outputs ffprobe compact key=value lines.
 # Includes color metadata for video streams so a single probe serves all needs.
 probe_all_streams() {
@@ -492,7 +525,7 @@ probe_all_streams() {
     -of compact=p=0:nk=0
     "$probe_input"
   )
-  "${cmd[@]}" 2>/dev/null || true
+  "${cmd[@]}" 2>/dev/null | dedup_streams_by_index || true
 }
 
 # Extract the value of a named field from one compact ffprobe line.
@@ -780,6 +813,11 @@ build_command() {
   local -n cmd_ref="$cmd_name"
 
   cmd_ref=("$FFMPEG" -hide_banner)
+  # Suppress ffmpeg's verbose stream/format info and per-frame stats by default.
+  # --debug restores full output for troubleshooting.
+  if [[ "$DEBUG" != "true" ]]; then
+    cmd_ref+=(-loglevel error -nostats)
+  fi
   if [[ "$OVERWRITE" == "true" ]]; then
     cmd_ref+=(-y)
   else
