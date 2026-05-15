@@ -842,7 +842,7 @@ build_command() {
     -c:v libsvtav1
     -crf "$CRF"
     -preset "$PRESET"
-    -svtav1-params "tune=0:film-grain=0"
+    -svtav1-params "tune=0:film-grain=0:log=0"
     -c:s copy
     -c:t copy
     -max_muxing_queue_size 4096
