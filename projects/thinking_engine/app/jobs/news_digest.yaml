@@ -1,0 +1,46 @@
+# News Digest — Example Job Definition
+# Summarizes recent news on a topic and scores output quality via rubric
+
+id: news_digest_v1
+name: news_digest
+description: >
+  Generates a concise daily news digest on a given topic.
+  Scores output based on structure and completeness.
+
+schedule: "0 7 * * *"   # Daily at 7am
+
+budget:
+  max_tokens: 1500
+  max_cost_usd: 0.02
+
+context:
+  - type: static
+    as: topic
+    text: "artificial intelligence and machine learning"
+
+prompt_template: |
+  You are a research analyst. Create a concise news digest about: {topic}
+
+  Include exactly 5 items. For each item provide:
+  - headline: a one-line summary
+  - source: the publication or outlet
+  - significance: why this matters (1-2 sentences)
+  - category: one of [breakthrough, business, policy, research, product]
+
+  Output a JSON object with:
+  - date: today's date (YYYY-MM-DD)
+  - topic: the topic analyzed
+  - items: list of 5 items as described above
+  - meta_summary: 2-3 sentence overview of the day's themes
+
+fitness:
+  type: rubric
+  rules:
+    - field: date
+      check: is_not_empty
+    - field: topic
+      check: is_not_empty
+    - field: items
+      check: is_list_min_length(5)
+    - field: meta_summary
+      check: is_not_empty

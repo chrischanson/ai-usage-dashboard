@@ -1,0 +1,10 @@
+# Thinking Engine
+
+*.pyc
+__pycache__/
+.env
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.venv/
