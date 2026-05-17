@@ -4,7 +4,7 @@ sh_test(
     name = "test-video-compressor",
     srcs = ["test-video-compressor.sh"],
     data = [
-        "//projects/video-compressor:video-compressor.sh",
+        "//public_projects/video-compressor:video-compressor.sh",
         "fakes/ffmpeg",
         "fakes/ffprobe",
     ],
