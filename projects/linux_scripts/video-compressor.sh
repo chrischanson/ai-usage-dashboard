@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# rip-compressor.sh
+# video-compressor.sh
 #
-# Compress DVD/Blu-ray rips while preserving the rip structure:
+# Compress video files while preserving the original structure:
 #   - Video: AV1 via SVT-AV1.
 #   - Audio: mono/stereo/unknown -> FLAC, surround -> Opus.
 #   - Subtitles, attachments, chapters, and metadata are copied.
@@ -35,7 +35,7 @@ OUT_DIR=""
 DVD_PROBESIZE=500M
 DVD_ANALYZE_DURATION=300M
 
-FFMPEG_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/rip-compressor/ffmpeg"
+FFMPEG_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/video-compressor/ffmpeg"
 FFMPEG=""
 FFPROBE=""
 

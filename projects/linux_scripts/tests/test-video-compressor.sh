@@ -2,7 +2,7 @@
 set -euo pipefail
 
 TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPT="${TEST_DIR}/../rip-compressor.sh"
+SCRIPT="${TEST_DIR}/../video-compressor.sh"
 FAKES_DIR="${TEST_DIR}/fakes"
 
 fail() {
@@ -47,7 +47,7 @@ trap 'rm -rf "$TMPDIR"' EXIT
 setup_media_tree
 
 bash -n "$SCRIPT"
-pass "rip-compressor.sh parses as Bash"
+pass "video-compressor.sh parses as Bash"
 
 dvd_try_dry="$(run_script --try --dry-run "${TMPDIR}/dvd")"
 assert_contains "$dvd_try_dry" "Ready: 1 file(s), dry-run" "DVD dry-run summary"
@@ -92,4 +92,4 @@ assert_contains "$ts_try_dry" "subtitle  #4 dvb [eng] English SDH -> copy" "TS f
 assert_contains "$ts_try_dry" "subtitle  #5 dvb [ger] -> copy" "TS second subtitle is detailed"
 pass "Blu-ray TS 5.1(side) Opus handling is stable"
 
-printf 'All rip-compressor tests passed.\n'
+printf 'All video-compressor tests passed.\n'

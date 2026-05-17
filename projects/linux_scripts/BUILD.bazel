@@ -1,1 +1,1 @@
-exports_files(["rip-compressor.sh"])
+exports_files(["video-compressor.sh"])
