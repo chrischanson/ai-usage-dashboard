@@ -56,6 +56,10 @@ Most scripts require the following tools:
 - `bc` (for `large-dir-audit.sh`)
 - `tinydng-cli` (optional, for `media-report.sh` compression)
 
+`video-compressor.sh` additionally requires:
+- `ffmpeg` with `libsvtav1`, `libopus`, and `flac` encoders, plus `ffprobe`
+  (or the script can auto-download a static BtbN build via `--bootstrap`)
+
 ## ⚠️ Safety First
 
 Most scripts run in **Dry-Run mode by default**. Always review the output before applying changes with `--wet-run` or `-y`.

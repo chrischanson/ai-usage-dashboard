@@ -74,6 +74,7 @@ Options:
   --preset <0-13>        SVT-AV1 speed preset. Default: 8.
   --output <path>        Single-file output path.
   --out-dir <path>       Output directory. Directory inputs preserve structure.
+                         Also accepted as --output-root.
   --overwrite            Replace existing output files.
   --bootstrap            Download/install the static ffmpeg now. With an input,
                          install first and then continue.
@@ -200,6 +201,17 @@ parse_args() {
       --help|-h)
         usage
         exit 0
+        ;;
+      --)
+        shift
+        while [[ $# -gt 0 ]]; do
+          if [[ -n "$INPUT" ]]; then
+            die "Only one input path is supported"
+          fi
+          INPUT="$1"
+          shift
+        done
+        break
         ;;
       -*)
         die "Unknown option: $1"
@@ -1105,7 +1117,7 @@ main() {
       local -a normal_files=()
       local file title_id dvd_dir dvd_key
 
-      for file in "${source_files[@]}"; do
+      for file in "${source_files[@]+"${source_files[@]}"}"; do
         if is_dvd_vob_part "$file"; then
           title_id="$(dvd_vob_title_id "$file")"
           dvd_dir="$(dirname -- "$file")"
@@ -1119,7 +1131,11 @@ main() {
         fi
       done
 
-      source_files=("${normal_files[@]}")
+      if (( ${#normal_files[@]} > 0 )); then
+        source_files=("${normal_files[@]}")
+      else
+        source_files=()
+      fi
 
       if (( ${#dvd_groups[@]} > 0 )); then
         while IFS= read -r dvd_key; do
@@ -1150,7 +1166,7 @@ main() {
     fi
 
     local file output
-    for file in "${source_files[@]}"; do
+    for file in "${source_files[@]+"${source_files[@]}"}"; do
       output="$(output_for_file "$file" "$root_for_rel" "$output_root")"
       item_inputs+=("$file")
       item_probes+=("$file")
