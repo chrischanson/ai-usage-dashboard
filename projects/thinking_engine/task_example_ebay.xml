@@ -1,0 +1,348 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task
+  id="ebay_deal_hunter"
+  version="1"
+  parent_version="0"
+  domain="commerce"
+  status="active"
+  created="2026-05-16"
+  evolved="2026-05-16">
+
+  <identity>
+    <name>eBay Profitable Deal Hunter</name>
+    <description>
+      Searches eBay for user-defined product categories, verifies listing quality
+      using an LLM reading the full listing, compares against market price for the
+      same product in the same condition, and alerts only on deals offering at least
+      50% discount with high confidence the item is genuinely functional.
+    </description>
+    <tags>ebay, deals, resale, arbitrage, commerce</tags>
+  </identity>
+
+  <!-- ═══════════════════════════════════════════
+       GOAL
+  ═══════════════════════════════════════════ -->
+  <goal>
+    <statement>
+      Identify eBay listings where a verified working product is listed at 50% or
+      less of the current market price for the same product in the same condition —
+      and surface only those opportunities with high confidence, low ambiguity, and
+      enough time remaining to act on them.
+    </statement>
+    <success_criteria>
+      <criterion id="condition_verified" weight="0.35">
+        The LLM has read the full listing title, description, and seller notes and
+        concluded with high confidence that the item is functional and matches the
+        stated condition (working, no major defects, not for parts).
+      </criterion>
+      <criterion id="discount_accuracy" weight="0.35">
+        The market price reference is for the same model, same condition, same region.
+        The discount calculation is accurate and not inflated by an artificially high
+        "original price" stated by the seller.
+      </criterion>
+      <criterion id="deal_actionability" weight="0.20">
+        The listing has sufficient time remaining (auction) or is Buy It Now,
+        the seller has acceptable feedback score (≥ 98%), and shipping cost is
+        factored into the final discount calculation.
+      </criterion>
+      <criterion id="alert_precision" weight="0.10">
+        Over a rolling 7-day window, the majority of alerted deals are ones the
+        user rates as genuinely interesting (thumbs up/down feedback).
+      </criterion>
+    </success_criteria>
+  </goal>
+
+  <!-- ═══════════════════════════════════════════
+       PROGRESS MEASUREMENT
+  ═══════════════════════════════════════════ -->
+  <measurement>
+    <method>judge_llm</method>
+    <judge_model>claude-haiku-4-5</judge_model>
+    <rubric>
+      You are evaluating whether an eBay deal analysis is accurate and trustworthy.
+      You will receive: the listing details, the LLM's condition assessment, the
+      market price reference used, and the calculated discount.
+
+      Score each criterion and return ONLY valid JSON — no prose.
+
+      {
+        "condition_verified": float 0.0-1.0,   // how confident is the condition assessment?
+        "discount_accuracy": float 0.0-1.0,    // is the market price reference fair and apples-to-apples?
+        "deal_actionability": float 0.0-1.0,   // can the user actually act on this right now?
+        "alert_precision": float 0.0-1.0,      // based on prior user feedback, is this the type of deal they want?
+        "composite": float 0.0-1.0,            // weighted average
+        "red_flags": [],                        // any concerns: vague description, low seller rating, parts-only risk, etc.
+        "recommendation": "alert" | "skip" | "needs_more_info"
+      }
+    </rubric>
+    <thresholds>
+      <alert_above>0.78</alert_above>
+      <evolve_below>0.55</evolve_below>
+      <discard_below>0.30</discard_below>
+    </thresholds>
+    <progress_tracking>
+      <metric>rolling_7d_composite_avg</metric>
+      <improvement_target>+0.05 per evolution cycle</improvement_target>
+      <plateau_threshold>3</plateau_threshold>
+    </progress_tracking>
+  </measurement>
+
+  <!-- ═══════════════════════════════════════════
+       SCHEDULE
+  ═══════════════════════════════════════════ -->
+  <schedule>
+    <cron>0 */3 * * *</cron>               <!-- every 3 hours -->
+    <timezone>America/Chicago</timezone>
+    <max_concurrent>3</max_concurrent>     <!-- run watchlists in parallel -->
+    <timeout_seconds>180</timeout_seconds>
+  </schedule>
+
+  <!-- ═══════════════════════════════════════════
+       PARAMETERS
+       User-defined watchlist — edit these
+  ═══════════════════════════════════════════ -->
+  <parameters>
+    <!-- Add or remove search targets here -->
+    <watchlist>
+      <item>
+        <query>Apple MacBook Pro M2</query>
+        <condition>used</condition>          <!-- new | used | refurbished -->
+        <min_discount_pct>50</min_discount_pct>
+        <max_price_usd>800</max_price_usd>
+        <exclude_keywords>broken, parts only, cracked, water damage, AS-IS</exclude_keywords>
+      </item>
+      <item>
+        <query>Synology NAS DS923</query>
+        <condition>used</condition>
+        <min_discount_pct>50</min_discount_pct>
+        <max_price_usd>300</max_price_usd>
+        <exclude_keywords>parts, broken, no drives, untested</exclude_keywords>
+      </item>
+      <item>
+        <query>Nvidia RTX 4070 GPU</query>
+        <condition>used</condition>
+        <min_discount_pct>50</min_discount_pct>
+        <max_price_usd>250</max_price_usd>
+        <exclude_keywords>mining, parts, broken, untested, damaged</exclude_keywords>
+      </item>
+    </watchlist>
+  </parameters>
+
+  <!-- ═══════════════════════════════════════════
+       CONTEXT
+       Data gathered before the prompt runs
+  ═══════════════════════════════════════════ -->
+  <context>
+    <input id="ebay_listings" required="true">
+      <source>api:ebay_browse</source>
+      <endpoint>/buy/browse/v1/item_summary/search</endpoint>
+      <params>
+        <q>{item.query}</q>
+        <filter>conditions:{item.condition},price:[..{item.max_price_usd}],buyingOptions:{FIXED_PRICE|AUCTION}</filter>
+        <sort>newlyListed</sort>
+        <limit>20</limit>
+      </params>
+      <dedupe>
+        <!-- Skip listing IDs already seen in results_store -->
+        <against>results_store:ebay_deal_hunter:listing_id</against>
+      </dedupe>
+    </input>
+
+    <input id="listing_detail" required="true">
+      <!-- For each candidate listing, fetch full description -->
+      <source>web_fetch</source>
+      <url>https://www.ebay.com/itm/{listing_id}</url>
+      <extract>title, description, seller_info, item_specifics, photos_count</extract>
+      <max_chars>4000</max_chars>
+    </input>
+
+    <input id="market_price" required="true">
+      <!-- Get comparable sold prices for same item + condition -->
+      <source>api:ebay_browse</source>
+      <endpoint>/buy/browse/v1/item_summary/search</endpoint>
+      <params>
+        <q>{item.query}</q>
+        <filter>conditions:{item.condition},soldItems:true</filter>
+        <sort>endTimeSoonest</sort>
+        <limit>10</limit>
+      </params>
+      <transform>median_sold_price</transform>   <!-- compute median of last 10 sold -->
+    </input>
+
+    <input id="prior_alerts" required="false">
+      <source>results_store</source>
+      <job_id>ebay_deal_hunter</job_id>
+      <filter>alert_sent=true AND item_query={item.query}</filter>
+      <last_n>10</last_n>
+      <format>summary</format>
+    </input>
+  </context>
+
+  <!-- ═══════════════════════════════════════════
+       PROMPT
+       Two-stage: condition check then deal evaluation
+  ═══════════════════════════════════════════ -->
+  <prompt version="1">
+
+    <!-- Stage 1: condition verification (runs per listing) -->
+    <stage id="condition_check">
+      <system>
+        You are an expert product inspector. Your job is to read eBay listings
+        and determine with high confidence whether an item is genuinely functional
+        and accurately described. Be skeptical. Flag any ambiguity.
+        Return only valid JSON.
+      </system>
+      <user>
+        Evaluate this eBay listing for "{item.query}" listed as "{item.condition}" condition.
+
+        LISTING TITLE: {listing.title}
+        LISTING DESCRIPTION: {listing.description}
+        ITEM SPECIFICS: {listing.item_specifics}
+        SELLER FEEDBACK SCORE: {listing.seller_feedback_pct}% ({listing.seller_feedback_count} ratings)
+        NUMBER OF PHOTOS: {listing.photos_count}
+        ASKING PRICE: ${listing.price} (+ ${listing.shipping_cost} shipping)
+
+        Assess the following and return JSON:
+        {{
+          "is_functional": true | false | "uncertain",
+          "condition_matches_claim": true | false | "uncertain",
+          "red_flags": [list of strings — any concerning phrases or omissions],
+          "parts_only_risk": float 0.0-1.0,
+          "confidence": float 0.0-1.0,
+          "condition_summary": string max 60 words,
+          "pass": true | false   // true only if is_functional=true AND confidence >= 0.75
+        }}
+      </user>
+    </stage>
+
+    <!-- Stage 2: deal evaluation (only runs if condition_check.pass = true) -->
+    <stage id="deal_evaluation" depends_on="condition_check.pass=true">
+      <system>
+        You are a deal analyst. Given a verified functional item and market price data,
+        calculate the true discount and assess whether this is a genuine opportunity.
+        Return only valid JSON.
+      </system>
+      <user>
+        ITEM: {item.query} ({item.condition})
+        LISTING PRICE: ${listing.price}
+        SHIPPING COST: ${listing.shipping_cost}
+        TOTAL COST TO BUYER: ${listing.total_cost}
+
+        MARKET PRICE (median of last 10 sold, same condition): ${market_price.median}
+        MARKET PRICE RANGE: ${market_price.p25} – ${market_price.p75}
+
+        CONDITION ASSESSMENT: {condition_check.condition_summary}
+        SELLER FEEDBACK: {listing.seller_feedback_pct}%
+        LISTING TYPE: {listing.buying_option}
+        TIME REMAINING: {listing.time_remaining}
+
+        PRIOR ALERTS FOR THIS CATEGORY: {prior_alerts}
+
+        Evaluate and return JSON:
+        {{
+          "true_discount_pct": float,             // (market_median - total_cost) / market_median * 100
+          "meets_50pct_threshold": true | false,
+          "market_price_confidence": float 0.0-1.0, // how reliable is the market price reference?
+          "deal_quality": "exceptional" | "good" | "marginal" | "skip",
+          "actionability": "buy_now" | "watch" | "skip",
+          "estimated_resale_value": float,         // if reselling: conservative market price
+          "estimated_profit_after_fees": float,    // resale - cost - ebay_fees(13%) - shipping
+          "one_line_summary": string max 80 chars
+        }}
+      </user>
+    </stage>
+
+  </prompt>
+
+  <!-- ═══════════════════════════════════════════
+       EXECUTION
+  ═══════════════════════════════════════════ -->
+  <execution>
+    <budget>
+      <max_cost_usd>0.10</max_cost_usd>      <!-- per watchlist item per run -->
+      <max_tokens_in>5000</max_tokens_in>
+      <max_tokens_out>600</max_tokens_out>
+    </budget>
+    <routing>
+      <!-- Stage 1 condition check: needs good reading comprehension -->
+      <stage ref="condition_check">
+        <provider priority="1" model="claude-haiku-4-5">anthropic</provider>
+        <provider priority="2" model="gemini-flash-2.0">gemini</provider>
+        <provider priority="3" model="qwen3:30b">ollama</provider>
+      </stage>
+      <!-- Stage 2 deal eval: lightweight math + reasoning -->
+      <stage ref="deal_evaluation">
+        <provider priority="1" model="llama-3.1-70b">groq</provider>
+        <provider priority="2" model="gemini-flash-2.0">gemini</provider>
+        <provider priority="3" model="qwen3:30b">ollama</provider>
+      </stage>
+    </routing>
+    <output_format>json</output_format>
+    <retry>
+      <max_attempts>2</max_attempts>
+      <on_parse_failure>retry_with_format_reminder</on_parse_failure>
+    </retry>
+  </execution>
+
+  <!-- ═══════════════════════════════════════════
+       CHILDREN
+  ═══════════════════════════════════════════ -->
+  <children>
+    <child
+      task_id="alert_formatter"
+      trigger="on_success"
+      condition="deal_evaluation.meets_50pct_threshold=true AND judge.composite >= 0.78"
+      pass_fields="item.query, listing.url, listing.price, market_price.median,
+                   deal_evaluation.true_discount_pct, deal_evaluation.one_line_summary,
+                   deal_evaluation.estimated_profit_after_fees, condition_check.confidence,
+                   listing.time_remaining">
+    </child>
+  </children>
+
+  <!-- ═══════════════════════════════════════════
+       EVOLUTION
+  ═══════════════════════════════════════════ -->
+  <evolution>
+    <enabled>true</enabled>
+    <cycle>weekly</cycle>
+    <trigger_condition>
+      rolling_7d_composite_avg &lt; 0.65
+      OR user_thumbs_down_rate &gt; 0.30
+    </trigger_condition>
+    <strategy>dspy_prompt_optimization</strategy>
+    <mutation_targets>
+      <target>prompt/stage[@id='condition_check']/user</target>
+      <target>prompt/stage[@id='deal_evaluation']/user</target>
+      <target>parameters/watchlist/item/exclude_keywords</target>
+    </mutation_targets>
+    <constraints>
+      <must_preserve>output JSON schema for both stages</must_preserve>
+      <must_preserve>stage dependency: deal_evaluation requires condition_check.pass=true</must_preserve>
+      <must_preserve>min_discount_pct threshold</must_preserve>
+    </constraints>
+    <eval_set>
+      <source>results_store</source>
+      <filter>judge_score IS NOT NULL</filter>
+      <holdout_pct>20</holdout_pct>
+      <min_samples>15</min_samples>
+    </eval_set>
+  </evolution>
+
+  <!-- ═══════════════════════════════════════════
+       ALERTS
+  ═══════════════════════════════════════════ -->
+  <alerts>
+    <channel>pushover</channel>
+    <priority>high</priority>              <!-- eBay deals are time-sensitive -->
+    <format>
+🛒 DEAL: {item.query}
+💰 ${listing.price} vs ${market_price.median} market → {deal_evaluation.true_discount_pct}% off
+⏱ {listing.time_remaining} remaining
+📦 {condition_check.condition_summary}
+💵 Est. profit after fees: ${deal_evaluation.estimated_profit_after_fees}
+🔗 {listing.url}
+    </format>
+    <dedup_window_hours>24</dedup_window_hours>  <!-- don't re-alert same listing -->
+  </alerts>
+
+</task>
