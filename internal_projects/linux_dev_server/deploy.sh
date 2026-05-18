@@ -22,7 +22,7 @@ set -euo pipefail
 TARGET_DIR="$(pwd)"
 GITEA_URL="http://10.0.0.201:3000"
 REPO_REMOTE="${GITEA_URL}/admin/projects.git"
-REPO_SUBDIR="projects/linux_dev_server"
+REPO_SUBDIR="internal_projects/linux_dev_server"
 CLONE_DIR="${TARGET_DIR}/.repos/projects"
 
 # ── Self-update ───────────────────────────────────────────────
