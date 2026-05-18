@@ -23,7 +23,7 @@ RUN apt-get update -q && apt-get install -y --no-install-recommends \
     libssl-dev \
     clang llvm lld \
     # Utilities
-    sudo unzip zip jq \
+    sudo unzip zip jq tmux \
     && rm -rf /var/lib/apt/lists/*
 
 # ── GitHub CLI (gh) ────────────────────────────────────────────
