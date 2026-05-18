@@ -43,6 +43,8 @@ services:
       - OPENAI_BASE_URL=${CODEX_OPENAI_BASE_URL:-https://openrouter.ai/api/v1}
       # Tailscale — optional auth key for headless login
       - TAILSCALE_AUTH_KEY=${TAILSCALE_AUTH_KEY:-}
+      # Gemini CLI — optional API key for headless mode
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
     volumes:
       # Home directory persists across container rebuilds
       - dev-home:/home/dev

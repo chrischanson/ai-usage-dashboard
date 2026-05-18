@@ -67,6 +67,7 @@ export OPENCODE_API_KEY="${OPENCODE_API_KEY}"
 export OPENCODE_ZEN_API_KEY="${OPENCODE_ZEN_API_KEY}"
 export CODEX_API_KEY="${CODEX_API_KEY}"
 export OPENAI_BASE_URL="${OPENAI_BASE_URL}"
+export GEMINI_API_KEY="${GEMINI_API_KEY}"
 # When Codex is pointed at real OpenAI, make OPENAI_API_KEY match
 # CODEX_API_KEY so Codex picks up the right key.
 if [ -n "${CODEX_API_KEY}" ] && [ "${OPENAI_BASE_URL}" != "https://openrouter.ai/api/v1" ]; then
@@ -103,6 +104,7 @@ export OPENCODE_API_KEY="${OPENCODE_API_KEY}"
 export OPENCODE_ZEN_API_KEY="${OPENCODE_ZEN_API_KEY}"
 export CODEX_API_KEY="${CODEX_API_KEY}"
 export OPENAI_BASE_URL="${OPENAI_BASE_URL}"
+export GEMINI_API_KEY="${GEMINI_API_KEY}"
 # When Codex is pointed at real OpenAI, make OPENAI_API_KEY match
 # CODEX_API_KEY so Codex picks up the right key.
 if [ -n "\${CODEX_API_KEY}" ] && [ "\${OPENAI_BASE_URL}" != "https://openrouter.ai/api/v1" ]; then
