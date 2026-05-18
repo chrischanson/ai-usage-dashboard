@@ -8,5 +8,11 @@ ssh-keys/*.pub
 gitea/data/
 buildbuddy/data/
 
+# GitHub CLI auth token (persisted via bind mount)
+gh-config/
+
+# Tailscale state (node key, auth — persist across rebuilds)
+tailscale-state/
+
 # macOS
 .DS_Store

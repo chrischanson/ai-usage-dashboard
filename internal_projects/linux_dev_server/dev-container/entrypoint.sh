@@ -41,6 +41,10 @@ fi
 chmod 600 "$AUTH_KEYS"
 chown -R dev:dev /home/dev/.ssh
 
+# ── GitHub CLI config (persisted via host bind mount) ─────────
+mkdir -p /home/dev/.config/gh
+chown -R dev:dev /home/dev/.config/gh
+
 # ── Export environment variables for SSH sessions ─────────────
 # SSH strips Docker env vars upon login. We must explicitly write
 # the AI keys into a profile script so the dev user has access.
@@ -125,6 +129,24 @@ fi
 exec /usr/local/bin/claude.real "$@"
 WRAPPER
     chmod +x /usr/local/bin/claude
+fi
+
+# ── Tailscale (mesh networking) ───────────────────────────────
+# Persist state via host bind mount (/var/lib/tailscale) so the
+# node key and auth survive container rebuilds.
+mkdir -p /var/lib/tailscale
+tailscaled --tun=userspace-networking --state=/var/lib/tailscale/tailscaled.state --socket=/var/run/tailscale/tailscaled.sock &
+mkdir -p /var/run/tailscale
+sleep 2
+if [ -n "${TAILSCALE_AUTH_KEY}" ]; then
+    if tailscale --socket=/var/run/tailscale/tailscaled.sock status >/dev/null 2>&1; then
+        echo "[entrypoint] Tailscale already authenticated — skipping login"
+    else
+        echo "[entrypoint] Authenticating Tailscale..."
+        tailscale --socket=/var/run/tailscale/tailscaled.sock up --authkey="${TAILSCALE_AUTH_KEY}" --hostname=dev-server
+    fi
+else
+    echo "[entrypoint] Tailscale started — no auth key set, run 'tailscale up' manually to authenticate"
 fi
 
 # ── Startup banner ────────────────────────────────────────────

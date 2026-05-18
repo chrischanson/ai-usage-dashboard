@@ -20,6 +20,9 @@ services:
       context: ./dev-container
     container_name: dev
     hostname: dev
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
     environment:
       # AI agent API keys — read from .env file
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:?Set OPENROUTER_API_KEY in .env}
@@ -38,6 +41,8 @@ services:
       # CODEX_OPENAI_BASE_URL in .env to use real OpenAI.
       - CODEX_API_KEY=${OPENAI_API_KEY:-}
       - OPENAI_BASE_URL=${CODEX_OPENAI_BASE_URL:-https://openrouter.ai/api/v1}
+      # Tailscale — optional auth key for headless login
+      - TAILSCALE_AUTH_KEY=${TAILSCALE_AUTH_KEY:-}
     volumes:
       # Home directory persists across container rebuilds
       - dev-home:/home/dev
@@ -52,6 +57,10 @@ services:
       - ./ssh-keys:/etc/ssh-keys:ro
       # Persist SSH host keys to avoid fingerprint changes on rebuild
       - ./ssh-host-keys:/etc/ssh-host-keys
+      # Persist GitHub CLI auth across rebuilds
+      - ./gh-config:/home/dev/.config/gh
+      # Persist Tailscale state (auth, node key) across rebuilds
+      - ./tailscale-state:/var/lib/tailscale
     ports:
       - "2220:22"     # SSH — Antigravity/Windsurf connect here
     networks:

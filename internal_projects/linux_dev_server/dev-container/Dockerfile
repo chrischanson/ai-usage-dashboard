@@ -66,6 +66,10 @@ RUN curl -fsSL -o /usr/local/bin/bazel \
     && chmod +x /usr/local/bin/bazel \
     && bazel --version
 
+# ── Tailscale (mesh networking) ───────────────────────────────
+RUN curl -fsSL https://tailscale.com/install.sh | sh \
+    && rm -rf /var/lib/apt/lists/*
+
 # ── SSH server config ──────────────────────────────────────────
 RUN mkdir -p /var/run/sshd \
     # Harden SSH: key-only auth, no passwords, no root login
