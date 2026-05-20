@@ -111,6 +111,8 @@ if [ -n "\${CODEX_API_KEY}" ] && [ "\${OPENAI_BASE_URL}" != "https://openrouter.
   export OPENAI_API_KEY="\${CODEX_API_KEY}"
 fi
 $END_MARKER
+# Always land in workspace/main on login
+cd ~/workspace/main
 EOF
 chown dev:dev "$BASHRC"
 
