@@ -14,5 +14,8 @@ gh-config/
 # Tailscale state (node key, auth — persist across rebuilds)
 tailscale-state/
 
+# Antigravity CLI local config
+.antigravitycli/
+
 # macOS
 .DS_Store

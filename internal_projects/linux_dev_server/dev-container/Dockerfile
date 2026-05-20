@@ -66,7 +66,9 @@ RUN npm install -g @google/gemini-cli
 # ── Antigravity CLI (Google) ───────────────────────────────────
 # Terminal AI coding agent with multi-step reasoning and tool
 # calling. Authenticates via Google OAuth or ANTIGRAVITY_API_KEY.
-RUN curl -fsSL https://antigravity.google/cli/install.sh | bash
+RUN curl -fsSL https://antigravity.google/cli/install.sh | bash \
+    && mv /root/.local/bin/agy /usr/local/bin/ || \
+    echo "WARNING: Antigravity CLI install failed — skipping"
 
 # ── Bazelisk (manages Bazel versions automatically) ────────────
 # Bazelisk downloads the correct Bazel version based on .bazelversion
