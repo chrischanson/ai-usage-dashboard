@@ -6,7 +6,7 @@
 main() {
     # Configuration
     GITEA_REPO_URL="http://10.0.0.201:3000/admin/projects.git"
-    SCRIPTS_SUBDIR="projects/linux_scripts"
+    SCRIPTS_SUBDIR="internal_projects/linux_scripts"
     
     # Define the directory where the script resides
     SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"

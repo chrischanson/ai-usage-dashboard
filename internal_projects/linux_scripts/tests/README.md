@@ -3,7 +3,7 @@
 Run the video-compressor regression tests with:
 
 ```bash
-./projects/linux_scripts/tests/test-video-compressor.sh
+./internal_projects/linux_scripts/tests/test-video-compressor.sh
 ```
 
 The `fakes/` directory contains small `ffmpeg` and `ffprobe` stand-ins. They let
