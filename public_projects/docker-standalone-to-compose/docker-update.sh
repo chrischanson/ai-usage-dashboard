@@ -19,7 +19,7 @@ main() {
 # ─── Version ─────────────────────────────────────────────────────────────────
 # Bump this on every release. The self-updater compares this against the
 # remote version to determine if an update is available.
-SCRIPT_VERSION="1.2.5"
+SCRIPT_VERSION="1.2.6"
 
 # ─── Self-update configuration ───────────────────────────────────────────────
 GITHUB_REPO="chrischanson/docker-standalone-to-compose"
@@ -542,6 +542,91 @@ compose_up() {
         return $exit_code
       fi
     fi
+
+    # ── Port allocation conflict ──────────────────────────────────────────
+    # Happens when a host process or another Docker container is already bound
+    # to a port declared in the compose file (e.g. 80 or 443).
+    if echo "$output" | grep -qiE 'port is already allocated|Bind for .* failed'; then
+      local conflicting_ports
+      conflicting_ports=$(
+        printf '%s\n' "$output" \
+          | grep -iE 'port is already allocated|Bind for .* failed' \
+          | sed -n 's/.*Bind for .*:\([0-9]*\) failed.*/\1/p' \
+          | sort -u
+      )
+
+      if [[ -n "$conflicting_ports" ]]; then
+        local handled_conflict=false
+        while IFS= read -r port; do
+          [[ -z "$port" ]] && continue
+          warn "    Port $port is already allocated. Searching for conflicting containers..."
+
+          # Find containers that publish this port.
+          local docker_conflict
+          docker_conflict=$(
+            docker ps -a --format '{{.Names}} {{.Ports}}' \
+              | grep -E "([^0-9]|^)${port}->" \
+              | awk '{print $1}'
+          )
+
+          # Filter out containers belonging to this project (the one failing to start).
+          if [[ -n "$docker_conflict" ]]; then
+            local clean_conflict=""
+            while IFS= read -r cname; do
+              [[ -z "$cname" ]] && continue
+              if [[ "$cname" =~ ^${project}[-_] ]]; then
+                continue
+              fi
+              clean_conflict+="$cname"$'\n'
+            done <<< "$docker_conflict"
+            docker_conflict=$(echo "$clean_conflict" | sed '/^$/d')
+          fi
+
+          if [[ -n "$docker_conflict" ]]; then
+            warn "    Found conflicting Docker container(s) holding port $port:"
+            while IFS= read -r cname; do
+              [[ -z "$cname" ]] && continue
+              force_remove_conflicting "$cname"
+            done <<< "$docker_conflict"
+            handled_conflict=true
+          else
+            # Not in Docker. Check if a host process holds it.
+            local host_proc=""
+            if command -v ss &>/dev/null; then
+              host_proc=$(sudo ss -tulpn "sport = :$port" 2>/dev/null | grep -v 'Netid' | head -n 1)
+            elif command -v lsof &>/dev/null; then
+              host_proc=$(sudo lsof -i ":$port" -t -sTCP:LISTEN 2>/dev/null | xargs ps -fp 2>/dev/null | tail -n +2)
+            fi
+
+            err "    Port $port is occupied by a host process/service."
+            if [[ -n "$host_proc" ]]; then
+              err "    Occupying process details:"
+              err "    $host_proc"
+              # Extract the process name
+              local proc_name
+              proc_name=$(echo "$host_proc" | grep -oE 'pid=[0-9]+,proc=[^,)]+' | cut -d= -f3 || true)
+              [[ -z "$proc_name" ]] && proc_name=$(echo "$host_proc" | grep -oP 'users:\(\("\K[^"]+' | head -n 1 || true)
+              [[ -z "$proc_name" ]] && proc_name=$(echo "$host_proc" | awk '{print $NF}' | cut -d/ -f1 || true)
+              if [[ -n "$proc_name" && "$proc_name" != "docker" ]]; then
+                err "    To fix: Stop the host service using: sudo systemctl stop $proc_name"
+              fi
+            else
+              err "    Could not determine the exact host process. Please run: sudo lsof -i :$port"
+            fi
+          fi
+        done <<< "$conflicting_ports"
+
+        if [[ "$handled_conflict" == "true" ]]; then
+          retry=$((retry + 1))
+          continue
+        fi
+
+        # If it was a host conflict, we can't auto-resolve it. Exit immediately.
+        echo "$output" >&2
+        return $exit_code
+      fi
+    fi
+
 
     # Unknown error — surface it immediately.
     echo "$output" >&2
