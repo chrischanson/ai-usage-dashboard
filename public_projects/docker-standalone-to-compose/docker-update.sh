@@ -19,7 +19,7 @@ main() {
 # ─── Version ─────────────────────────────────────────────────────────────────
 # Bump this on every release. The self-updater compares this against the
 # remote version to determine if an update is available.
-SCRIPT_VERSION="1.2.1"
+SCRIPT_VERSION="1.2.2"
 
 # ─── Self-update configuration ───────────────────────────────────────────────
 GITHUB_REPO="chrischanson/docker-standalone-to-compose"
@@ -339,6 +339,7 @@ compose_up() {
   local output exit_code
   local max_retries=5 retry=0
   local last_output=""
+  local net_overlap_seen=false   # true after first pool-overlap; bail on second
 
   while [[ $retry -le $max_retries ]]; do
 
@@ -415,11 +416,35 @@ compose_up() {
     fi
 
     # ── Network pool overlap ──────────────────────────────────────────────
-    # Happens when a stale Docker network from a previous compose run has a
-    # subnet that now conflicts with a host interface (e.g. wg0) or another
-    # Docker network.  Extract the offending network name from the error and
-    # remove it if it has no active containers, then retry.
+    # First occurrence: try to remove a stale Docker network from a prior run
+    # and retry.  If the error recurs on the very next attempt it means the
+    # network didn't exist at all — Docker's IPAM is auto-allocating a subnet
+    # that conflicts with a host interface (e.g. wg0).  In that case, retrying
+    # is pointless; bail immediately and tell the user to add an ipam block.
     if echo "$output" | grep -qiE 'Pool overlaps|invalid pool request'; then
+
+      if [[ "$net_overlap_seen" == "true" ]]; then
+        # Second hit — IPAM conflict, not a stale network.
+        err "    Docker IPAM keeps allocating a conflicting subnet."
+        err "    This is NOT a stale-network problem — retrying will not help."
+        err ""
+        err "    Root cause: Docker's automatic subnet allocation chose a range"
+        err "    already in use by a host interface (e.g. wg0). Run:"
+        err "      ip addr"
+        err "    to see which subnets are in use, then add an explicit 'ipam'"
+        err "    block to the affected network in your compose file:"
+        err ""
+        err "      networks:"
+        err "        wg:                     # the network name from your compose file"
+        err "          ipam:"
+        err "            config:"
+        err "              - subnet: 172.20.0.0/24   # pick any free range"
+        echo "$output" >&2
+        return $exit_code
+      fi
+
+      net_overlap_seen=true
+
       local net_names
       # Error line looks like:
       #   failed to create network <name>: Error response from daemon: ...
@@ -451,23 +476,14 @@ compose_up() {
         done <<< "$net_names"
         if [[ "$net_remove_failed" == "false" ]]; then
           retry=$((retry + 1))
-          # If this is the last retry, the stale network is gone but Docker is
-          # still choosing a conflicting subnet from its IPAM pool.  This means
-          # the compose file must declare an explicit subnet that avoids the
-          # conflicting range (e.g. the wg0 or another host interface).
-          if [[ $retry -gt $max_retries ]]; then
-            err "    Network removed but Docker IPAM keeps allocating a conflicting subnet."
-            err "    Fix: add an explicit 'ipam' subnet to your compose file's networks block"
-            err "    that does not overlap with any host interface (check: ip addr)."
-            err "    Example:"
-            err "      networks:"
-            err "        wg:"
-            err "          ipam:"
-            err "            config:"
-            err "              - subnet: 172.20.0.0/24"
-          fi
           continue
         fi
+      else
+        # No network name found at all — treat as IPAM conflict immediately.
+        err "    Could not identify conflicting network. Likely a Docker IPAM conflict."
+        err "    Add an explicit 'ipam' subnet to your compose file's networks block."
+        echo "$output" >&2
+        return $exit_code
       fi
     fi
 
