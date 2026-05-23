@@ -44,12 +44,12 @@ They talk to the API so the control plane remains the stable contract.
 ## Documentation Map
 
 | File | Purpose |
-|------|---------|
-| `plan.md` | Main product and architecture plan |
-| `docs/architecture.md` | System components and responsibilities |
-| `docs/scheduling-and-concurrency.md` | Scheduling model, leases, retries, and deduplication |
-| `docs/tool-interface.md` | Worker service contract and manifest design |
-| `docs/deployment.md` | Docker, registry, server, and update workflow |
+|------|---------| 
+| `plan.md` | Goal, glossary, design principles, selected tools, MVP definition |
+| `docs/architecture.md` | Components, data flow, container layout, operator interface, security model |
+| `docs/scheduling-and-concurrency.md` | Scheduling model, job lifecycle, leases, retries, dedup, concurrency |
+| `docs/tool-interface.md` | Worker protocol, manifests, capabilities, secrets, permissions, approvals |
+| `docs/deployment.md` | Docker, registry, deploy flow, rollback, health checks, backups, access |
 | `docs/roadmap.md` | Implementation phases and decision gates |
 | `docs/ebay-tool-example.md` | Example first tool and safety boundaries |
 

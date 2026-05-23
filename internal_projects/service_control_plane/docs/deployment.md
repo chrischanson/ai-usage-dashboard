@@ -93,13 +93,21 @@ Steps:
 4. tag images with git SHA
 5. push images to registry
 6. SSH to remote server
-7. update deployment metadata with new image tags
+7. update deployment state file with new image tags
 8. pull images
 9. run database migrations
 10. restart changed services
 11. wait for health checks
 12. show deployed versions
-13. preserve previous deployment metadata for rollback
+13. copy current state file to previous state file for rollback
+
+Deployment state file (e.g., `deploy-state.json` on the server) should record:
+
+- image tag per service
+- git SHA
+- deploy timestamp
+- deployer identity
+- migration version
 
 ## Rollback
 
@@ -162,7 +170,7 @@ Backups should include:
 Do not store raw secret values in the database unless a proper secret management
 strategy is in place.
 
-## Access
+## Access and Security
 
 Default:
 
@@ -172,6 +180,9 @@ Default:
 
 Do not expose the control API publicly until authentication, authorization,
 rate limits, and audit logs are in place.
+
+See the Security Model section in architecture.md for the full security posture
+including token scoping, secret handling, and audit logging.
 
 ## Avoid Docker Socket in API
 

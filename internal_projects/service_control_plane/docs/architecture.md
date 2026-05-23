@@ -166,14 +166,14 @@ worker attaches analysis/recommendation to canonical item
 
 Initial Compose services:
 
-| Service | Purpose |
-|---------|---------|
-| `postgres` | Central state |
-| `control-api` | API for operators and workers |
-| `control-scheduler` | Durable schedule-to-job creator |
-| `control-tui` | Optional shell entrypoint for local/remote TUI use |
-| `tool-ebay-research` | First example worker |
-| `caddy` | Optional reverse proxy |
+| Service | Purpose | Phase |
+|---------|---------|-------|
+| `postgres` | Central state | 2 |
+| `control-api` | API for operators and workers | 2 |
+| `control-scheduler` | Durable schedule-to-job creator | 2 |
+| `tool-ebay-research` | First example worker | 3 |
+| `caddy` | Optional reverse proxy | 3+ |
+| `control-tui` | Optional shell entrypoint for local/remote TUI use | 4 |
 
 Add Redis or NATS only after there is a measured need for push-based work
 delivery or higher throughput.
@@ -200,4 +200,53 @@ and the job can be retried.
 Compose is the right starting point for one remote server. The design should not
 block a later migration to Nomad or Kubernetes, but those are not needed for the
 first useful version.
+
+## Operator Interface
+
+The primary interface is terminal-based. A web UI is optional and deferred.
+
+### CLI Commands
+
+```
+control status
+control services
+control jobs
+control jobs retry <id>
+control jobs cancel <id>
+control schedules
+control schedules pause <id>
+control run <capability> --input ...
+control tui
+```
+
+### TUI Dashboard
+
+The TUI should support:
+
+- live service health
+- active jobs
+- schedule toggles
+- job logs and events
+- manual run forms
+- retries and cancellation
+
+Approval queue and recommendation review are Phase 5 features and should not
+block the initial TUI.
+
+## Security Model
+
+Start private by default:
+
+- access through Tailscale or SSH tunnel
+- service tokens scoped to capabilities
+- operator tokens scoped to roles
+- secrets stored only on the server
+- secret values never returned through APIs
+- all risky actions written to the audit log
+- spend/action limits enforced in the control plane
+
+Avoid mounting the Docker socket into the API container. It is effectively root
+on the host. Let the deploy script and Compose manage containers instead.
+
+See plan.md for the glossary of core terms used throughout these documents.
 

@@ -29,7 +29,7 @@ Worker-owned cron looks simple but creates platform problems:
 
 Central scheduling solves those problems early.
 
-## Hybrid Autonomous Mode
+## Hybrid Autonomous Mode (Deferred)
 
 Some workers may need to wake themselves up. For example, a worker may monitor a
 local queue, respond to a webhook, or perform a quick local health probe.
@@ -43,6 +43,15 @@ worker must request a run lease before doing platform-visible work
 
 The control plane can approve or deny the run based on dedupe keys, limits,
 paused schedules, maintenance windows, and permissions.
+
+This mode is deferred until a real use case requires it. Open design questions:
+
+- Does the worker create its own job, or does the control plane create one on
+  the worker's behalf?
+- Is the run lease requested through the same `/jobs/claim` endpoint, or a
+  separate `/runs/request` endpoint?
+- How does dedup work when the worker is generating its own dedupe keys?
+- What prevents a misbehaving worker from bypassing the lease requirement?
 
 ## Schedule Records
 
@@ -180,17 +189,19 @@ Other useful fields:
 
 Concurrency should be enforceable at multiple scopes:
 
-| Scope | Example |
-|-------|---------|
-| Global | No more than 20 jobs running across the whole platform |
-| Tool | No more than 4 eBay research jobs |
-| Capability | No more than 2 `ebay.search` jobs |
-| Source | No more than 3 jobs hitting eBay APIs |
-| Account | No more than 1 job using a specific eBay account |
-| Action | No more than 1 `place_bid` job, approval required |
+| Scope | Example | Phase |
+|-------|---------|-------|
+| Global | No more than 20 jobs running across the whole platform | Phase 2 |
+| Per-service | No more than 4 eBay research jobs | Phase 2 |
+| Per-capability | No more than 2 `ebay.search` jobs | Phase 2 |
+| Per-source | No more than 3 jobs hitting eBay APIs | Phase 5 |
+| Per-account | No more than 1 job using a specific eBay account | Phase 5 |
+| Per-action | No more than 1 `place_bid` job, approval required | Phase 5 |
 
-Start simple with global, per-tool, and per-capability limits. Add source and
-account limits before risky or rate-limited integrations.
+Phase 2 should implement only the first three scopes. The schema can use a
+generic `concurrency_limits` JSONB column to remain extensible, but enforcement
+logic should stay simple until per-source, per-account, or per-action limits are
+actually needed.
 
 ## Retries
 

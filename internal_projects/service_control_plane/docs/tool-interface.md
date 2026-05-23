@@ -6,6 +6,10 @@ Tool containers should be easy to add without changing the control plane for
 every new domain. The interface between a worker and the control plane should be
 small, stable, and explicit.
 
+This document describes the full target protocol. See roadmap.md for which
+endpoints are needed per phase. Phase 2 requires only: register, heartbeat,
+claim, complete, and fail.
+
 ## Tool Manifest
 
 Each tool should declare a manifest.
@@ -109,7 +113,7 @@ lease_expires_at
 
 The control plane should only return jobs the worker is allowed to execute.
 
-## Progress Events
+## Progress Events (Phase 3+)
 
 Workers should publish append-only events:
 
@@ -126,7 +130,7 @@ job.failed
 
 Events make the TUI useful and give good audit/debug history.
 
-## Results
+## Results (Phase 3+)
 
 Results should be structured JSON with a schema per capability.
 
@@ -175,7 +179,7 @@ denied capabilities:
 
 Risky capabilities should require explicit enablement.
 
-## Approval Gates
+## Approval Gates (Phase 5)
 
 Capabilities that spend money, send messages externally, modify accounts, or
 place bids should require approvals and limits.
