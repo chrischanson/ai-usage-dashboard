@@ -47,9 +47,19 @@ main() {
     if git clone --depth 1 "$GITEA_REPO_URL" "$TEMP_DIR"; then
         echo "Copying scripts from $SCRIPTS_SUBDIR to $SCRIPT_DIR..."
         
-        # Copy all files from the subdirectory to the target directory
-        # Using -f to overwrite and -p to preserve permissions
-        cp -fp "$TEMP_DIR/$SCRIPTS_SUBDIR"/* "$SCRIPT_DIR/" 2>/dev/null
+        # Copy files. For scripts_update.sh itself, unlink it first to avoid
+        # in-place overwrite which corrupts the active running file descriptor.
+        for file in "$TEMP_DIR/$SCRIPTS_SUBDIR"/*; do
+            [ -e "$file" ] || continue
+            local fname
+            fname="$(basename "$file")"
+            if [ "$fname" = "scripts_update.sh" ]; then
+                rm -f "$SCRIPT_DIR/$fname"
+                cp -fp "$file" "$SCRIPT_DIR/$fname"
+            else
+                cp -fp "$file" "$SCRIPT_DIR/" 2>/dev/null
+            fi
+        done
         
         # Also copy the public video-compressor.sh script
         local public_video_compressor="$TEMP_DIR/public_projects/video-compressor/video-compressor.sh"
