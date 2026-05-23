@@ -19,7 +19,7 @@ main() {
 # ─── Version ─────────────────────────────────────────────────────────────────
 # Bump this on every release. The self-updater compares this against the
 # remote version to determine if an update is available.
-SCRIPT_VERSION="1.2.0"
+SCRIPT_VERSION="1.2.1"
 
 # ─── Self-update configuration ───────────────────────────────────────────────
 GITHUB_REPO="chrischanson/docker-standalone-to-compose"
@@ -344,10 +344,10 @@ compose_up() {
 
     if [[ "$DEBUG" == "true" ]]; then
       warn "[debug] compose_up attempt $((retry + 1))/$((max_retries + 1)): ${up_args[*]}"
-      # Stream output live — no capture — so the user sees everything in real time.
-      "${up_args[@]}"
-      exit_code=$?
-      output=""  # nothing captured; set empty so pattern matching below is skipped
+      # Capture output AND stream it live to stderr simultaneously via tee.
+      # This ensures pattern-matching still works in debug mode.
+      output=$("${up_args[@]}" 2>&1 | tee /dev/stderr)
+      exit_code=${PIPESTATUS[0]}
     else
       output=$("${up_args[@]}" 2>&1)
       exit_code=$?
@@ -451,6 +451,21 @@ compose_up() {
         done <<< "$net_names"
         if [[ "$net_remove_failed" == "false" ]]; then
           retry=$((retry + 1))
+          # If this is the last retry, the stale network is gone but Docker is
+          # still choosing a conflicting subnet from its IPAM pool.  This means
+          # the compose file must declare an explicit subnet that avoids the
+          # conflicting range (e.g. the wg0 or another host interface).
+          if [[ $retry -gt $max_retries ]]; then
+            err "    Network removed but Docker IPAM keeps allocating a conflicting subnet."
+            err "    Fix: add an explicit 'ipam' subnet to your compose file's networks block"
+            err "    that does not overlap with any host interface (check: ip addr)."
+            err "    Example:"
+            err "      networks:"
+            err "        wg:"
+            err "          ipam:"
+            err "            config:"
+            err "              - subnet: 172.20.0.0/24"
+          fi
           continue
         fi
       fi
