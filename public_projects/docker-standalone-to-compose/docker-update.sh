@@ -19,7 +19,7 @@ main() {
 # ─── Version ─────────────────────────────────────────────────────────────────
 # Bump this on every release. The self-updater compares this against the
 # remote version to determine if an update is available.
-SCRIPT_VERSION="1.2.3"
+SCRIPT_VERSION="1.2.4"
 
 # ─── Self-update configuration ───────────────────────────────────────────────
 GITHUB_REPO="chrischanson/docker-standalone-to-compose"
@@ -338,7 +338,7 @@ find_networks_by_compose_subnets() {
   local compose_subnets
   compose_subnets=$(
     docker compose -p "$project" -f "$f" config 2>/dev/null \
-      | awk '/subnet:/{print $2}'
+      | sed -n 's/.*subnet:[[:space:]]*\([^[:space:]]*\).*/\1/p'
   )
   [[ -z "$compose_subnets" ]] && return
 
@@ -378,9 +378,9 @@ compose_up() {
     if [[ "$DEBUG" == "true" ]]; then
       warn "[debug] compose_up attempt $((retry + 1))/$((max_retries + 1)): ${up_args[*]}"
       # Capture output AND stream it live to stderr simultaneously via tee.
-      # This ensures pattern-matching still works in debug mode.
-      output=$("${up_args[@]}" 2>&1 | tee /dev/stderr)
-      exit_code=${PIPESTATUS[0]}
+      # Enable pipefail in subshell so the subshell returns docker compose's exit code, not tee's.
+      output=$(set -o pipefail; "${up_args[@]}" 2>&1 | tee /dev/stderr)
+      exit_code=$?
     else
       output=$("${up_args[@]}" 2>&1)
       exit_code=$?
