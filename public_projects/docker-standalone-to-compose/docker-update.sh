@@ -293,6 +293,34 @@ force_remove_conflicting() {
   done
 }
 
+# Remove a stale/orphaned Docker network that is blocking compose (Pool overlaps).
+# Only removes the network when it has NO active containers attached — if containers
+# are using it we bail out and let the operator decide.
+force_remove_conflicting_network() {
+  local net="$1"
+
+  # Network doesn't exist at all — nothing to do.
+  if ! docker network inspect "$net" &>/dev/null; then
+    return 0
+  fi
+
+  # Check for attached containers ("Containers" key in inspect output).
+  local attached
+  attached=$(docker network inspect "$net" --format '{{len .Containers}}' 2>/dev/null)
+  if [[ "${attached:-0}" -gt 0 ]]; then
+    err "    Network '$net' has $attached active container(s) attached — refusing to remove."
+    err "    Disconnect them first, then re-run this script."
+    return 1
+  fi
+
+  warn "    Removing stale orphaned network: $net"
+  if ! docker network rm "$net" 2>/dev/null; then
+    err "    Failed to remove network '$net'."
+    return 1
+  fi
+  return 0
+}
+
 compose_up() {
   local project="$1"
   local f="$2"
@@ -359,6 +387,46 @@ compose_up() {
           fi
         done <<< "$container_names"
         if [[ "$remove_failed" == "false" ]]; then
+          retry=$((retry + 1))
+          continue
+        fi
+      fi
+    fi
+
+    # ── Network pool overlap ──────────────────────────────────────────────
+    # Happens when a stale Docker network from a previous compose run has a
+    # subnet that now conflicts with a host interface (e.g. wg0) or another
+    # Docker network.  Extract the offending network name from the error and
+    # remove it if it has no active containers, then retry.
+    if echo "$output" | grep -qiE 'Pool overlaps|invalid pool request'; then
+      local net_names
+      # Error line looks like:
+      #   failed to create network <name>: Error response from daemon: ...
+      net_names=$(
+        printf '%s\n' "$output" \
+          | grep -iE 'Pool overlaps|invalid pool request|failed to create network' \
+          | sed -n 's/.*failed to create network \([^:]*\):.*/\1/Ip' \
+          | sort -u
+      )
+
+      # Fallback: derive expected network names from compose config.
+      if [[ -z "$net_names" ]]; then
+        warn "    Could not parse conflicting network name — checking compose-defined networks"
+        net_names=$(
+          docker compose -p "$project" -f "$f" config 2>/dev/null \
+            | awk '/^networks:/{p=1; next} p && /^  [^ ]/{gsub(/:$/,""); print "'"$project"'_" $1} /^[^ ]/{if(!/^networks:/) p=0}'
+        )
+      fi
+
+      if [[ -n "$net_names" ]]; then
+        local net_remove_failed=false
+        while IFS= read -r net; do
+          [[ -z "$net" ]] && continue
+          if ! force_remove_conflicting_network "$net"; then
+            net_remove_failed=true
+          fi
+        done <<< "$net_names"
+        if [[ "$net_remove_failed" == "false" ]]; then
           retry=$((retry + 1))
           continue
         fi
