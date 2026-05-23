@@ -19,7 +19,7 @@ main() {
 # ─── Version ─────────────────────────────────────────────────────────────────
 # Bump this on every release. The self-updater compares this against the
 # remote version to determine if an update is available.
-SCRIPT_VERSION="1.2.2"
+SCRIPT_VERSION="1.2.3"
 
 # ─── Self-update configuration ───────────────────────────────────────────────
 GITHUB_REPO="chrischanson/docker-standalone-to-compose"
@@ -326,6 +326,38 @@ force_remove_conflicting_network() {
   return 0
 }
 
+# Scan all existing Docker networks and return the names of any whose IPAM
+# subnets overlap with subnets declared in the given compose file.
+# This catches the renamed-project case: e.g. 'ubuntu_wg' and 'docker-compose_wg'
+# both defined with subnet 10.42.42.0/24 — only the old one exists, blocking
+# creation of the new one.
+find_networks_by_compose_subnets() {
+  local project="$1"
+  local f="$2"
+
+  local compose_subnets
+  compose_subnets=$(
+    docker compose -p "$project" -f "$f" config 2>/dev/null \
+      | awk '/subnet:/{print $2}'
+  )
+  [[ -z "$compose_subnets" ]] && return
+
+  docker network ls --format '{{.Name}}' | while IFS= read -r netname; do
+    local net_subnets
+    net_subnets=$(
+      docker network inspect "$netname" \
+        --format '{{range .IPAM.Config}}{{.Subnet}}{{"\n"}}{{end}}' 2>/dev/null
+    )
+    while IFS= read -r csub; do
+      [[ -z "$csub" ]] && continue
+      if printf '%s\n' "$net_subnets" | grep -qxF "$csub"; then
+        echo "$netname"
+        break
+      fi
+    done <<< "$compose_subnets"
+  done | sort -u
+}
+
 compose_up() {
   local project="$1"
   local f="$2"
@@ -416,11 +448,14 @@ compose_up() {
     fi
 
     # ── Network pool overlap ──────────────────────────────────────────────
-    # First occurrence: try to remove a stale Docker network from a prior run
-    # and retry.  If the error recurs on the very next attempt it means the
-    # network didn't exist at all — Docker's IPAM is auto-allocating a subnet
-    # that conflicts with a host interface (e.g. wg0).  In that case, retrying
-    # is pointless; bail immediately and tell the user to add an ipam block.
+    # Three-level lookup strategy:
+    #  1. Parse the failing network name directly from the error message.
+    #  2. Derive expected name from compose config (project_network).
+    #  3. Scan ALL Docker networks for subnet overlap with compose-declared
+    #     subnets (catches renamed-project leftovers, e.g. ubuntu_wg when
+    #     running as project docker-compose with same subnet).
+    # If none found after all three levels, bail with an IPAM diagnostic.
+    # If the same error recurs after removal, bail (pure IPAM allocation issue).
     if echo "$output" | grep -qiE 'Pool overlaps|invalid pool request'; then
 
       if [[ "$net_overlap_seen" == "true" ]]; then
@@ -445,43 +480,55 @@ compose_up() {
 
       net_overlap_seen=true
 
-      local net_names
-      # Error line looks like:
-      #   failed to create network <name>: Error response from daemon: ...
-      net_names=$(
+      # ── Level 1: parse name from error message ──
+      local candidate_nets
+      candidate_nets=$(
         printf '%s\n' "$output" \
           | grep -iE 'Pool overlaps|invalid pool request|failed to create network' \
           | sed -n 's/.*failed to create network \([^:]*\):.*/\1/Ip' \
           | sort -u
       )
 
-      # Fallback: derive expected network names from compose config.
-      if [[ -z "$net_names" ]]; then
-        warn "    Could not parse conflicting network name — checking compose-defined networks"
-        net_names=$(
+      # ── Level 2: derive expected name from compose config ──
+      if [[ -z "$candidate_nets" ]]; then
+        candidate_nets=$(
           docker compose -p "$project" -f "$f" config 2>/dev/null \
             | awk '/^networks:/{p=1; next} p && /^  [^ ]/{gsub(/:$/,""); print "'"$project"'_" $1} /^[^ ]/{if(!/^networks:/) p=0}'
         )
       fi
 
-      [[ "$DEBUG" == "true" ]] && warn "[debug] conflicting networks: $(echo "$net_names" | tr '\n' ' ')"
+      # Filter to only networks that actually exist.
+      local existing_nets=""
+      while IFS= read -r net; do
+        [[ -z "$net" ]] && continue
+        docker network inspect "$net" &>/dev/null && existing_nets+="${net}"$'\n'
+      done <<< "$candidate_nets"
 
-      if [[ -n "$net_names" ]]; then
+      # ── Level 3: subnet-based scan (catches renamed-project leftovers) ──
+      if [[ -z "$existing_nets" ]]; then
+        warn "    No conflicting network found by name — scanning by subnet overlap..."
+        existing_nets=$(find_networks_by_compose_subnets "$project" "$f")
+      fi
+
+      [[ "$DEBUG" == "true" ]] && warn "[debug] networks to remove: $(printf '%s' "$existing_nets" | tr '\n' ' ')"
+
+      if [[ -n "$existing_nets" ]]; then
         local net_remove_failed=false
         while IFS= read -r net; do
           [[ -z "$net" ]] && continue
           if ! force_remove_conflicting_network "$net"; then
             net_remove_failed=true
           fi
-        done <<< "$net_names"
+        done <<< "$existing_nets"
         if [[ "$net_remove_failed" == "false" ]]; then
           retry=$((retry + 1))
           continue
         fi
       else
-        # No network name found at all — treat as IPAM conflict immediately.
-        err "    Could not identify conflicting network. Likely a Docker IPAM conflict."
-        err "    Add an explicit 'ipam' subnet to your compose file's networks block."
+        err "    Could not find any conflicting network by name or subnet."
+        err "    Likely a Docker IPAM conflict with a host interface."
+        err "    Run 'ip addr' to check, then add an explicit 'ipam' subnet"
+        err "    to your compose file's networks block that avoids the conflict."
         echo "$output" >&2
         return $exit_code
       fi
