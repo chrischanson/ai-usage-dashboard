@@ -51,6 +51,19 @@ main() {
         # Using -f to overwrite and -p to preserve permissions
         cp -fp "$TEMP_DIR/$SCRIPTS_SUBDIR"/* "$SCRIPT_DIR/" 2>/dev/null
         
+        # Also copy the public video-compressor.sh script
+        local public_video_compressor="$TEMP_DIR/public_projects/video-compressor/video-compressor.sh"
+        if [ -f "$public_video_compressor" ]; then
+            echo "Copying video-compressor.sh from public_projects to $SCRIPT_DIR..."
+            cp -fp "$public_video_compressor" "$SCRIPT_DIR/"
+            
+            # Clean up old legacy rip-compressor.sh if it exists in the target directory
+            if [ -f "$SCRIPT_DIR/rip-compressor.sh" ]; then
+                echo "Removing legacy rip-compressor.sh (replaced by video-compressor.sh)..."
+                rm -f "$SCRIPT_DIR/rip-compressor.sh"
+            fi
+        fi
+        
         echo "✅ Scripts updated successfully from Gitea."
     else
         echo "❌ Failed to clone repository from $GITEA_REPO_URL"
