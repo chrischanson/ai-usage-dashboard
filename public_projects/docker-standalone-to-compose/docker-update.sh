@@ -19,7 +19,7 @@ main() {
 # ─── Version ─────────────────────────────────────────────────────────────────
 # Bump this on every release. The self-updater compares this against the
 # remote version to determine if an update is available.
-SCRIPT_VERSION="1.0.0"
+SCRIPT_VERSION="1.2.0"
 
 # ─── Self-update configuration ───────────────────────────────────────────────
 GITHUB_REPO="chrischanson/docker-standalone-to-compose"
@@ -68,6 +68,9 @@ OPTIONS
     -V, --version           Print the current version and exit.
     -f, --force             Force recreate all containers even if no
                             image has changed.
+    -d, --debug             Stream raw Docker Compose output on every
+                            attempt and print diagnostics on each retry.
+                            Use this when the script fails silently.
     --build SERVICE         Build SERVICE with --no-cache and recreate
                             with --force-recreate.
     --build=SERVICE         Same as above (= syntax).
@@ -216,6 +219,7 @@ check_and_offer_upgrade() {
 
 COMPOSE_DIR="$(cd "$(dirname "$0")" && pwd)"
 FORCE=false
+DEBUG=false
 BUILD_SERVICE=""
 TARGETS=()
 SUCCESS=()
@@ -228,6 +232,7 @@ while [[ $# -gt 0 ]]; do
     -h|--help)         show_help; return 0 ;;
     -V|--version)      echo "docker-update.sh version ${SCRIPT_VERSION}"; return 0 ;;
     --force|-f)        FORCE=true; shift ;;
+    --debug|-d)        DEBUG=true; shift ;;
     --build)           [[ $# -lt 2 || "$2" == -* ]] && { err "--build requires a service name"; return 1; }; BUILD_SERVICE="$2"; shift 2 ;;
     --build=*)         BUILD_SERVICE="${1#*=}"; [[ -z "$BUILD_SERVICE" ]] && { err "--build requires a service name"; return 1; }; shift ;;
     -*)                err "Unknown option: $1"; echo "Run with --help for usage." >&2; return 1 ;;
@@ -333,15 +338,29 @@ compose_up() {
 
   local output exit_code
   local max_retries=5 retry=0
+  local last_output=""
 
   while [[ $retry -le $max_retries ]]; do
-    output=$("${up_args[@]}" 2>&1)
-    exit_code=$?
+
+    if [[ "$DEBUG" == "true" ]]; then
+      warn "[debug] compose_up attempt $((retry + 1))/$((max_retries + 1)): ${up_args[*]}"
+      # Stream output live — no capture — so the user sees everything in real time.
+      "${up_args[@]}"
+      exit_code=$?
+      output=""  # nothing captured; set empty so pattern matching below is skipped
+    else
+      output=$("${up_args[@]}" 2>&1)
+      exit_code=$?
+    fi
+
+    last_output="$output"  # preserve for failure reporting
 
     if [[ $exit_code -eq 0 ]]; then
-      echo "$output"
+      [[ -n "$output" ]] && echo "$output"
       return 0
     fi
+
+    [[ "$DEBUG" == "true" ]] && warn "[debug] exit_code=$exit_code — analysing error..."
 
     # Match both Docker Compose v1 ("The container name") and v2
     # ("container ... already in use") conflict messages.
@@ -377,6 +396,8 @@ compose_up() {
               done
         )
       fi
+
+      [[ "$DEBUG" == "true" ]] && warn "[debug] conflicting containers: $(echo "$container_names" | tr '\n' ' ')"
 
       if [[ -n "$container_names" ]]; then
         local remove_failed=false
@@ -418,6 +439,8 @@ compose_up() {
         )
       fi
 
+      [[ "$DEBUG" == "true" ]] && warn "[debug] conflicting networks: $(echo "$net_names" | tr '\n' ' ')"
+
       if [[ -n "$net_names" ]]; then
         local net_remove_failed=false
         while IFS= read -r net; do
@@ -433,11 +456,18 @@ compose_up() {
       fi
     fi
 
+    # Unknown error — surface it immediately.
     echo "$output" >&2
     return $exit_code
   done
 
   err "    Failed to bring up $project after $max_retries retries"
+  # Always show the last docker compose output so the user knows why.
+  if [[ -n "$last_output" ]]; then
+    echo "--- Last docker compose output ---" >&2
+    echo "$last_output" >&2
+    echo "---------------------------------" >&2
+  fi
   return 1
 }
 
