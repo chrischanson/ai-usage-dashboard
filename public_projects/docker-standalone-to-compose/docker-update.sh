@@ -19,7 +19,7 @@ main() {
 # ─── Version ─────────────────────────────────────────────────────────────────
 # Bump this on every release. The self-updater compares this against the
 # remote version to determine if an update is available.
-SCRIPT_VERSION="1.2.4"
+SCRIPT_VERSION="1.2.5"
 
 # ─── Self-update configuration ───────────────────────────────────────────────
 GITHUB_REPO="chrischanson/docker-standalone-to-compose"
@@ -313,9 +313,18 @@ force_remove_conflicting_network() {
   local attached
   attached=$(docker network inspect "$net" --format '{{len .Containers}}' 2>/dev/null)
   if [[ "${attached:-0}" -gt 0 ]]; then
-    err "    Network '$net' has $attached active container(s) attached — refusing to remove."
-    err "    Disconnect them first, then re-run this script."
-    return 1
+    local attached_containers
+    attached_containers=$(docker network inspect "$net" --format '{{range $k, $v := .Containers}}{{$v.Name}}{{"\n"}}{{end}}' 2>/dev/null)
+    if [[ -n "$attached_containers" ]]; then
+      warn "    Network '$net' has active container(s) attached: $(echo "$attached_containers" | tr '\n' ' ')"
+      while IFS= read -r cname; do
+        [[ -z "$cname" ]] && continue
+        if ! force_remove_conflicting "$cname"; then
+          err "    Failed to remove container '$cname' attached to conflicting network '$net'."
+          return 1
+        fi
+      done <<< "$attached_containers"
+    fi
   fi
 
   warn "    Removing stale orphaned network: $net"
