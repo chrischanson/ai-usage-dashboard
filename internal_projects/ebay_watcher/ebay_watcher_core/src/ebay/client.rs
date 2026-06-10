@@ -13,6 +13,7 @@ pub trait EbayClient: Send + Sync {
     fn place_bid(&self, token: &str, item_id: &str, amount: f64) -> Result<BidResult>;
 }
 
+#[derive(Clone)]
 pub struct RealEbayClient {
     config: Config,
     http_client: reqwest::blocking::Client,
@@ -297,6 +298,7 @@ fn parse_place_offer(xml: &str) -> Result<BidResult> {
 }
 
 // Mock Client for tests
+#[derive(Clone)]
 pub struct MockEbayClient {
     pub items: Arc<std::sync::Mutex<Vec<Item>>>,
     pub saved_searches: Arc<std::sync::Mutex<Vec<SavedSearch>>>,
