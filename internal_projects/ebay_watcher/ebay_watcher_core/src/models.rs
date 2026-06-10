@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OAuthToken {
@@ -32,5 +32,28 @@ pub struct BidIntent {
     pub max_bid: f64,
     pub target_time: i64,
     pub status: String, // 'pending', 'attempted', 'succeeded', 'failed', 'missed', 'cancelled'
+    pub error_message: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SavedSearch {
+    pub name: String,
+    pub query: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ItemSummary {
+    pub id: String,
+    pub title: String,
+    pub price: f64,
+    pub shipping: f64,
+    pub buy_it_now: Option<f64>,
+    pub end_time: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct BidResult {
+    pub success: bool,
+    pub transaction_id: Option<String>,
     pub error_message: Option<String>,
 }
