@@ -1,0 +1,25 @@
+# eBay Watcher Configuration Example
+
+[ebay]
+# Your application credentials from the eBay Developer Portal
+client_id = "YOUR_CLIENT_ID_HERE"
+client_secret = "YOUR_CLIENT_SECRET_HERE"
+ru_name = "YOUR_RUNAME_HERE"
+
+# Use Sandbox environment for testing (true) or Production (false)
+sandbox = true
+
+[sync]
+# Time between automatic sync checks of saved searches and watch lists (in seconds)
+poll_interval_seconds = 300
+
+[sniper]
+# How many seconds before the auction ends to place the proxy bid
+lead_time_seconds = 5
+
+# Fallback to legacy Trading API PlaceOffer if Offer API placeProxyBid is unauthorized (limited release)
+fallback_to_trading_api = true
+
+[database]
+# Path to SQLite database file
+db_path = "ebay_watcher.db"
