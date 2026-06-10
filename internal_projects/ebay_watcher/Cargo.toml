@@ -3,4 +3,5 @@ resolver = "2"
 members = [
     "ebay_watcher_core",
     "ebay_watcher_daemon",
+    "ebay_watcher_tui",
 ]

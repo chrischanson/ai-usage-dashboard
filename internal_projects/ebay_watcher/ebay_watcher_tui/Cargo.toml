@@ -1,0 +1,13 @@
+[package]
+name = "ebay_watcher_tui"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ebay_watcher_core = { path = "../ebay_watcher_core" }
+ratatui = "0.26"
+crossterm = "0.27"
+tokio = { version = "1.38", features = ["full"] }
+rusqlite = { version = "0.31", features = ["bundled"] }
+chrono = "0.4"
+libc = "0.2"
