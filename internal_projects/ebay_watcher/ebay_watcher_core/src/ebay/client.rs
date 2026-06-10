@@ -331,9 +331,8 @@ impl EbayClient for MockEbayClient {
     }
 
     fn fetch_my_ebay_buying(&self, _token: &str) -> Result<(Vec<Item>, Vec<SavedSearch>)> {
-        let items = self.items.lock().unwrap().clone();
         let searches = self.saved_searches.lock().unwrap().clone();
-        Ok((items, searches))
+        Ok((Vec::new(), searches))
     }
 
     fn search_items(&self, _token: &str, _query: &str) -> Result<Vec<ItemSummary>> {

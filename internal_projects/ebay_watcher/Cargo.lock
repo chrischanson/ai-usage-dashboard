@@ -150,6 +150,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ebay_watcher_daemon"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "ebay_watcher_core",
+ "reqwest",
+ "rusqlite",
+ "serde",
+ "tokio",
+]
+
+[[package]]
 name = "encoding_rs"
 version = "0.8.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"

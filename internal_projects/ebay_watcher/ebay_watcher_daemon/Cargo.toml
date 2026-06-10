@@ -1,0 +1,12 @@
+[package]
+name = "ebay_watcher_daemon"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ebay_watcher_core = { path = "../ebay_watcher_core" }
+tokio = { version = "1.38", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+chrono = "0.4"
+rusqlite = { version = "0.31", features = ["bundled"] }
+reqwest = "0.12"
