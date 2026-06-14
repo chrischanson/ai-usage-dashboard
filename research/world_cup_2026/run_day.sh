@@ -170,13 +170,43 @@ while [ "${ITERATION}" -lt "${MAX_ITERATIONS}" ]; do
         ln -sf "${SCRIPT_DIR}/predict" "${SKILL_LINK}"
     fi
 
+    # Read the next model to use from predictions.md if it exists, default to Gemini 3.5 Flash (Medium)
+    MODEL="Gemini 3.5 Flash (Medium)"
+    if [ -f "${PREDICTIONS_PATH}" ]; then
+        EXTRACTED_MODEL=$(grep -E '^next_model:' "${PREDICTIONS_PATH}" | head -n 1 | cut -d':' -f2- | tr -d '"'\'' ' || true)
+        if [ "${EXTRACTED_MODEL}" = "High" ] || [ "${EXTRACTED_MODEL}" = "Gemini3.5Flash(High)" ] || [ "${EXTRACTED_MODEL}" = "Gemini 3.5 Flash (High)" ]; then
+            MODEL="Gemini 3.5 Flash (High)"
+        fi
+    fi
+    echo "[$(date -u +%H:%M:%S)] Selected model for iteration: ${MODEL}"
+
+    # Map model name for each agent type
+    EXEC_MODEL="${MODEL}"
+    FALLBACK_EXEC_MODEL="${MODEL}"
+    if [ "${AGENT}" = "opencode" ]; then
+        EXEC_MODEL="google/gemini-3.5-flash"
+    fi
+    if [ "${FALLBACK_AGENT}" = "opencode" ]; then
+        FALLBACK_EXEC_MODEL="google/gemini-3.5-flash"
+    fi
+
     if [ -f "${SKILLS_RUNNER}" ]; then
-        python3 "${SKILLS_RUNNER}" wc_predict --agent "${AGENT}" --vars "${PREDICT_VARS}" || {
+        if OUTPUT=$(python3 "${SKILLS_RUNNER}" wc_predict --agent "${AGENT}" --model "${EXEC_MODEL}" --vars "${PREDICT_VARS}"); then
+            echo "${OUTPUT}"
+        else
             echo "Warning: ${AGENT} predict failed. Trying ${FALLBACK_AGENT} fallback..." >&2
-            python3 "${SKILLS_RUNNER}" wc_predict --agent "${FALLBACK_AGENT}" --vars "${PREDICT_VARS}" || {
-                echo "Warning: Prediction iteration ${ITERATION} failed on both agents. Continuing." >&2
-            }
-        }
+            OUTPUT=$(python3 "${SKILLS_RUNNER}" wc_predict --agent "${FALLBACK_AGENT}" --model "${FALLBACK_EXEC_MODEL}" --vars "${PREDICT_VARS}")
+            echo "${OUTPUT}"
+        fi
+        
+        # Extract run directory and read token usage
+        RUN_DIR=$(echo "${OUTPUT}" | grep "Execution logs and metadata saved to:" | sed 's/Execution logs and metadata saved to: //')
+        if [ -n "${RUN_DIR}" ] && [ -d "${RUN_DIR}" ]; then
+            if [ -f "${RUN_DIR}/run_metadata.json" ]; then
+                TOKENS_TEXT=$(python3 -c "import json; m=json.load(open('${RUN_DIR}/run_metadata.json')); u=m.get('token_usage'); print(f\"Tokens Used: {u['input_tokens']} input, {u['output_tokens']} output (Total: {u['total_tokens']})\" if u else 'Tokens Used: Unknown')")
+                echo "[$(date -u +%H:%M:%S)] ${TOKENS_TEXT}"
+            fi
+        fi
     else
         SKILL_CONTENT=$(cat "${SCRIPT_DIR}/predict/SKILL.md")
         COMPILED="${SKILL_CONTENT//\{DATE\}/${DATE}}"
@@ -187,16 +217,16 @@ while [ "${ITERATION}" -lt "${MAX_ITERATIONS}" ]; do
         COMPILED="${COMPILED//\{INTERVAL_PATH\}/${INTERVAL_PATH}}"
         COMPILED="${COMPILED//\{OUTPUT_DIR\}/${DAY_DIR}}"
         if [ "${AGENT}" = "opencode" ]; then
-            opencode run --dangerously-skip-permissions "${COMPILED}" || {
+            opencode run --dangerously-skip-permissions --model "${EXEC_MODEL}" "${COMPILED}" || {
                 echo "Warning: opencode predict failed. Trying agy fallback..." >&2
-                agy --dangerously-skip-permissions --print "${COMPILED}" || {
+                agy --dangerously-skip-permissions --model "${FALLBACK_EXEC_MODEL}" --print "${COMPILED}" || {
                     echo "Warning: Prediction iteration ${ITERATION} failed on both command line agents. Continuing." >&2
                 }
             }
         else
-            agy --dangerously-skip-permissions --print "${COMPILED}" || {
+            agy --dangerously-skip-permissions --model "${EXEC_MODEL}" --print "${COMPILED}" || {
                 echo "Warning: agy predict failed. Trying opencode fallback..." >&2
-                opencode run --dangerously-skip-permissions "${COMPILED}" || {
+                opencode run --dangerously-skip-permissions --model "${FALLBACK_EXEC_MODEL}" "${COMPILED}" || {
                     echo "Warning: Prediction iteration ${ITERATION} failed on both command line agents. Continuing." >&2
                 }
             }

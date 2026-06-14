@@ -19,6 +19,88 @@ SKILLS_DIR = os.path.dirname(os.path.abspath(__file__))
 WORKSPACE_DIR = os.path.dirname(SKILLS_DIR)
 RUNS_DIR = os.path.join(SKILLS_DIR, "runs")
 
+def get_max_log_id():
+    db_path = os.path.expanduser("~/.codex/logs_2.sqlite")
+    if not os.path.exists(db_path):
+        return 0
+    
+    import shutil
+    temp_dir = os.path.join(WORKSPACE_DIR, "research", "world_cup_2026", "runs", ".tmp_db")
+    os.makedirs(temp_dir, exist_ok=True)
+    temp_db_path = os.path.join(temp_dir, "logs_temp.sqlite")
+    
+    try:
+        shutil.copy2(db_path, temp_db_path)
+        import sqlite3
+        conn = sqlite3.connect(temp_db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT MAX(id) FROM logs")
+        res = cursor.fetchone()
+        conn.close()
+        return res[0] or 0
+    except Exception:
+        return 0
+    finally:
+        if os.path.exists(temp_db_path):
+            try:
+                os.remove(temp_db_path)
+                os.rmdir(temp_dir)
+            except Exception:
+                pass
+
+def get_token_usage_from_db(max_id_before):
+    db_path = os.path.expanduser("~/.codex/logs_2.sqlite")
+    if not os.path.exists(db_path):
+        return None
+        
+    import shutil
+    temp_dir = os.path.join(WORKSPACE_DIR, "research", "world_cup_2026", "runs", ".tmp_db")
+    os.makedirs(temp_dir, exist_ok=True)
+    temp_db_path = os.path.join(temp_dir, "logs_temp.sqlite")
+    
+    try:
+        shutil.copy2(db_path, temp_db_path)
+        import sqlite3
+        conn = sqlite3.connect(temp_db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute(
+            "SELECT feedback_log_body FROM logs WHERE id > ? AND feedback_log_body LIKE '%\"usage\":%'", 
+            (max_id_before,)
+        )
+        rows = cursor.fetchall()
+        
+        total_input_tokens = 0
+        total_output_tokens = 0
+        
+        import re
+        for row in rows:
+            body = row[0]
+            m_in = re.findall(r'"input_tokens"\s*:\s*(\d+)', body)
+            m_out = re.findall(r'"output_tokens"\s*:\s*(\d+)', body)
+            if m_in and m_out:
+                total_input_tokens += sum(int(x) for x in m_in)
+                total_output_tokens += sum(int(x) for x in m_out)
+                
+        conn.close()
+        if total_input_tokens > 0 or total_output_tokens > 0:
+            return {
+                "input_tokens": total_input_tokens,
+                "output_tokens": total_output_tokens,
+                "total_tokens": total_input_tokens + total_output_tokens
+            }
+        return None
+    except Exception as e:
+        print(f"Warning: Failed to extract token usage from database: {e}", file=sys.stderr)
+        return None
+    finally:
+        if os.path.exists(temp_db_path):
+            try:
+                os.remove(temp_db_path)
+                os.rmdir(temp_dir)
+            except Exception:
+                pass
+
 def parse_frontmatter(content):
     """
     Parses simple YAML frontmatter delimited by --- at the top of a file.
@@ -111,9 +193,13 @@ def execute_agent(agent_type, model, prompt, dry_run=False):
         cmd = [
             "agy",
             "--dangerously-skip-permissions",
+        ]
+        if model:
+            cmd.extend(["--model", model])
+        cmd.extend([
             "--print",
             prompt
-        ]
+        ])
     elif agent_type == "opencode":
         cmd = [
             "opencode",
@@ -217,10 +303,12 @@ def main():
     # Compile prompt
     compiled_prompt = compile_prompt(instructions, variables)
     
+    max_id_before = 0
     if not args.dry_run:
         # Write prompt before execution
         with open(os.path.join(run_dir, "input_prompt.md"), "w", encoding="utf-8") as f:
             f.write(compiled_prompt)
+        max_id_before = get_max_log_id()
             
     # Execute
     return_code, full_output, duration = execute_agent(agent, model, compiled_prompt, args.dry_run)
@@ -229,6 +317,8 @@ def main():
         # Write logs
         with open(os.path.join(run_dir, "output.log"), "w", encoding="utf-8") as f:
             f.write(full_output)
+            
+        token_usage = get_token_usage_from_db(max_id_before)
             
         # Write execution metadata
         metadata_summary = {
@@ -241,6 +331,8 @@ def main():
             "return_code": return_code,
             "status": "success" if return_code == 0 else "failed"
         }
+        if token_usage:
+            metadata_summary["token_usage"] = token_usage
         
         with open(os.path.join(run_dir, "run_metadata.json"), "w", encoding="utf-8") as f:
             json.dump(metadata_summary, f, indent=2)

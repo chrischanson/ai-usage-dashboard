@@ -118,7 +118,7 @@ Avoid churn:
 
 Use this format in `{PREDICTIONS_PATH}`:
 
-> **CRITICAL LAYOUT RULE:** The `## 📊 Executive Summary Table` section MUST be the very first section after the title. It must list EVERY active match being predicted in a single table. Do NOT place any match-level analysis before this table. Agents that omit or delay this section are non-compliant.
+> **CRITICAL LAYOUT RULE:** The `## 📊 Executive Summary Table` section MUST be the very first section after the title. It must list EVERY active match being predicted in a single table, including columns for Match, Status, Prediction, Confidence, and Last Updated. The Last Updated column must record the exact UTC timestamp of the iteration when that match's prediction or confidence last changed. If it did not change this iteration, carry forward the previous timestamp. Do NOT place any match-level analysis before this table. Agents that omit or delay this section or these columns are non-compliant.
 
 ```markdown
 ---
@@ -129,17 +129,18 @@ matches_covered: <number of active predictions>
 overall_confidence: "<brief summary>"
 model: "{AGENT}: <your model name/version, e.g., Claude Sonnet 4.6 or Gemini 2.5 Flash>"
 next_interval_minutes: <determined interval integer, e.g., 5>
+next_model: "<Gemini 3.5 Flash (Medium) or Gemini 3.5 Flash (High)>"
 ---
 
 # World Cup 2026 Predictions for {DATE} - Iteration <N>
 
 ## 📊 Executive Summary Table
-A quick-glance tracker of the predicted results and confidence levels for all active matches today.
+A quick-glance tracker of the predicted results, confidence levels, and when they were last updated.
 
-| Match | Status | Prediction | Confidence |
-|:------|:-------|:-----------|:-----------|
-| [Team A] vs. [Team B] | [not_started / live_pre_halftime] | [TEAM A WIN / TEAM B WIN / DRAW] | [High / Medium / Low] |
-| ... | ... | ... | ... |
+| Match | Status | Prediction | Confidence | Last Updated |
+|:------|:-------|:-----------|:-----------|:-------------|
+| [Team A] vs. [Team B] | [not_started / live_pre_halftime] | [TEAM A WIN / TEAM B WIN / DRAW] | [High / Medium / Low] | [UTC timestamp when prediction/confidence last changed, e.g. YYYY-MM-DDTHH:MM:SSZ] |
+| ... | ... | ... | ... | ... |
 
 ---
 
@@ -221,27 +222,29 @@ Only update the tracker if the iteration uncovers a reusable insight that is bot
 
 Never add a same-day pre-match observation to "Active Heuristics" as if it were proven by results.
 
-## Step 7: Dynamic Interval
+## Step 7: Dynamic Interval and Model Selection
 
-Choose the next interval from 5 to 15 minutes based on the nearest eligible match and the information rate:
-1. Write only the determined integer to `{INTERVAL_PATH}` (the file must contain exactly one integer with no other text).
-2. Set the `next_interval_minutes` key in the `{PREDICTIONS_PATH}` frontmatter to this integer.
-3. Record `**Next Interval:** <minutes> minutes` in the `{CHANGELOG_PATH}` entry header.
+1. Choose the next interval from 5 to 15 minutes based on the nearest eligible match and the information rate:
+   - Write only the determined integer to `{INTERVAL_PATH}` (the file must contain exactly one integer with no other text).
+   - Set the `next_interval_minutes` key in the `{PREDICTIONS_PATH}` frontmatter to this integer.
+   - Record `**Next Interval:** <minutes> minutes` in the `{CHANGELOG_PATH}` entry header.
 
 Default interval guide:
-
 - `5`: match is live before halftime; kickoff within 60 minutes; official lineups or warm-up reports are expected or arriving; breaking injury/team news; sharp odds move; unresolved high-impact uncertainty.
 - `6-8`: kickoff within 2 hours, information is mostly stable, or active conflicting reports.
 - `9-11`: kickoff within 4 hours, quiet news cycle, no major unresolved questions.
 - `12-15`: next eligible match is more than 4 hours away, or all active matches are skipped/quiet.
 
 Adjust for information rate:
-
 - Shorten by 1-3 minutes if this iteration found material new evidence, but never go below 5 minutes.
 - Lengthen by 1-3 minutes if two consecutive iterations found no material new evidence.
 - Use `15` if there are no eligible matches left before halftime, and state this in the changelog.
 
 The file content of `{INTERVAL_PATH}` must be exactly one integer between 5 and 15.
+
+2. Predict the complexity/difficulty of the questions for the next iteration:
+   - If the next questions are predicted to be hard (e.g., they require deep tactical interpretation, complex analysis of conflicting reports, or resolving late lineup updates close to kickoff), set the `next_model` key in the `{PREDICTIONS_PATH}` frontmatter to `Gemini 3.5 Flash (High)`.
+   - Otherwise, set the `next_model` key to `Gemini 3.5 Flash (Medium)`.
 
 ## Important Rules
 
