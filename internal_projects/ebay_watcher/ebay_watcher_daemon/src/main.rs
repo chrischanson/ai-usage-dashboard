@@ -21,12 +21,12 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         println!("config.toml not found. Please create one based on config.example.toml.");
         process::exit(1);
     };
-    let client = RealEbayClient::new(config);
-    run_daemon(config_path, client).await
+    let client = RealEbayClient::new(config.clone());
+    run_daemon(config, client).await
 }
 
 pub async fn run_daemon<C: EbayClient + Clone + 'static>(
-    config_path: &str,
+    config: Config,
     client: C,
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
     // 1. Setup signal listeners immediately to avoid race conditions
@@ -34,21 +34,16 @@ pub async fn run_daemon<C: EbayClient + Clone + 'static>(
     let mut sigint = signal(SignalKind::interrupt())?;
     let mut sigterm = signal(SignalKind::terminate())?;
 
-    // 2. Load config
-    let config = if Path::new(config_path).exists() {
-        Config::load_from_file(config_path)?
-    } else {
-        println!("Config file not found: {}", config_path);
-        process::exit(1);
-    };
-
-    // 3. Initialize DB
+    // 2. Initialize DB
     let conn = init_db(&config.database.db_path)?;
 
-    // 4. Write PID file
+    // 4. Write PID file atomically: write to a temp path then rename into place
+    //    so the TUI never reads a partially-written or empty file.
     let pid = process::id();
     let pid_file = "ebay_watcher.pid";
-    fs::write(pid_file, pid.to_string())?;
+    let pid_tmp = format!("{}.tmp", pid_file);
+    fs::write(&pid_tmp, pid.to_string())?;
+    fs::rename(&pid_tmp, pid_file)?;
     println!("Daemon started with PID {}", pid);
 
     // 5. Initialize sync engine, and scheduler
@@ -65,7 +60,7 @@ pub async fn run_daemon<C: EbayClient + Clone + 'static>(
     }
 
     // 7. First sync and schedule
-    if let Err(e) = sync_engine.run_sync_cycle(&conn) {
+    if let Err(e) = sync_engine.run_sync_cycle(&config.database.db_path).await {
         println!("Error during initial sync: {:?}", e);
     }
     if let Err(e) = scheduler.schedule_upcoming_bids(&conn) {
@@ -80,17 +75,13 @@ pub async fn run_daemon<C: EbayClient + Clone + 'static>(
         tokio::select! {
             _ = tokio::time::sleep(poll_interval) => {
                 println!("Interval timer triggered sync.");
-                if let Ok(conn) = init_db(&config.database.db_path) {
-                    let _ = sync_engine.run_sync_cycle(&conn);
-                    let _ = scheduler.schedule_upcoming_bids(&conn);
-                }
+                let _ = sync_engine.run_sync_cycle(&config.database.db_path).await;
+                let _ = scheduler.schedule_upcoming_bids(&conn);
             }
             _ = sigusr1.recv() => {
                 println!("SIGUSR1 signal triggered immediate sync.");
-                if let Ok(conn) = init_db(&config.database.db_path) {
-                    let _ = sync_engine.run_sync_cycle(&conn);
-                    let _ = scheduler.schedule_upcoming_bids(&conn);
-                }
+                let _ = sync_engine.run_sync_cycle(&config.database.db_path).await;
+                let _ = scheduler.schedule_upcoming_bids(&conn);
             }
             _ = sigint.recv() => {
                 println!("SIGINT received. Shutting down daemon...");
@@ -144,7 +135,8 @@ mod tests {
 
         // Spawn daemon in background task calling run_daemon
         let handle = tokio::spawn(async move {
-            if let Err(e) = run_daemon("test_config.toml", mock_client).await {
+            let config = Config::load_from_file("test_config.toml").unwrap();
+            if let Err(e) = run_daemon(config, mock_client).await {
                 println!("Daemon run failed: {:?}", e);
             }
         });

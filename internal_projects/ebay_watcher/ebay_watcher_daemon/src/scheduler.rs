@@ -6,6 +6,7 @@ use rusqlite::Connection;
 use tokio::time::sleep;
 use ebay_watcher_core::db;
 use ebay_watcher_core::ebay::EbayClient;
+use ebay_watcher_core::models::BidStatus;
 use ebay_watcher_core::Result;
 
 pub struct SnipeScheduler<C: EbayClient> {
@@ -30,12 +31,12 @@ impl<C: EbayClient + Clone + 'static> SnipeScheduler<C> {
         let intents = db::get_bid_intents(conn)?;
         for intent in intents {
             let id = intent.id.expect("Bid intent must have ID");
-            if intent.status == "pending" && intent.target_time < now {
+            if intent.status == BidStatus::Pending && intent.target_time < now {
                 println!("Recovering missed bid: intent_id={}, item_id={}", id, intent.item_id);
-                db::update_bid_intent_status(conn, id, "missed", Some("Auction ended while offline"))?;
-            } else if intent.status == "attempted" {
+                db::update_bid_intent_status(conn, id, BidStatus::Missed, Some("Auction ended while offline"))?;
+            } else if intent.status == BidStatus::Attempted {
                 println!("Recovering crashed bid: intent_id={}, item_id={}", id, intent.item_id);
-                db::update_bid_intent_status(conn, id, "failed", Some("Daemon crashed during execution"))?;
+                db::update_bid_intent_status(conn, id, BidStatus::Failed, Some("Daemon crashed during execution"))?;
             }
         }
         Ok(())
@@ -53,8 +54,8 @@ impl<C: EbayClient + Clone + 'static> SnipeScheduler<C> {
                 continue;
             }
 
-            // Calculate execution time: target_time - lead_time_seconds
-            let execution_time = intent.target_time - self.lead_time_seconds as i64;
+            // Calculate execution time using shared helper
+            let execution_time = ebay_watcher_core::models::calculate_snipe_execution_time(intent.target_time, self.lead_time_seconds);
             let delay = execution_time - now;
 
             active.insert(id);
@@ -68,8 +69,8 @@ impl<C: EbayClient + Clone + 'static> SnipeScheduler<C> {
                     sleep(Duration::from_secs(delay as u64)).await;
                 }
 
-                // Open DB connection for thread
-                let conn = match Connection::open(&db_path) {
+                // Open DB connection for thread using shared helper
+                let conn = match db::open_conn(&db_path) {
                     Ok(c) => c,
                     Err(e) => {
                         println!("Scheduler thread failed to open DB: {:?}", e);
@@ -78,45 +79,42 @@ impl<C: EbayClient + Clone + 'static> SnipeScheduler<C> {
                     }
                 };
 
-                let _ = conn.pragma_update(None, "journal_mode", "WAL");
-                let _ = conn.busy_timeout(Duration::from_millis(5000));
-
                 let current_intent = match db::get_bid_intents(&conn) {
                     Ok(intents) => intents.into_iter().find(|i| i.id == Some(id)),
                     Err(_) => None,
                 };
 
                 if let Some(intent) = current_intent {
-                    if intent.status == "pending" {
+                    if intent.status == BidStatus::Pending {
                         println!("Starting snipe for item={}", intent.item_id);
-                        let _ = db::update_bid_intent_status(&conn, id, "attempted", None);
-
+                        let _ = db::update_bid_intent_status(&conn, id, BidStatus::Attempted, None);
+ 
                         // Get token
                         let token = match db::get_token(&conn) {
                             Ok(Some(t)) => t,
                             _ => {
-                                let _ = db::update_bid_intent_status(&conn, id, "failed", Some("No access token"));
+                                let _ = db::update_bid_intent_status(&conn, id, BidStatus::Failed, Some("No access token"));
                                 active_bids.lock().unwrap().remove(&id);
                                 return;
                             }
                         };
 
                         // Place bid
-                        match client.place_bid(&token.access_token, &intent.item_id, intent.max_bid) {
+                        match client.place_bid(&token.access_token, &intent.item_id, intent.max_bid).await {
                             Ok(res) => {
                                 if res.success {
                                     println!("Snipe succeeded for item={}", intent.item_id);
-                                    let _ = db::update_bid_intent_status(&conn, id, "succeeded", None);
+                                    let _ = db::update_bid_intent_status(&conn, id, BidStatus::Succeeded, None);
                                 } else {
                                     let err = res.error_message.unwrap_or_else(|| "Unknown error".to_string());
                                     println!("Snipe failed for item={}: {}", intent.item_id, err);
-                                    let _ = db::update_bid_intent_status(&conn, id, "failed", Some(&err));
+                                    let _ = db::update_bid_intent_status(&conn, id, BidStatus::Failed, Some(&err));
                                 }
                             }
                             Err(e) => {
                                 let err = format!("{:?}", e);
                                 println!("Snipe failed for item={}: {}", intent.item_id, err);
-                                let _ = db::update_bid_intent_status(&conn, id, "failed", Some(&err));
+                                let _ = db::update_bid_intent_status(&conn, id, BidStatus::Failed, Some(&err));
                             }
                         }
                     }
@@ -165,7 +163,7 @@ mod tests {
             item_id: "expired_item".to_string(),
             max_bid: 10.0,
             target_time: now - 10,
-            status: "pending".to_string(),
+            status: BidStatus::Pending,
             error_message: None,
         };
         db::save_bid_intent(&conn, &expired_intent).unwrap();
@@ -176,7 +174,7 @@ mod tests {
             item_id: "crashed_item".to_string(),
             max_bid: 20.0,
             target_time: now - 5,
-            status: "attempted".to_string(),
+            status: BidStatus::Attempted,
             error_message: None,
         };
         db::save_bid_intent(&conn, &crashed_intent).unwrap();
@@ -187,7 +185,7 @@ mod tests {
             item_id: "future_item".to_string(),
             max_bid: 30.0,
             target_time: now + 2, // 2 seconds in future
-            status: "pending".to_string(),
+            status: BidStatus::Pending,
             error_message: None,
         };
         db::save_bid_intent(&conn, &future_intent).unwrap();
@@ -202,9 +200,9 @@ mod tests {
         let i1 = intents.iter().find(|i| i.id == Some(1)).unwrap();
         let i2 = intents.iter().find(|i| i.id == Some(2)).unwrap();
         let i3 = intents.iter().find(|i| i.id == Some(3)).unwrap();
-        assert_eq!(i1.status, "missed");
-        assert_eq!(i2.status, "failed");
-        assert_eq!(i3.status, "pending");
+        assert_eq!(i1.status, BidStatus::Missed);
+        assert_eq!(i2.status, BidStatus::Failed);
+        assert_eq!(i3.status, BidStatus::Pending);
 
         // Run scheduler
         scheduler.schedule_upcoming_bids(&conn).unwrap();
@@ -216,7 +214,7 @@ mod tests {
         let conn2 = init_db(db_file).unwrap();
         let intents_after = db::get_bid_intents(&conn2).unwrap();
         let i3_after = intents_after.iter().find(|i| i.id == Some(3)).unwrap();
-        assert_eq!(i3_after.status, "succeeded");
+        assert_eq!(i3_after.status, BidStatus::Succeeded);
 
         let _ = fs::remove_file(db_file);
     }

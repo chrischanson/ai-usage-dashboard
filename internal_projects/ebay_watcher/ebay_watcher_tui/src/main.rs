@@ -14,7 +14,6 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Tabs, Table, Row, Cell, Clear, Wrap},
     Frame, Terminal,
 };
-use rusqlite::Connection;
 use chrono::{TimeZone, Utc};
 pub mod ui;
 
@@ -45,6 +44,7 @@ struct App {
     db_path: String,
     config: Config,
     items: Vec<Item>,
+    filtered_items: Vec<Item>,
     bid_intents: Vec<BidIntent>,
     dashboard_state: DashboardState,
     selected_idx: usize,
@@ -63,6 +63,7 @@ impl App {
             db_path,
             config,
             items: Vec::new(),
+            filtered_items: Vec::new(),
             bid_intents: Vec::new(),
             dashboard_state,
             selected_idx: 0,
@@ -74,81 +75,49 @@ impl App {
     }
 
     fn refresh_data(&mut self) {
-        if let Ok(conn) = Connection::open(&self.db_path) {
-            let _ = conn.pragma_update(None, "journal_mode", "WAL");
-            let _ = conn.busy_timeout(Duration::from_millis(5000));
-
+        if let Ok(conn) = ebay_watcher_core::db::open_conn(&self.db_path) {
             // Load dashboard state
             self.dashboard_state = DashboardState::load(&conn);
 
             // Load items
-            let mut items = Vec::new();
-            if let Ok(mut stmt) = conn.prepare(
-                "SELECT id, title, current_price, shipping_cost, buy_it_now_price, end_time FROM items"
-            ) {
-                if let Ok(rows) = stmt.query_map([], |row| {
-                    Ok(Item {
-                        id: row.get(0)?,
-                        title: row.get(1)?,
-                        current_price: row.get(2)?,
-                        shipping_cost: row.get(3)?,
-                        buy_it_now_price: row.get(4)?,
-                        end_time: row.get(5)?,
-                    })
-                }) {
-                    for r in rows {
-                        if let Ok(item) = r {
-                            items.push(item);
-                        }
-                    }
-                }
+            if let Ok(items) = ebay_watcher_core::db::get_items(&conn) {
+                self.items = items;
             }
-            self.items = items;
 
             // Load bid intents
-            let mut intents = Vec::new();
-            if let Ok(mut stmt) = conn.prepare(
-                "SELECT id, item_id, max_bid, target_time, status, error_message FROM bid_intents"
-            ) {
-                if let Ok(rows) = stmt.query_map([], |row| {
-                    Ok(BidIntent {
-                        id: Some(row.get(0)?),
-                        item_id: row.get(1)?,
-                        max_bid: row.get(2)?,
-                        target_time: row.get(3)?,
-                        status: row.get(4)?,
-                        error_message: row.get(5)?,
-                    })
-                }) {
-                    for r in rows {
-                        if let Ok(intent) = r {
-                            intents.push(intent);
-                        }
-                    }
-                }
+            if let Ok(intents) = ebay_watcher_core::db::get_bid_intents(&conn) {
+                self.bid_intents = intents;
             }
-            self.bid_intents = intents;
         }
+        self.update_filtered_items();
+    }
+
+    fn update_filtered_items(&mut self) {
+        self.filtered_items = match self.active_tab {
+            1 => self.items.clone(), // Search Matches
+            2 => self.items.clone(), // Watchlist (simplified)
+            3 => {
+                let limit = self.config.deals.max_total_price;
+                self.items.iter()
+                    .filter(|i| i.current_price + i.shipping_cost <= limit)
+                    .cloned()
+                    .collect()
+            }
+            _ => Vec::new(),
+        };
     }
 
     fn set_status(&mut self, msg: &str) {
         self.status_msg = Some((msg.to_string(), Instant::now()));
     }
 
-    fn active_items(&self) -> Vec<Item> {
-        match self.active_tab {
-            1 => self.items.clone(), // Search Matches (all items)
-            2 => self.items.clone(), // Watchlist (all items for simplicity)
-            3 => self.items.iter()
-                .filter(|i| i.current_price + i.shipping_cost <= 100.0) // Deals (<= $100 total cost)
-                .cloned()
-                .collect(),
-            _ => Vec::new(),
-        }
+    fn active_items(&self) -> &[Item] {
+        &self.filtered_items
     }
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load config
     let config_path = "config.toml";
     let config = if Path::new(config_path).exists() {
@@ -160,6 +129,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 client_id: "dummy".into(),
                 client_secret: "dummy".into(),
                 ru_name: "dummy".into(),
+                dev_name: "dummy".into(),
                 sandbox: true,
             },
             sync: ebay_watcher_core::config::SyncConfig {
@@ -171,6 +141,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
             database: ebay_watcher_core::config::DatabaseConfig {
                 db_path: "ebay_watcher.db".into(),
+            },
+            deals: ebay_watcher_core::config::DealsConfig {
+                max_total_price: 100.0,
             },
         }
     };
@@ -230,6 +203,7 @@ fn run_app(
                         KeyCode::Tab => {
                             app.active_tab = (app.active_tab + 1) % 5;
                             app.selected_idx = 0;
+                            app.update_filtered_items();
                         }
                         KeyCode::Up => {
                             if app.selected_idx > 0 {
@@ -247,15 +221,16 @@ fn run_app(
                             }
                         }
                         KeyCode::Char('r') => {
-                            // Send SIGUSR1 to daemon if running
+                            // Attempt the signal directly to avoid a TOCTOU race between
+                            // the `daemon_active` snapshot and the actual kill call.
                             if let Some(pid) = app.dashboard_state.daemon_pid {
-                                if app.dashboard_state.daemon_active {
-                                    unsafe {
-                                        libc::kill(pid, libc::SIGUSR1);
-                                    }
-                                    app.set_status("Triggered daemon immediate synchronization.");
-                                } else {
-                                    app.set_status("Daemon PID file exists but process is not running.");
+                                match nix::sys::signal::kill(
+                                    nix::unistd::Pid::from_raw(pid as i32),
+                                    nix::sys::signal::Signal::SIGUSR1,
+                                ) {
+                                    Ok(()) => app.set_status("Triggered daemon immediate synchronization."),
+                                    Err(nix::errno::Errno::ESRCH) => app.set_status("Daemon process not found (stale PID file?)."),
+                                    Err(e) => app.set_status(&format!("Failed to signal daemon: {e}")),
                                 }
                             } else {
                                 app.set_status("Daemon is not running (no PID file).");
@@ -282,6 +257,36 @@ fn run_app(
                                 };
                             }
                         }
+                        KeyCode::Char('x') => {
+                            if app.active_tab == 4 && !app.bid_intents.is_empty() && app.selected_idx < app.bid_intents.len() {
+                                let intent = &app.bid_intents[app.selected_idx];
+                                if intent.status == ebay_watcher_core::models::BidStatus::Pending {
+                                    if let Some(intent_id) = intent.id {
+                                        if let Ok(conn) = ebay_watcher_core::db::open_conn(&app.db_path) {
+                                            if ebay_watcher_core::db::update_bid_intent_status(
+                                                &conn,
+                                                intent_id,
+                                                ebay_watcher_core::models::BidStatus::Cancelled,
+                                                Some("Cancelled by user"),
+                                            ).is_ok() {
+                                                if let Some(pid) = app.dashboard_state.daemon_pid {
+                                                    let _ = nix::sys::signal::kill(
+                                                        nix::unistd::Pid::from_raw(pid as i32),
+                                                        nix::sys::signal::Signal::SIGUSR1,
+                                                    );
+                                                }
+                                                app.set_status(&format!("Cancelled snipe for intent ID {}", intent_id));
+                                            } else {
+                                                app.set_status("Failed to cancel snipe in database.");
+                                            }
+                                        }
+                                        app.refresh_data();
+                                    }
+                                } else {
+                                    app.set_status("Only pending snipes can be cancelled.");
+                                }
+                            }
+                        }
                         _ => {}
                     },
                     InputMode::BidModal { item_id, item_title, item_price, end_time, mut input, mut error } => {
@@ -305,23 +310,23 @@ fn run_app(
                                         next_mode = Some(InputMode::BidModal { item_id, item_title, item_price, end_time, input, error });
                                     } else {
                                         // Save bid intent
-                                        if let Ok(conn) = Connection::open(&app.db_path) {
-                                            let target_time = end_time - app.config.sniper.lead_time_seconds as i64;
+                                        if let Ok(conn) = ebay_watcher_core::db::open_conn(&app.db_path) {
+                                            let target_time = end_time; // Raw auction end time (double subtraction fix)
                                             let intent = BidIntent {
                                                 id: None,
                                                 item_id: item_id.clone(),
                                                 max_bid: bid,
                                                 target_time,
-                                                status: "pending".to_string(),
+                                                status: ebay_watcher_core::models::BidStatus::Pending,
                                                 error_message: None,
                                             };
                                             if ebay_watcher_core::db::save_bid_intent(&conn, &intent).is_ok() {
                                                 if let Some(pid) = app.dashboard_state.daemon_pid {
-                                                    if app.dashboard_state.daemon_active {
-                                                        unsafe {
-                                                            libc::kill(pid, libc::SIGUSR1);
-                                                        }
-                                                    }
+                                                    // Best-effort signal; ESRCH is silently ignored if daemon has exited.
+                                                    let _ = nix::sys::signal::kill(
+                                                        nix::unistd::Pid::from_raw(pid as i32),
+                                                        nix::sys::signal::Signal::SIGUSR1,
+                                                    );
                                                 }
                                                 app.set_status(&format!("Scheduled snipe of ${:.2} on item {}", bid, item_id));
                                             } else {
@@ -362,17 +367,18 @@ fn run_app(
                                     next_mode = Some(InputMode::AuthModal { input, error });
                                 } else {
                                     let client = RealEbayClient::new(app.config.clone());
-                                    match client.get_token(input.trim()) {
+                                    let token_res = tokio::runtime::Handle::current().block_on(client.get_token(input.trim()));
+                                    match token_res {
                                         Ok(token) => {
-                                            if let Ok(conn) = Connection::open(&app.db_path) {
+                                            if let Ok(conn) = ebay_watcher_core::db::open_conn(&app.db_path) {
                                                 if set_token(&conn, &token).is_ok() {
                                                     app.set_status("Successfully authorized with eBay!");
                                                     if let Some(pid) = app.dashboard_state.daemon_pid {
-                                                        if app.dashboard_state.daemon_active {
-                                                            unsafe {
-                                                                libc::kill(pid, libc::SIGUSR1);
-                                                            }
-                                                        }
+                                                        // Best-effort signal; ESRCH is silently ignored if daemon has exited.
+                                                        let _ = nix::sys::signal::kill(
+                                                            nix::unistd::Pid::from_raw(pid as i32),
+                                                            nix::sys::signal::Signal::SIGUSR1,
+                                                        );
                                                     }
                                                 } else {
                                                     app.set_status("Failed to save credentials to database.");
@@ -459,7 +465,7 @@ fn ui(f: &mut Frame, app: &App) {
 
     // 4. Render Status bar / Footer
     let keys_span = Span::styled(
-        " [Tab] Next Tab | [r] Sync Daemon | [a] Auth code | [b] Setup Snipe | [q] Quit ",
+        " [Tab] Next Tab | [r] Sync Daemon | [a] Auth code | [b] Setup Snipe | [x] Cancel Snipe | [q] Quit ",
         Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
     );
 
@@ -620,7 +626,7 @@ fn render_bids_table(f: &mut Frame, area: Rect, bids: &[BidIntent], selected_idx
             "pending" => Color::Cyan,
             _ => Color::White,
         };
-        let status_cell = Cell::from(bid.status.clone()).style(Style::default().fg(status_color).add_modifier(Modifier::BOLD));
+        let status_cell = Cell::from(bid.status.to_string()).style(Style::default().fg(status_color).add_modifier(Modifier::BOLD));
 
         let cells = vec![
             Cell::from(bid.id.map(|id| id.to_string()).unwrap_or_default()),
@@ -647,3 +653,83 @@ fn render_bids_table(f: &mut Frame, area: Rect, bids: &[BidIntent], selected_idx
 
     f.render_widget(table, area);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ebay_watcher_core::db::save_item;
+
+    #[test]
+    fn test_tui_app_filtering_deals() {
+        let temp_db_path = "test_tui_deals.db";
+        let _ = std::fs::remove_file(temp_db_path);
+
+        let config = Config {
+            ebay: ebay_watcher_core::config::EbayConfig {
+                client_id: "dummy".into(),
+                client_secret: "dummy".into(),
+                ru_name: "dummy".into(),
+                dev_name: "dummy".into(),
+                sandbox: true,
+            },
+            sync: ebay_watcher_core::config::SyncConfig {
+                poll_interval_seconds: 60,
+            },
+            sniper: ebay_watcher_core::config::SniperConfig {
+                lead_time_seconds: 5,
+                fallback_to_trading_api: true,
+            },
+            database: ebay_watcher_core::config::DatabaseConfig {
+                db_path: temp_db_path.to_string(),
+            },
+            deals: ebay_watcher_core::config::DealsConfig {
+                max_total_price: 100.0,
+            },
+        };
+
+        let mut app = App::new(config);
+        
+        let conn = ebay_watcher_core::db::open_conn(temp_db_path).unwrap();
+        
+        // Save items: one cheap (under 100 total), one expensive (over 100 total)
+        let cheap_item = Item {
+            id: "cheap1".to_string(),
+            title: "Cheap Item".to_string(),
+            current_price: 80.0,
+            shipping_cost: 15.0, // total 95.0
+            buy_it_now_price: None,
+            end_time: 12345,
+        };
+        let expensive_item = Item {
+            id: "expensive1".to_string(),
+            title: "Expensive Item".to_string(),
+            current_price: 90.0,
+            shipping_cost: 15.0, // total 105.0
+            buy_it_now_price: None,
+            end_time: 12345,
+        };
+        save_item(&conn, &cheap_item).unwrap();
+        save_item(&conn, &expensive_item).unwrap();
+        
+        std::mem::drop(conn);
+
+        // Refresh data to fetch from DB
+        app.refresh_data();
+
+        // 1. Tab 1 (Search Matches) should show both items
+        app.active_tab = 1;
+        app.update_filtered_items();
+        assert_eq!(app.filtered_items.len(), 2);
+        assert!(app.filtered_items.iter().any(|i| i.id == "cheap1"));
+        assert!(app.filtered_items.iter().any(|i| i.id == "expensive1"));
+
+        // 2. Tab 3 (Deals) should show only the cheap item (total <= 100)
+        app.active_tab = 3;
+        app.update_filtered_items();
+        assert_eq!(app.filtered_items.len(), 1);
+        assert_eq!(app.filtered_items[0].id, "cheap1");
+
+        let _ = std::fs::remove_file(temp_db_path);
+    }
+}
+

@@ -11,3 +11,6 @@ chrono = "0.4"
 rusqlite = { version = "0.31", features = ["bundled"] }
 reqwest = "0.12"
 nix = { version = "0.29", features = ["signal"] }
+
+[dev-dependencies]
+ebay_watcher_core = { path = "../ebay_watcher_core", features = ["mock"] }

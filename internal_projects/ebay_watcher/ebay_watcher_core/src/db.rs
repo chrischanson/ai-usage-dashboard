@@ -1,7 +1,20 @@
 use rusqlite::{Connection, params, OptionalExtension};
+use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
 use std::path::Path;
 use crate::error::Result;
-use crate::models::{OAuthToken, Item, Alert, BidIntent};
+use crate::models::{OAuthToken, Item, Alert, BidIntent, BidStatus};
+
+impl ToSql for BidStatus {
+    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
+        Ok(ToSqlOutput::Borrowed(ValueRef::Text(self.as_str().as_bytes())))
+    }
+}
+
+impl FromSql for BidStatus {
+    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
+        value.as_str()?.parse().map_err(|_| FromSqlError::InvalidType)
+    }
+}
 
 pub fn init_db<P: AsRef<Path>>(path: P) -> Result<Connection> {
     let conn = Connection::open(path)?;
@@ -20,6 +33,18 @@ pub fn init_db<P: AsRef<Path>>(path: P) -> Result<Connection> {
     let migration_sql = include_str!("../../migrations/001_initial.sql");
     conn.execute_batch(migration_sql)?;
 
+    Ok(conn)
+}
+
+/// Opens and configures a connection to an **already-migrated** database.
+/// Unlike [`init_db`], this does **not** re-run migrations — use for
+/// per-tick daemon connections where the schema is known to be up to date.
+pub fn open_conn<P: AsRef<Path>>(path: P) -> Result<Connection> {
+    let conn = Connection::open(path)?;
+    conn.pragma_update(None, "journal_mode", "WAL")?;
+    conn.pragma_update(None, "synchronous", "NORMAL")?;
+    conn.busy_timeout(std::time::Duration::from_millis(5000))?;
+    conn.execute("PRAGMA foreign_keys = ON;", [])?;
     Ok(conn)
 }
 
@@ -86,6 +111,27 @@ pub fn get_item(conn: &Connection, id: &str) -> Result<Option<Item>> {
         })
     }).optional()?;
     Ok(item)
+}
+
+pub fn get_items(conn: &Connection) -> Result<Vec<Item>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, title, current_price, shipping_cost, buy_it_now_price, end_time FROM items"
+    )?;
+    let item_iter = stmt.query_map([], |row| {
+        Ok(Item {
+            id: row.get(0)?,
+            title: row.get(1)?,
+            current_price: row.get(2)?,
+            shipping_cost: row.get(3)?,
+            buy_it_now_price: row.get(4)?,
+            end_time: row.get(5)?,
+        })
+    })?;
+    let mut items = Vec::new();
+    for item in item_iter {
+        items.push(item?);
+    }
+    Ok(items)
 }
 
 pub fn add_alert(conn: &Connection, item_id: &str, discovered_at: i64) -> Result<()> {
@@ -190,7 +236,7 @@ pub fn get_pending_bid_intents(conn: &Connection) -> Result<Vec<BidIntent>> {
 pub fn update_bid_intent_status(
     conn: &Connection,
     id: i32,
-    status: &str,
+    status: BidStatus,
     error_message: Option<&str>,
 ) -> Result<()> {
     conn.execute(
@@ -233,6 +279,11 @@ mod tests {
         let fetched_item = get_item(&conn, "item1").unwrap().unwrap();
         assert_eq!(fetched_item, item);
 
+        // Test get_items
+        let items = get_items(&conn).unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0], item);
+
         // Test alerts
         add_alert(&conn, "item1", 15000).unwrap();
         let unread = get_unread_alerts(&conn).unwrap();
@@ -249,7 +300,7 @@ mod tests {
             item_id: "item1".to_string(),
             max_bid: 12.0,
             target_time: 19995,
-            status: "pending".to_string(),
+            status: BidStatus::Pending,
             error_message: None,
         };
         let intent_id = save_bid_intent(&conn, &intent).unwrap();
@@ -259,12 +310,12 @@ mod tests {
         assert_eq!(pending[0].max_bid, 12.0);
         assert_eq!(pending[0].id, Some(intent_id));
 
-        update_bid_intent_status(&conn, intent_id, "succeeded", None).unwrap();
+        update_bid_intent_status(&conn, intent_id, BidStatus::Succeeded, None).unwrap();
         let pending_after = get_pending_bid_intents(&conn).unwrap();
         assert_eq!(pending_after.len(), 0);
 
         let all_intents = get_bid_intents(&conn).unwrap();
         assert_eq!(all_intents.len(), 1);
-        assert_eq!(all_intents[0].status, "succeeded");
+        assert_eq!(all_intents[0].status, BidStatus::Succeeded);
     }
 }

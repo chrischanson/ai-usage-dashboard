@@ -11,7 +11,7 @@ use std::path::Path;
 use ebay_watcher_core::models::{Item, Alert, OAuthToken};
 
 pub struct DashboardState {
-    pub daemon_pid: Option<i32>,
+    pub daemon_pid: Option<u32>,
     pub daemon_active: bool,
     pub oauth_token: Option<OAuthToken>,
     pub total_items: usize,
@@ -28,10 +28,11 @@ impl DashboardState {
         let mut daemon_active = false;
         if Path::new(pid_file).exists() {
             if let Ok(pid_str) = fs::read_to_string(pid_file) {
-                if let Ok(pid) = pid_str.trim().parse::<i32>() {
+                if let Ok(pid) = pid_str.trim().parse::<u32>() {
                     daemon_pid = Some(pid);
-                    // Check if process is alive (using kill 0)
-                    daemon_active = unsafe { libc::kill(pid, 0) == 0 };
+                    // Display-only liveness probe via signal 0. This is a snapshot;
+                    // callers must NOT rely on it for security-sensitive decisions (TOCTOU).
+                    daemon_active = unsafe { libc::kill(pid as i32, 0) == 0 };
                 }
             }
         }
