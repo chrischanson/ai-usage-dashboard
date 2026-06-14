@@ -235,10 +235,10 @@ while [ "${ITERATION}" -lt "${MAX_ITERATIONS}" ]; do
 
     rm -f "${SKILL_LINK}"
 
-    # Read interval from configuration file (defaults to 5 minutes, minimum 5 minutes)
-    INTERVAL_MINS=$(cat "${SCRIPT_DIR}/prediction_interval.txt" 2>/dev/null | tr -d '[:space:]' || echo "5")
-    if ! echo "${INTERVAL_MINS}" | grep -qE '^[0-9]+$' || [ "${INTERVAL_MINS}" -lt 5 ]; then
-        INTERVAL_MINS=5
+    # Read interval from configuration file (defaults to 10 minutes, minimum 10 minutes)
+    INTERVAL_MINS=$(cat "${SCRIPT_DIR}/prediction_interval.txt" 2>/dev/null | tr -d '[:space:]' || echo "10")
+    if ! echo "${INTERVAL_MINS}" | grep -qE '^[0-9]+$' || [ "${INTERVAL_MINS}" -lt 10 ]; then
+        INTERVAL_MINS=10
     fi
     echo "[$(date -u +%H:%M:%S)] Iteration ${ITERATION} complete. Next run in ${INTERVAL_MINS} minutes."
 
@@ -250,7 +250,7 @@ while [ "${ITERATION}" -lt "${MAX_ITERATIONS}" ]; do
         ELAPSED=$((ELAPSED + 60))
         # Re-read configuration in case it changed mid-sleep
         NEW_MINS=$(cat "${SCRIPT_DIR}/prediction_interval.txt" 2>/dev/null | tr -d '[:space:]' || echo "${INTERVAL_MINS}")
-        if ! echo "${NEW_MINS}" | grep -qE '^[0-9]+$' || [ "${NEW_MINS}" -lt 5 ]; then
+        if ! echo "${NEW_MINS}" | grep -qE '^[0-9]+$' || [ "${NEW_MINS}" -lt 10 ]; then
             NEW_MINS=${INTERVAL_MINS}
         fi
         if [ "${NEW_MINS}" -ne "${INTERVAL_MINS}" ]; then

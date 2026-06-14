@@ -26,7 +26,7 @@ Today for this run: `{DATE}`.
 4. Research current evidence, prioritizing official and recent sources.
 5. Update `{PREDICTIONS_PATH}` as the full current working prediction file.
 6. Append a concise, auditable entry to `{CHANGELOG_PATH}`.
-7. Write the next polling interval, as a single integer from 5 to 15, to `{INTERVAL_PATH}`.
+7. Write the next polling interval, as a single integer from 10 to 30, to `{INTERVAL_PATH}`.
 
 ## Step 1: Load And Triage
 
@@ -128,7 +128,7 @@ last_updated: "<current UTC timestamp>"
 matches_covered: <number of active predictions>
 overall_confidence: "<brief summary>"
 model: "{AGENT}: <your model name/version, e.g., Claude Sonnet 4.6 or Gemini 2.5 Flash>"
-next_interval_minutes: <determined interval integer, e.g., 5>
+next_interval_minutes: <determined interval integer, e.g., 10>
 next_model: "<Gemini 3.5 Flash (Medium) or Gemini 3.5 Flash (High)>"
 ---
 
@@ -224,23 +224,23 @@ Never add a same-day pre-match observation to "Active Heuristics" as if it were 
 
 ## Step 7: Dynamic Interval and Model Selection
 
-1. Choose the next interval from 5 to 15 minutes based on the nearest eligible match and the information rate:
+1. Choose the next interval from 10 to 30 minutes based on the nearest eligible match and the information rate:
    - Write only the determined integer to `{INTERVAL_PATH}` (the file must contain exactly one integer with no other text).
    - Set the `next_interval_minutes` key in the `{PREDICTIONS_PATH}` frontmatter to this integer.
    - Record `**Next Interval:** <minutes> minutes` in the `{CHANGELOG_PATH}` entry header.
 
 Default interval guide:
-- `5`: match is live before halftime; kickoff within 60 minutes; official lineups or warm-up reports are expected or arriving; breaking injury/team news; sharp odds move; unresolved high-impact uncertainty.
-- `6-8`: kickoff within 2 hours, information is mostly stable, or active conflicting reports.
-- `9-11`: kickoff within 4 hours, quiet news cycle, no major unresolved questions.
-- `12-15`: next eligible match is more than 4 hours away, or all active matches are skipped/quiet.
+- `10`: match is live before halftime; kickoff within 60 minutes; official lineups or warm-up reports are expected or arriving; breaking injury/team news; sharp odds move; unresolved high-impact uncertainty.
+- `11-15`: kickoff within 2 hours, information is mostly stable, or active conflicting reports.
+- `16-22`: kickoff within 4 hours, quiet news cycle, no major unresolved questions.
+- `23-30`: next eligible match is more than 4 hours away, or all active matches are skipped/quiet.
 
 Adjust for information rate:
-- Shorten by 1-3 minutes if this iteration found material new evidence, but never go below 5 minutes.
-- Lengthen by 1-3 minutes if two consecutive iterations found no material new evidence.
-- Use `15` if there are no eligible matches left before halftime, and state this in the changelog.
+- Shorten by 2-5 minutes if this iteration found material new evidence, but never go below 10 minutes.
+- Lengthen by 2-5 minutes if two consecutive iterations found no material new evidence.
+- Use `30` if there are no eligible matches left before halftime, and state this in the changelog.
 
-The file content of `{INTERVAL_PATH}` must be exactly one integer between 5 and 15.
+The file content of `{INTERVAL_PATH}` must be exactly one integer between 10 and 30.
 
 2. Predict the complexity/difficulty of the questions for the next iteration:
    - If the next questions are predicted to be hard (e.g., they require deep tactical interpretation, complex analysis of conflicting reports, or resolving late lineup updates close to kickoff), set the `next_model` key in the `{PREDICTIONS_PATH}` frontmatter to `Gemini 3.5 Flash (High)`.
