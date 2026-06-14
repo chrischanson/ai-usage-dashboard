@@ -48,16 +48,28 @@ ensure_skill_link() {
 }
 
 read_interval_mins() {
-    local raw
+    local raw min_mins max_mins default_mins config_path
+    config_path="${SCRIPT_DIR}/model_config.json"
+    
+    if [ -f "${config_path}" ]; then
+        min_mins=$(python3 -c "import json; c=json.load(open('${config_path}')); print(c.get('min_interval_minutes', 15))")
+        max_mins=$(python3 -c "import json; c=json.load(open('${config_path}')); print(c.get('max_interval_minutes', 45))")
+        default_mins=$(python3 -c "import json; c=json.load(open('${config_path}')); print(c.get('default_interval_minutes', 15))")
+    else
+        min_mins="${MIN_INTERVAL_MINS:-15}"
+        max_mins="${MAX_INTERVAL_MINS:-45}"
+        default_mins="${DEFAULT_INTERVAL_MINS:-15}"
+    fi
+
     raw=$(cat "${INTERVAL_PATH}" 2>/dev/null | tr -d '[:space:]' || true)
     if ! echo "${raw}" | grep -qE '^[0-9]+$'; then
-        raw="${DEFAULT_INTERVAL_MINS}"
+        raw="${default_mins}"
     fi
-    if [ "${raw}" -lt "${MIN_INTERVAL_MINS}" ]; then
-        raw="${MIN_INTERVAL_MINS}"
+    if [ "${raw}" -lt "${min_mins}" ]; then
+        raw="${min_mins}"
     fi
-    if [ "${raw}" -gt "${MAX_INTERVAL_MINS}" ]; then
-        raw="${MAX_INTERVAL_MINS}"
+    if [ "${raw}" -gt "${max_mins}" ]; then
+        raw="${max_mins}"
     fi
     echo "${raw}"
 }
@@ -295,14 +307,13 @@ echo "Postmortem target:        $(format_utc_epoch "${POSTMORTEM_EPOCH}")"
 echo ""
 echo "--- Step 3: Prediction Loop (dynamic interval until all games end) ---"
 
-PREDICT_VARS="DATE=${DATE}"
-PREDICT_VARS="${PREDICT_VARS},SCHEDULE_PATH=${SCHEDULE_PATH}"
-PREDICT_VARS="${PREDICT_VARS},TRACKER_PATH=${TRACKER_PATH}"
-PREDICT_VARS="${PREDICT_VARS},PREDICTIONS_PATH=${PREDICTIONS_PATH}"
-PREDICT_VARS="${PREDICT_VARS},CHANGELOG_PATH=${CHANGELOG_PATH}"
-PREDICT_VARS="${PREDICT_VARS},INTERVAL_PATH=${INTERVAL_PATH}"
-PREDICT_VARS="${PREDICT_VARS},OUTPUT_DIR=${DAY_DIR}"
-PREDICT_VARS="${PREDICT_VARS},AGENT=${AGENT}"
+PREDICT_VARS_BASE="DATE=${DATE}"
+PREDICT_VARS_BASE="${PREDICT_VARS_BASE},SCHEDULE_PATH=${SCHEDULE_PATH}"
+PREDICT_VARS_BASE="${PREDICT_VARS_BASE},TRACKER_PATH=${TRACKER_PATH}"
+PREDICT_VARS_BASE="${PREDICT_VARS_BASE},PREDICTIONS_PATH=${PREDICTIONS_PATH}"
+PREDICT_VARS_BASE="${PREDICT_VARS_BASE},CHANGELOG_PATH=${CHANGELOG_PATH}"
+PREDICT_VARS_BASE="${PREDICT_VARS_BASE},INTERVAL_PATH=${INTERVAL_PATH}"
+PREDICT_VARS_BASE="${PREDICT_VARS_BASE},OUTPUT_DIR=${DAY_DIR}"
 
 ITERATION=0
 
@@ -313,32 +324,50 @@ while [ "$(date -u +%s)" -lt "${LAST_END_EPOCH}" ]; do
 
     ensure_skill_link "wc_predict" "${SCRIPT_DIR}/predict"
 
-    # Read the next model to use from predictions.md if it exists, default to Gemini 3.5 Flash (Medium)
-    MODEL="Gemini 3.5 Flash (Medium)"
+    # Extract the next difficulty level from predictions.md if it exists, default to 'medium'
+    DIFFICULTY="medium"
     if [ -f "${PREDICTIONS_PATH}" ]; then
-        EXTRACTED_MODEL=$(grep -E '^next_model:' "${PREDICTIONS_PATH}" | head -n 1 | cut -d':' -f2- | tr -d '"'\'' ' || true)
-        if [ "${EXTRACTED_MODEL}" = "High" ] || [ "${EXTRACTED_MODEL}" = "Gemini3.5Flash(High)" ] || [ "${EXTRACTED_MODEL}" = "Gemini 3.5 Flash (High)" ]; then
-            MODEL="Gemini 3.5 Flash (High)"
+        EXTRACTED_DIFF=$(grep -E '^next_difficulty:' "${PREDICTIONS_PATH}" | head -n 1 | cut -d':' -f2- | tr -d '"'\'' ' || true)
+        if [ "${EXTRACTED_DIFF}" = "high" ] || [ "${EXTRACTED_DIFF}" = "medium" ] || [ "${EXTRACTED_DIFF}" = "low" ]; then
+            DIFFICULTY="${EXTRACTED_DIFF}"
         fi
     fi
-    log "Selected model for iteration: ${MODEL}"
 
-    # Map model name for each agent type
-    EXEC_MODEL="${MODEL}"
-    FALLBACK_EXEC_MODEL="${MODEL}"
-    if [ "${AGENT}" = "opencode" ]; then
-        EXEC_MODEL="google/gemini-3.5-flash"
+    # Read agent and model from model_config.json
+    CONFIG_PATH="${SCRIPT_DIR}/model_config.json"
+    if [ -f "${CONFIG_PATH}" ]; then
+        EXEC_AGENT=$(python3 -c "import json; c=json.load(open('${CONFIG_PATH}')); tier=c.get('${DIFFICULTY}', {}); print(tier.get('agent', 'agy'))")
+        EXEC_MODEL=$(python3 -c "import json; c=json.load(open('${CONFIG_PATH}')); tier=c.get('${DIFFICULTY}', {}); print(tier.get('model', ''))")
+    else
+        # Fallback if config is missing
+        EXEC_AGENT="agy"
+        if [ "${DIFFICULTY}" = "high" ]; then
+            EXEC_MODEL="Gemini 3.5 Flash (High)"
+        else
+            EXEC_MODEL="Gemini 3.5 Flash (Medium)"
+        fi
     fi
-    if [ "${FALLBACK_AGENT}" = "opencode" ]; then
+
+    # Determine fallback agent and model
+    if [ "${EXEC_AGENT}" = "opencode" ]; then
+        FALLBACK_EXEC_AGENT="agy"
+        FALLBACK_EXEC_MODEL="Gemini 3.5 Flash (Medium)"
+    else
+        FALLBACK_EXEC_AGENT="opencode"
         FALLBACK_EXEC_MODEL="google/gemini-3.5-flash"
     fi
 
+    log "Difficulty: ${DIFFICULTY} | Agent: ${EXEC_AGENT} | Model: ${EXEC_MODEL:-[default]}"
+
+    PREDICT_VARS_PRIMARY="${PREDICT_VARS_BASE},AGENT=${EXEC_AGENT}"
+    PREDICT_VARS_FALLBACK="${PREDICT_VARS_BASE},AGENT=${FALLBACK_EXEC_AGENT}"
+
     if [ -f "${SKILLS_RUNNER}" ]; then
-        if OUTPUT=$(python3 "${SKILLS_RUNNER}" wc_predict --agent "${AGENT}" --model "${EXEC_MODEL}" --vars "${PREDICT_VARS}"); then
+        if OUTPUT=$(python3 "${SKILLS_RUNNER}" wc_predict --agent "${EXEC_AGENT}" --model "${EXEC_MODEL}" --vars "${PREDICT_VARS_PRIMARY}"); then
             echo "${OUTPUT}"
         else
-            echo "Warning: ${AGENT} predict failed. Trying ${FALLBACK_AGENT} fallback..." >&2
-            OUTPUT=$(python3 "${SKILLS_RUNNER}" wc_predict --agent "${FALLBACK_AGENT}" --model "${FALLBACK_EXEC_MODEL}" --vars "${PREDICT_VARS}")
+            echo "Warning: ${EXEC_AGENT} predict failed. Trying ${FALLBACK_EXEC_AGENT} fallback..." >&2
+            OUTPUT=$(python3 "${SKILLS_RUNNER}" wc_predict --agent "${FALLBACK_EXEC_AGENT}" --model "${FALLBACK_EXEC_MODEL}" --vars "${PREDICT_VARS_FALLBACK}")
             echo "${OUTPUT}"
         fi
         
@@ -359,7 +388,7 @@ while [ "$(date -u +%s)" -lt "${LAST_END_EPOCH}" ]; do
         COMPILED="${COMPILED//\{CHANGELOG_PATH\}/${CHANGELOG_PATH}}"
         COMPILED="${COMPILED//\{INTERVAL_PATH\}/${INTERVAL_PATH}}"
         COMPILED="${COMPILED//\{OUTPUT_DIR\}/${DAY_DIR}}"
-        if [ "${AGENT}" = "opencode" ]; then
+        if [ "${EXEC_AGENT}" = "opencode" ]; then
             opencode run --dangerously-skip-permissions --model "${EXEC_MODEL}" "${COMPILED}" || {
                 echo "Warning: opencode predict failed. Trying agy fallback..." >&2
                 agy --dangerously-skip-permissions --model "${FALLBACK_EXEC_MODEL}" --print "${COMPILED}" || {
@@ -383,7 +412,9 @@ while [ "$(date -u +%s)" -lt "${LAST_END_EPOCH}" ]; do
         COVERED=$(grep -E '^matches_covered:' "${PREDICTIONS_PATH}" | head -n 1 | cut -d':' -f2 | tr -d ' ' || echo "1")
         if [ "${COVERED}" = "0" ]; then
             log "Prediction skill reports no matches left to cover; skipping further invocations and waiting until all games end at $(format_utc_epoch "${LAST_END_EPOCH}")."
-            sleep_until_or_interval_change "${LAST_END_EPOCH}" "${MAX_INTERVAL_MINS}"
+            local max_interval
+            max_interval=$(python3 -c "import json; c=json.load(open('${SCRIPT_DIR}/model_config.json')); print(c.get('max_interval_minutes', 45))" 2>/dev/null || echo "${MAX_INTERVAL_MINS}")
+            sleep_until_or_interval_change "${LAST_END_EPOCH}" "${max_interval}"
             break
         fi
     fi

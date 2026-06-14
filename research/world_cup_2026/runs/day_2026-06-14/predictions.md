@@ -1,161 +1,69 @@
 ---
 date: "2026-06-14"
-iteration: 18
-last_updated: "2026-06-14T02:25:23Z"
-matches_covered: 4
-overall_confidence: "Medium (Germany/Neuer fit on fast turf; Verbruggen confirmed fit for Netherlands; Valencia expected to start for Ecuador; Kadıoğlu fit but Yıldız remains a major starting doubt for Türkiye)"
-model: "agy: Gemini 3.5 Flash"
-next_interval_minutes: 7
+iteration: 37
+last_updated: "2026-06-14T19:35:50Z"
+matches_covered: 3
+overall_confidence: "Medium (Netherlands, Côte d'Ivoire, and Sweden predictions remain stable at Medium confidence, supported by confirmed lineups and stable pre-match reports)"
+model: "agy: Gemini 3.5 Flash (Medium)"
+next_interval_minutes: 40
+next_model: "Gemini 3.5 Flash (Medium)"
 ---
 
-# World Cup 2026 Predictions for 2026-06-14 - Iteration 18
+# World Cup 2026 Predictions for 2026-06-14 - Iteration 37
 
 ## 📊 Executive Summary Table
-A quick-glance tracker of the predicted results and confidence levels for all active matches today.
+A quick-glance tracker of the predicted results, confidence levels, and when they were last updated.
 
-| Match | Status | Prediction | Confidence |
-|:------|:-------|:-----------|:-----------|
-| Australia vs. Türkiye | not_started | TÜRKİYE WIN | Low |
-| Germany vs. Curaçao | not_started | GERMANY WIN | High |
-| Netherlands vs. Japan | not_started | NETHERLANDS WIN | Medium |
-| Côte d'Ivoire vs. Ecuador | not_started | DRAW | Medium |
+| Match | Status | Prediction | Confidence | Last Updated |
+|:------|:-------|:-----------|:-----------|:-------------|
+| Netherlands vs. Japan | not_started | NETHERLANDS WIN | Medium | 2026-06-14T02:25:23Z |
+| Côte d'Ivoire vs. Ecuador | not_started | DRAW | Medium | 2026-06-14T02:25:23Z |
+| Sweden vs. Tunisia | not_started | SWEDEN WIN | Medium | 2026-06-14T09:03:10Z |
 
 ---
 
 ## 🔍 Detailed Match Analysis
 
-### Match: Australia vs. Türkiye
-
-**Status:** not_started
-**Kickoff:** 04:00 UTC | **Venue:** BC Place (Vancouver) | **Group/Round:** Group D
-
-### Prediction: TÜRKİYE WIN
-**Confidence:** Low
-
-### Reasoning
-Vincenzo Montella has Hakan Çalhanoğlu and Arda Güler fit, and left-back Ferdi Kadıoğlu has returned to full training. However, Kenan Yıldız remains a major doubt to start and is expected to be on the bench. Australia's physical block on the temporary grass pitch at BC Place (which will have the roof closed to control the environment) will challenge Türkiye's ground-based attack. The main way this fails is if Australia's physical block successfully neutralizes Türkiye's creative players and exploits set-piece transitions.
-
-### Key Factors
-- [strong] Turkish media reports confirm Kenan Yıldız continues individual training and is not expected to start.
-- [strong] Vincenzo Montella confirms Hakan Çalhanoğlu is fit to start in the double pivot and Arda Güler will lead playmaking behind the striker.
-- [official] Socceroos teammates confirm striker Mohamed Toure is fully recovered from illness, participated in full training, and is available.
-- [strong] Ferdi Kadıoğlu has recovered from injury and returned to full training, making him available to start at left-back.
-- [strong] Betting markets show Türkiye favored at -145 to -149 (around 1.67 decimal), with Draw at +274 to +285, and Australia at +390 to +440.
-- [risk] Without Yıldız's full fitness or creative threat on the left, Türkiye may struggle to break down Australia's physical block on the temporary grass pitch.
-- [Invalidator] An early Australia set-piece goal on the temporary grass pitch allows them to sit extremely deep, neutralizing Türkiye's technical play.
-
-### Evidence Gathered This Iteration
-- [strong] Pitch report: BC Place's temporary grass surface is locally sourced and maintained with UV grow lights/irrigation under a closed roof to ensure stability.
-- [strong] Betting odds check: Turkey's moneyline has settled around 1.67 (-149), with Australia at 4.90 (+390) and the draw at 3.74 (+274).
-
-### Search History
-- **Iteration 11**: `Australia Turkiye World Cup 2026 official starting lineup confirmed June 14 04:00 UTC`, `Australia Turkiye Montella press conference Calhanoglu Guler Yildiz fitness question marks`, `Australia Turkiye Mohamed Toure injury doubt fitness training June 14`
-- **Iteration 12**: `Australia Türkiye World Cup 2026 Montella lineup update Çalhanoğlu Yıldız Güler June 14`, `Mohamed Toure Australia fit training session Socceroos June 14 2026`, `Australia Türkiye World Cup 2026 betting odds movement sharp money June 14`
-- **Iteration 13**: `Australia Turkey World Cup 2026 Kenan Yildiz fitness injury update June 14`, `Australia Turkey World Cup 2026 predicted lineups news June 14`, `Australia Turkey World Cup 2026 betting odds movement June 14`
-- **Iteration 14**: `Australia Turkey World Cup 2026 BC Place pitch condition wet dry grass turf`, `Turkey national team manager Vincenzo Montella quotes Kenan Yildiz starter or bench June 14`, `Australia Socceroos Tony Popovic tactics low block Turkey June 14`
-- **Iteration 15**: `Australia vs Turkiye World Cup June 14 2026 lineup leaks Kenan Yildiz bench start`, `Tony Popovic press conference Australia Turkey June 14 2026`, `Australia Turkey odds movement pinnacle bet365 BC Place June 14`
-- **Iteration 16**: `Australia vs Turkiye World Cup 2026 starting XI lineup news June 14`, `Australia Turkey World Cup 2026 Kenan Yildiz injury update June 14`, `Australia vs Turkey betting odds movement pinnacle bet365 June 14`
-- **Iteration 17**: `Australia Turkey World Cup 2026 starting lineups June 14`, `Australia Turkey "June 14" 2026 lineup update Yildiz Kadioglu Toure`, `Australia vs Turkey betting odds sharp money Pinnacle bet365 June 14 2026`
-- **Iteration 18**: `Australia vs Turkey Vincenzo Montella starting XI news June 14 2026`, `Australia vs Turkey BC Place temporary grass pitch report June 14 2026`, `Australia vs Turkey betting odds pinnacle bet365 June 14 2026`
-
-### Questions for Next Iteration
-1. Does the official starting XI at ~03:00 UTC confirm Kenan Yıldız starts on the bench, and does Ferdi Kadıoğlu start at left-back?
-2. Does Mohamed Toure start as Australia's central striker or is he benched/inactive due to lingering injury/illness concerns?
-3. How do closing betting lines move in the final hour after official lineups are announced?
-
-### Prediction Changes
-- **Previous prediction:** TÜRKİYE WIN (Low)
-- **Change:** No change - prediction reinforced because Ferdi Kadıoğlu's fitness is confirmed, though Kenan Yıldız's doubtful starting status and the heavy pitch keep the outcome low-confidence.
-
----
-
-### Match: Germany vs. Curaçao
-
-**Status:** not_started
-**Kickoff:** 17:00 UTC | **Venue:** NRG Stadium, Houston, TX | **Group/Round:** Group E
-
-### Prediction: GERMANY WIN
-**Confidence:** High
-
-### Reasoning
-Germany remains overwhelming favorites under Julian Nagelsmann, with Manuel Neuer confirmed fit to start. The retractable roof at Houston Stadium is officially confirmed to remain closed for the match, guaranteeing stable, climate-controlled, windless conditions that favor Germany's quick ground passing game. The only way this prediction fails is in the event of a catastrophic early red card or multiple unprecedented individual errors.
-
-### Key Factors
-- [official] Nagelsmann confirms Manuel Neuer is fully fit after a calf injury and will start in goal.
-- [strong] Predicted German XI features Nathaniel Brown at LB and Aleksandar Pavlović/Felix Nmecha double pivot, showing strong squad depth.
-- [strong] Curaçao coach Dick Advocaat (78, oldest ever in WC) is implementing a compact 4-2-3-1 defensive low block but admits the match is a benchmark.
-- [official] Houston Stadium's retractable roof will be kept closed for the match, ensuring a controlled indoor environment.
-- [strong] Pre-match betting odds show Germany as overwhelming favorite with moneyline prices around -3500.
-- [risk] Germany's history of slow tournament starts (2018 vs. Mexico, 2022 vs. Japan).
-- [Invalidator] Only a catastrophic early red card or massive individual blunder could prevent a Germany win.
-
-### Evidence Gathered This Iteration
-- [official] Roof status: Officials confirmed the retractable roof at Houston Stadium will be closed to ensure a controlled indoor environment.
-- [strong] Betting odds check: Germany's moneyline has settled around -3500, with a draw at +1500 and Curaçao at +3300.
-
-### Search History
-- **Iteration 12**: `Germany vs Curaçao World Cup 2026 starting XI confirmed leaks June 14`, `Germany vs Curaçao NRG Stadium Houston roof open closed pitch grass turf June 14`, `Germany vs Curaçao World Cup 2026 betting odds movement sharp money June 14`
-- **Iteration 13**: `Germany vs Curacao World Cup 2026 Manuel Neuer starting keeper June 14`, `Germany vs Curacao World Cup 2026 betting odds handicap lines June 14`, `Germany vs Curacao World Cup 2026 tactical preview team news June 14`
-- **Iteration 14**: `Germany Curacao June 14 2026 live stream broadcast channels`, `Curacao national team Dick Advocaat tactics low block Germany June 14`, `Germany starting lineup Musiala Wirtz Havertz Curaçao June 14`
-- **Iteration 15**: `Germany Curaçao World Cup 2026 starting lineup news Julian Nagelsmann press conference`, `Dick Advocaat Curacao press conference quotes Germany match June 14 2026`, `Germany Curaçao betting odds handicap line movement draftkings June 14`
-- **Iteration 16**: `Germany vs Curaçao World Cup 2026 starting XI line-up news June 14`, `Germany vs Curacao betting odds movement pinnacle bet365 June 14`, `Germany vs Curacao Houston Stadium pitch grass conditions June 14`
-- **Iteration 17**: `Germany vs Curacao World Cup 2026 team news lineups June 14`, `Germany vs Curacao World Cup pitch report NRG Stadium Houston June 14`, `Germany vs Curacao betting odds handicap movement June 14 2026`
-- **Iteration 18**: `Germany vs Curacao World Cup team news predicted starting XI June 14 2026`, `Germany vs Curacao NRG Stadium pitch roof June 14 2026`, `Germany vs Curacao betting odds Pinnacle bet365 June 14 2026`
-
-### Questions for Next Iteration
-1. Does the official starting XI at ~16:00 UTC confirm Manuel Neuer's start, and are there any surprise defensive rotations?
-2. Does the temporary grass pitch hold up perfectly during warm-ups and early minutes, or does it show signs of slickness or tearing?
-3. How do the Asian Handicap lines move closer to kickoff?
-
-### Prediction Changes
-- **Previous prediction:** GERMANY WIN (High)
-- **Change:** No change - prediction reinforced because of Germany's exceptional form (9 wins in a row), Manuel Neuer's confirmed fitness, and the guaranteed windless, climate-controlled indoor playing conditions.
-
----
-
 ### Match: Netherlands vs. Japan
 
 **Status:** not_started
-**Kickoff:** 20:00 UTC | **Venue:** AT&T Stadium (Dallas), Arlington, TX | **Group/Round:** Group F
+**Kickoff:** 20:00 UTC | **Venue:** Dallas Stadium, Arlington, TX | **Group/Round:** Group F
 
 ### Prediction: NETHERLANDS WIN
 **Confidence:** Medium
 
 ### Reasoning
-Ronald Koeman confirmed that goalkeeper Bart Verbruggen has recovered from a hip bruise and is fully fit to start, resolving the primary Dutch goalkeeper uncertainty. Japan enters the tournament with massive roster issues, missing Wataru Endo, Kaoru Mitoma, and Takumi Minamino. While the Dutch miss Xavi Simons due to an ACL rupture, their squad is much deeper, and they are expected to overpower Japan's reshuffled midfield pivot of Tanaka and Morita. The main way this fails is if Japan's midfield successfully controls possession and denies space to the Dutch wingers.
+Official lineups confirm Bart Verbruggen starts in goal, resolving the Dutch goalkeeper fitness concern, while Memphis Depay will start on the bench with Donyell Malen preferred upfront. Japan's squad remains severely depleted, missing Wataru Endo, Kaoru Mitoma, Takumi Minamino, and Hidemasa Morita. The Dutch physical and depth advantage should prevail, but confidence is capped at Medium due to the temporary grass pitch at Dallas Stadium, which plays slow and heavy, increasing draw or counter-attack upset risks.
 
 ### Key Factors
-- [official] Japan captain Wataru Endo has withdrawn due to a foot injury, and Kaoru Mitoma is out of the tournament.
-- [official] Takumi Minamino is absent from the playing roster due to an ACL injury, serving only as a mentor.
-- [official] Bart Verbruggen has recovered from a hip bruise, returned to full team training, and is confirmed fit to start by coach Ronald Koeman.
-- [official] Ronald Koeman confirmed that Memphis Depay is fully fit and fit to start.
-- [strong] Donyell Malen is expected to start on the right wing in excellent Serie A form.
-- [strong] Japan is projected to deploy Ao Tanaka and Hidemasa Morita in a double pivot to mitigate Endo's absence.
-- [risk] Xavi Simons is absent from the tournament due to a ruptured ACL sustained in April, weakening the Dutch midfield.
-- [Invalidator] Japan's midfield pivot of Tanaka and Morita successfully dominates possession and Takefusa Kubo exploits spaces out wide.
+- [official] Confirmed lineups: Bart Verbruggen starts in goal, and Donyell Malen starts upfront, leaving Memphis Depay on the bench.
+- [official] Japan is missing captain Wataru Endo (international retirement/foot injury) and Kaoru Mitoma (hamstring).
+- [strong] Hidemasa Morita and Takumi Minamino are also absent from the tournament due to injuries, severely limiting Japan's midfield options.
+- [strong] The pitch at Dallas Stadium is a temporary natural grass system installed over turf/concrete, which may play heavy and slow.
+- [strong] Betting markets favor the Netherlands with moneyline odds at Pinnacle stable around +104 (approx 2.04), draw +240 (3.40), Japan +263 (3.63).
+- [risk] Xavi Simons is absent from the tournament due to an ACL rupture, reducing the creative output of the Dutch midfield, while Jurrien Timber is out with a groin injury.
+- [Invalidator] Japan's makeshift double pivot (Ao Tanaka and Kaishu Sano) dominates possession and denies space to the Dutch wingers.
 
 ### Evidence Gathered This Iteration
-- [official] Team fitness: Ronald Koeman confirmed goalkeeper Bart Verbruggen is fully fit to start after training on June 12 and 13, alongside forward Memphis Depay.
-- [strong] Midfield news: Tactical analysis projects Hajime Moriyasu will deploy Ao Tanaka and Hidemasa Morita in the double pivot to replace the injured Wataru Endo.
-- [strong] Betting odds check: Netherlands' moneyline odds are priced around +100 to +106, with Japan at +265 to +280 and the draw at +250 to +260.
+- [strong] `Netherlands vs Japan AT&T Dallas Stadium grass pitch quality sod tearing warm up June 14 2026`: No reports of significant sod tearing, turf failure, or pitch quality issues during warm-up; Dallas Stadium's hybrid grass pitch transition remains standard and intact.
+- [strong] `Netherlands vs Japan warm up injury team news June 14 2026 World Cup`: Confirmed that Bart Verbruggen (hip) and Memphis Depay are fit and available, with Verbruggen starting in goal and Depay on the bench. Wataru Endo, Kaoru Mitoma, Takumi Minamino, and Hidemasa Morita remain officially absent for Japan.
+- [strong] `Netherlands vs Japan Pinnacle odds market moves kickoff June 14 2026`: Pre-match odds remain highly stable, with Netherlands favored around 1.98 - 2.03, the Draw at 3.60 - 3.62, and Japan at 3.59 - 3.75.
 
 ### Search History
-- **Iteration 12**: `Netherlands vs Japan World Cup 2026 team news starting XI Depay Verbruggen June 14`, `Japan national team World Cup 2026 tactical shape midfield without Wataru Endo Takefusa Kubo June 14`, `Netherlands vs Japan World Cup 2026 betting odds movement Dallas Stadium June 14`
-- **Iteration 13**: `Netherlands vs Japan World Cup 2026 starting XI Memphis Depay Donyell Malen June 14`, `Japan national team midfield tactical double pivot Tanaka Kamada World Cup 2026 June 14`, `Netherlands vs Japan World Cup 2026 betting odds movement Dallas June 14`, `Japan national team Takumi Minamino injury update World Cup 2026 June 14`
-- **Iteration 14**: `Netherlands Japan World Cup June 14 2026 referee card statistics`, `Japan national team coach Hajime Moriyasu press conference quotes Netherlands June 14`, `Netherlands Donyell Malen Serie A form starting role Japan June 14`
-- **Iteration 15**: `Netherlands Japan World Cup 2026 Ronald Koeman quotes Memphis Depay starter`, `Japan national team Kaishu Sano Ao Tanaka double pivot starters June 14 2026`, `Netherlands Japan odds movement Dallas AT&T Stadium June 14`
-- **Iteration 16**: `Netherlands vs Japan World Cup 2026 starting XI line-up news June 14`, `Bart Verbruggen injury Netherlands starting goalkeeper Japan June 14`, `Japan national team double pivot Kamada Sano Tanaka Moriyasu press conference June 14`, `Netherlands vs Japan betting odds movement AT&T Stadium June 14`
-- **Iteration 17**: `Netherlands vs Japan World Cup 2026 team news lineups June 14`, `Netherlands vs Japan Ronald Koeman Hajime Moriyasu press conference June 14 2026`, `Netherlands vs Japan betting odds movement June 14 2026`, `Xavi Simons injury Netherlands World Cup 2026 June 14`
-- **Iteration 18**: `Netherlands vs Japan World Cup team news predicted starting XI June 14 2026`, `Bart Verbruggen injury fitness Netherlands starting goalkeeper Japan June 14 2026`, `Japan national team midfield Moriyasu double pivot June 14 2026`, `Netherlands vs Japan betting odds pinnacle bet365 June 14 2026`
+- **Iteration 37**: `Netherlands vs Japan AT&T Dallas Stadium grass pitch quality sod tearing warm up June 14 2026`, `Netherlands vs Japan warm up injury team news June 14 2026 World Cup`, `Netherlands vs Japan Pinnacle odds market moves kickoff June 14 2026`
+- **Iteration 36**: `Netherlands vs Japan starting lineup official team news June 14 2026 World Cup`, `Netherlands vs Japan "starting XI" OR "lineup" OR "confirmed" June 14 2026 World Cup`, `Netherlands vs Japan starting XI official team sheet Japan lineup June 14 2026`, `Japan starting XI vs Netherlands "Kubo" "Tomiyasu" June 14 2026 World Cup`, `Japan lineup vs Netherlands June 14 2026 World Cup`, `"Japan" vs "Netherlands" starting lineup "Zion Suzuki" OR "Suzuki" OR "Ueda" June 14 2026`, `Memphis Depay benched OR substitute OR fitness Netherlands vs Japan June 14 2026`, `Dallas Stadium temporary grass pitch condition warm up Netherlands Japan June 14 2026`, `Netherlands vs Japan Pinnacle odds June 14 2026 World Cup`
+- **Iteration 35**: `Netherlands vs Japan starting XI confirmed official lineup June 14 2026`, `Netherlands vs Japan lineup official confirmed June 14 2026`, `Netherlands vs Japan official starting XI June 14 2026 World Cup`, `Netherlands vs Japan Pinnacle odds June 14 2026 World Cup`, `Dallas AT&T Stadium pitch turf grass conditions June 14 2026 World Cup`
+- **Iteration 34**: `Netherlands vs Japan starting XI confirmed official lineup June 14 2026`, `Netherlands vs Japan predicted lineups team news Koeman Moriyasu June 14 2026`, `Netherlands vs Japan Pinnacle betting odds June 14 2026`, `Dallas AT&T Stadium temporary grass pitch condition World Cup June 14 2026`
+- **Iteration 33**: `Netherlands vs Japan World Cup 2026 lineups team news June 14`, `"Netherlands" "Japan" starting XI confirmed OR official lineup World Cup 2026 June 14`, `Netherlands Japan AT&T Dallas Stadium pitch training comments OR player OR Koeman OR Moriyasu June 14`, `Netherlands vs Japan Pinnacle betting odds June 14 2026`
+- **Iteration 32**: `Netherlands vs Japan World Cup 2026 starting XI line-up news leaks June 14`, `Bart Verbruggen groin OR hip OR injury OR fitness Netherlands World Cup June 14 2026`, `Dallas Stadium grass OR pitch Netherlands Japan World Cup June 14 2026`, `Netherlands Japan AT&T Dallas Stadium pitch training comments OR player OR Koeman OR Moriyasu June 14`, `Netherlands Japan Pinnacle OR bet365 OR moneyline OR odds June 14 2026`, `Jurrien Timber groin OR injury OR squad OR left Netherlands World Cup June 14 2026`
 
 ### Questions for Next Iteration
-1. Does the official starting XI at ~19:00 UTC confirm Bart Verbruggen starts, and does Koeman start Depay or Malen upfront?
-2. Which combination of Kamada, Tanaka, or Sano does Moriyasu start in Japan's double pivot?
-3. Do the betting odds shift in the final hour after official lineups are announced?
+1. Does the live match flow of Netherlands vs. Japan show any early signs of the temporary grass pitch tearing up or playing extremely slow? [Causal: Poor pitch conditions would reduce the Dutch passing efficiency, increasing the likelihood of a draw or defensive transition upset].
+2. Are there any high-impact events (such as a goal, red card, or injury to a key playmaker like Frenkie de Jong or Takefusa Kubo) in the first 15 minutes of Netherlands vs. Japan? [Causal: A red card or key injury would immediately force a downward adjustment in confidence or a change in the predicted winner].
 
 ### Prediction Changes
 - **Previous prediction:** NETHERLANDS WIN (Medium)
-- **Change:** No change - prediction reinforced because Bart Verbruggen is confirmed fully fit and ready to start, resolving goalkeeper uncertainty, while Japan continues to manage a heavily depleted midfield and attack.
+- **Change:** No change - prediction reinforced by stable pre-match odds, confirmed lineups, and lack of warm-up pitch/injury issues.
 
 ---
 
@@ -168,44 +76,95 @@ Ronald Koeman confirmed that goalkeeper Bart Verbruggen has recovered from a hip
 **Confidence:** Medium
 
 ### Reasoning
-This remains a highly balanced matchup, though Ecuador's threat is elevated by the news that captain Enner Valencia participated in a 45-minute practice match on June 12 and is now expected to start. Ivory Coast is missing defender Evan Ndicka due to a thigh injury, forcing coach Emerse Faé to choose between Kossounou, Singo, and Diomande to partner with Emmanuel Agbadou. Given both teams' historically excellent defensive organizations (Ecuador conceding just 7 goals in 20 matches under Beccacece), a low-scoring draw is still the most probable outcome. The main way this fails is if Ivory Coast's reshuffled central defense lacks coordination and Valencia exploits it early.
+This fixture is highly balanced, pitting two defensively organized and physical sides against each other. Ivory Coast is missing key defender Evan Ndicka due to injury, but Odilon Kossounou has recovered to partner Emmanuel Agbadou in central defense. For Ecuador, captain Enner Valencia is recovering from a calf injury and remains a game-time decision, meaning he is highly likely to play on restricted minutes if he features at all, triggering the Workload Management Heuristic. Betting markets show an extremely low total goals line and short draw odds, reinforcing the probability of a defensive, low-scoring stalemate.
 
 ### Key Factors
-- [strong] Evan Ndicka is confirmed out of the match, forcing Agbadou and Kossounou, Singo, or Diomande to form the central defensive partnership for Ivory Coast.
-- [strong] Enner Valencia participated in a practice match on June 12 and is now expected to start for Ecuador, providing a significant boost to their attack.
-- [strong] Both sides have exceptionally strong defensive records (Ecuador conceded only 7 goals in 20 matches under Beccacece), pointing toward a low-scoring game.
-- [strong] Singo and Agbadou previously formed a successful defensive partnership in a friendly win against France.
-- [risk] If Valencia's calf issues recur early or he does not play, Ecuador's offensive threat will drop significantly.
-- [Invalidator] A lack of chemistry in the new central partnership leads to an early defensive error.
+- [official] Evan Ndicka is confirmed out for Ivory Coast due to a thigh injury.
+- [official] Odilon Kossounou is fully recovered and will partner Emmanuel Agbadou in central defense.
+- [strong] Enner Valencia is expected to start or play a restricted role, but his calf fitness is a risk under monitoring.
+- [strong] Both teams boast excellent defensive records, and the pitch at Lincoln Financial Field is a newly installed hybrid grass surface rather than temporary sod on concrete.
+- [strong] Betting markets show a tight match: Draw priced short around 2.82-2.83 on Pinnacle, with Ecuador at 2.45-2.49 and Ivory Coast at 3.59-3.69.
+- [risk] Enner Valencia is recovering from a calf injury and might be on restricted minutes, reducing Ecuador's late-match threat.
+- [Invalidator] A defensive error from a lack of coordination in Ivory Coast's new center-back pairing.
 
 ### Evidence Gathered This Iteration
-- [strong] Valencia fitness update: Enner Valencia successfully played 45 minutes in a practice match on June 12, trained well, and is now expected to start.
-- [strong] Ivory Coast defense: Emerse Faé has several central defenders to choose from (Kossounou, Singo, Diomande, Agbadou) to cover for the injured Evan Ndicka.
-- [strong] Betting odds check: Pinnacle shows Ecuador slightly favored at 2.43 to 2.45, with Ivory Coast at 3.48 to 3.69, and the draw very short at 2.77 to 2.82.
+- [strong] `Ivory Coast vs Ecuador team news Enner Valencia calf training update June 14 2026`: Enner Valencia has resumed limited training (participated in a 45-minute practice match) but remains a calf injury game-time decision, highly likely to play on restricted minutes if he plays at all, triggering the Workload Management Heuristic. Evan Ndicka is officially out with a thigh injury.
+- [strong] `Ivory Coast vs Ecuador Pinnacle odds movement June 14 2026`: Odds are highly stable, with Ecuador at 2.45 - 2.49, Draw at 2.82 - 2.83, and Ivory Coast at 3.59 - 3.69. The Under 1.75 goals is priced short around 2.08, indicating high market consensus for a low-scoring game.
+- [medium] `Ivory Coast vs Ecuador tactical previews expected lineups June 14 2026`: Both teams have strong defensive setups (Ecuador is unbeaten in 19 matches, Ivory Coast clean sheet record in qualifiers), suggesting a tactical, low-scoring draw matchup.
 
 ### Search History
-- **Iteration 12**: `Ivory Coast vs Ecuador World Cup 2026 starting XI Valencia fitness Ndicka June 14`, `Ivory Coast vs Ecuador tactical previews CB partnership Ndicka replacement June 14`, `Ivory Coast vs Ecuador World Cup 2026 betting odds movement June 14`
-- **Iteration 13**: `Ivory Coast vs Ecuador World Cup 2026 starting XI Valencia Ndicka June 14`, `Ivory Coast vs Ecuador sportsmole Valencia fitness June 14`, `Ivory Coast vs Ecuador World Cup 2026 tactical preview CB partnership Ndicka replacement June 14`, `Ivory Coast Ndicka "hamstring" OR "Rome" World Cup 2026 June 14`
-- **Iteration 14**: `Ivory Coast Ecuador World Cup June 14 2026 referee cards fouls Letexier`, `Ivory Coast national team coach Emerse Fae press conference quotes Ecuador June 14`, `Ecuador national team Beccacece press conference quotes Ivory Coast June 14`
-- **Iteration 15**: `Ivory Coast Ecuador starting XI predicted Odilon Kossounou Emmanuel Agbadou partnership June 14`, `Enner Valencia Ecuador hamstring calf fitness update pre-match June 14 2026`, `Ivory Coast Ecuador betting odds draw price movement sharp bet365 June 14`
-- **Iteration 16**: `Ivory Coast vs Ecuador World Cup 2026 starting XI line-up news June 14`, `Enner Valencia Ecuador injury calf update June 14`, `Ivory Coast central defense partnership Agbadou Kossounou Singo June 14`
-- **Iteration 17**: `Ivory Coast vs Ecuador World Cup 2026 team news lineups June 14`, `Ivory Coast vs Ecuador press conference Emerse Fae Beccacece June 14 2026`, `Ivory Coast vs Ecuador betting odds movement June 14 2026`
-- **Iteration 18**: `Ivory Coast vs Ecuador World Cup team news predicted starting XI June 14 2026`, `Ivory Coast central defense Kossounou Singo Agbadou Fae June 14 2026`, `Ivory Coast vs Ecuador Valencia injury calf update June 14 2026`, `Ivory Coast vs Ecuador betting odds pinnacle bet365 June 14 2026`
+- **Iteration 37**: `Ivory Coast vs Ecuador team news Enner Valencia calf training update June 14 2026`, `Ivory Coast vs Ecuador Pinnacle odds movement June 14 2026`, `Ivory Coast vs Ecuador tactical previews expected lineups June 14 2026`
+- **Iteration 36**: `Ivory Coast vs Ecuador lineups injury fitness Enner Valencia June 14 2026 World Cup`, `Ecuador coach comment Enner Valencia calf fitness June 14 2026 World Cup`, `Ivory Coast vs Ecuador Pinnacle odds June 14 2026 World Cup`, `Ivory Coast vs Ecuador tactical match preview expected goals June 14 2026 World Cup`
+- **Iteration 35**: `Ivory Coast vs Ecuador starting lineup Enner Valencia June 14 2026 World Cup`, `Ivory Coast vs Ecuador Pinnacle betting odds June 14 2026 World Cup`, `Ecuador Enner Valencia calf injury training fitness June 14 2026 World Cup`
+- **Iteration 34**: `Ivory Coast vs Ecuador starting XI official lineup June 14 2026`, `Ivory Coast vs Ecuador Enner Valencia calf fitness starting lineup news June 14 2026`, `Ivory Coast vs Ecuador Pinnacle betting odds June 14 2026`
+- **Iteration 33**: `Ivory Coast vs Ecuador World Cup 2026 lineups team news Valencia June 14`, `Ivory Coast vs Ecuador Pinnacle betting odds June 14 2026`, `Ivory Coast vs Ecuador pre match press conference Emerse Fae Beccacece June 14`
+- **Iteration 32**: `Ivory Coast vs Ecuador World Cup 2026 team news starting XI lineups Valencia June 14`, `Ivory Coast vs Ecuador Lincoln Financial Field grass pitch conditions comments June 14 2026`, `Ivory Coast vs Ecuador Pinnacle OR bet365 OR moneyline OR odds June 14 2026`
 
 ### Questions for Next Iteration
-1. Does the official starting XI at ~22:00 UTC confirm whether Enner Valencia starts, or is he named on the bench?
-2. Does Emerse Faé start Odilon Kossounou, Wilfried Singo, or Ousmane Diomande next to Emmanuel Agbadou in central defense?
-3. Do betting markets show late backing for Under 2.0 goals as kickoff approaches?
+1. Does the official starting XI confirm if Enner Valencia starts or starts on the bench for Ecuador? [Causal: If Valencia starts on the bench, Ecuador's transition threat is significantly reduced, which would lower their chances of winning].
+2. Are there any late pre-match injury reports or tactical shifts during warm-ups for either side? [Causal: Any last-minute lineup changes would affect tactical cohesion and potentially alter the expected draw outcome].
 
 ### Prediction Changes
 - **Previous prediction:** DRAW (Medium)
-- **Change:** No change - prediction reinforced because while Enner Valencia's expected return to the starting lineup boosts Ecuador's attack, both teams remain defensively structured and organized, pointing to a tight draw.
+- **Change:** No change - prediction reinforced by Enner Valencia's calf management (Workload Management Heuristic) and stable low-scoring market odds.
+
+---
+
+### Match: Sweden vs. Tunisia
+
+**Status:** not_started
+**Kickoff:** 02:00 UTC (June 15) | **Venue:** Estadio Monterrey, Monterrey, Mexico | **Group/Round:** Group F
+
+### Prediction: SWEDEN WIN
+**Confidence:** Medium
+
+### Reasoning
+Sweden has a significant talent and tactical advantage under manager Graham Potter, spearheaded by the elite attacking duo of Viktor Gyökeres and Alexander Isak who are fit and expected to start in tandem in a 3-4-1-2 formation. Tunisia enters the tournament after a difficult preparation phase, including a heavy 5-0 loss to Belgium, raising serious defensive block concerns. The match will be played on a true and fast hybrid grass pitch in Estadio Monterrey in dry weather, which plays to Sweden's passing strengths. Confidence is kept at Medium due to Dejan Kulusevski's injury exclusion restricting Sweden's bench depth to break down Tunisia's low-block.
+
+### Key Factors
+- [strong] Alexander Isak and Viktor Gyökeres are fit and in the squad, expected to start in tandem to lead the line.
+- [strong] Tunisia suffered a heavy 5-0 loss to Belgium in a recent friendly, raising serious defensive concerns.
+- [official] Estadio Monterrey features a newly installed SIS Pitches stitched hybrid grass surface, which plays fast and true.
+- [strong] Betting odds show Sweden as a clear favorite (around -110 / 1.91 at Pinnacle), with the draw at +240 (3.40) and Tunisia at +330 (4.30).
+- [risk] Dejan Kulusevski was excluded from the final 26-man squad due to knee patella rehabilitation, reducing Sweden's creative bench depth.
+- [Invalidator] Tunisia's low-block regains its qualifying form and frustrates Sweden, securing a low-scoring draw or counter-attack upset.
+
+### Evidence Gathered This Iteration
+- [strong] `Sweden vs Tunisia starting lineup prediction Potter 3-4-1-2 Isak Gyokeres June 14 2026`: Graham Potter is expected to deploy a 3-4-1-2 formation featuring Viktor Gyökeres and Alexander Isak starting in tandem, with Benjamin Nygren in the attacking midfield role.
+- [strong] `Sweden team news Kulusevski replacement lineup options vs Tunisia June 14 2026`: Dejan Kulusevski is officially omitted from the 26-man squad due to knee patella rehabilitation (sidelined 13 months), limiting Sweden's creative options off the bench.
+- [strong] `Sweden vs Tunisia Pinnacle betting odds sharp moves June 14 2026`: Sweden is favored at 1.961, Draw at 3.530, and Tunisia at 4.150 on Pinnacle, lines remain stable as kickoff approaches.
+
+### Search History
+- **Iteration 37**: `Sweden vs Tunisia starting lineup prediction Potter 3-4-1-2 Isak Gyokeres June 14 2026`, `Sweden team news Kulusevski replacement lineup options vs Tunisia June 14 2026`, `Sweden vs Tunisia Pinnacle betting odds sharp moves June 14 2026`
+- **Iteration 36**: `Sweden vs Tunisia starting lineup news Isak Gyokeres June 14 2026 World Cup`, `Sweden vs Tunisia Tunisia team news injuries lineup June 14 2026 World Cup`, `Sweden vs Tunisia Pinnacle odds June 14 2026 World Cup`, `Sweden vs Tunisia Graham Potter dual striker tactical lineup June 14 2026 World Cup`
+- **Iteration 35**: `Sweden vs Tunisia starting lineup Isak Gyokeres June 14 2026 World Cup`, `Sweden vs Tunisia Pinnacle betting odds June 14 2026 World Cup`, `Sweden team news Dejan Kulusevski injury squad June 14 2026 World Cup`
+- **Iteration 34**: `Sweden vs Tunisia lineups official confirmed leaks June 14 2026`, `Sweden vs Tunisia Estadio Monterrey weather forecast thunderstorm pitch condition June 14 2026`, `Sweden vs Tunisia Pinnacle betting odds June 14 2026`
+- **Iteration 33**: `Sweden vs Tunisia World Cup 2026 lineups team news June 14`, `Sweden vs Tunisia Pinnacle betting odds June 14 2026`, `Sweden vs Tunisia Estadio Monterrey BBVA pitch weather humidity June 14 2026`
+- **Iteration 32**: `Sweden vs Tunisia World Cup 2026 starting XI dual striker Isak Gyokeres Potter June 14`, `Sweden vs Tunisia Pinnacle OR bet365 OR moneyline OR odds June 14 2026`
+
+### Questions for Next Iteration
+1. Does the official starting lineup confirm Graham Potter's 3-4-1-2 with Isak and Gyökeres? [Causal: A surprise change to a single striker would lower Sweden's attacking potency, decreasing confidence to Low].
+2. Are there any late betting market movements on Pinnacle moving the match winner odds? [Causal: A significant shift towards Sweden (closer to 1.80) or Tunisia would indicate new information on squad preparation or sharpness].
+
+### Prediction Changes
+- **Previous prediction:** SWEDEN WIN (Medium)
+- **Change:** No change - prediction reinforced by expected 3-4-1-2 strike partnership of Isak/Gyökeres, and fast BBVA stadium pitch conditions.
 
 ---
 
 ## 🚫 Skipped Matches (Previously Tracked)
 
+### Match: Germany vs. Curaçao
+**Status:** complete
+**Kickoff:** 17:00 UTC | **Venue:** Houston Stadium, Houston, TX | **Group/Round:** Group E
+**Note:** This match is complete. Germany vs. Curaçao was predicted as DRAW (Low confidence) at halftime, but Germany won the match 5–1. Jamal Musiala, Nico Schlotterbeck, Kai Havertz, and Nathaniel Brown contributed to Germany's second-half goals.
+
 ### Match: Haiti vs. Scotland
-**Status:** Skipped (At/after estimated halftime)
+**Status:** complete
 **Kickoff:** 01:00 UTC | **Venue:** Boston Stadium, Foxborough, MA | **Group/Round:** Group C
-**Note:** This match was tracked in earlier iterations but has been skipped because it has reached estimated halftime (01:47 UTC).
+**Note:** This match is complete. Scotland was predicted to win (Medium confidence), and Scotland won the match (1-0).
+
+### Match: Australia vs. Türkiye
+**Status:** complete
+**Kickoff:** 04:00 UTC | **Venue:** BC Place (Vancouver) | **Group/Round:** Group D
+**Note:** This match is complete. Türkiye was predicted to win (Low confidence), but Australia won the match (Australia won).

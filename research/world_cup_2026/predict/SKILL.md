@@ -148,7 +148,7 @@ matches_covered: <number of matches still being actively tracked before estimate
 overall_confidence: "<brief summary>"
 model: "{AGENT}: <your model name/version, e.g., Claude Sonnet 4.6 or Gemini 2.5 Flash>"
 next_interval_minutes: <determined interval integer, e.g., 15>
-next_model: "<Gemini 3.5 Flash (Medium) or Gemini 3.5 Flash (High)>"
+next_difficulty: "<high, medium, or low>"
 ---
 
 # World Cup 2026 Predictions for {DATE} - Iteration <N>
@@ -261,8 +261,9 @@ Adjust for information rate and token efficiency:
 The file content of `{INTERVAL_PATH}` must be exactly one integer between 15 and 45.
 
 2. Predict the complexity/difficulty of the questions for the next iteration:
-   - If the next questions are predicted to be hard (e.g., they require deep tactical interpretation, complex analysis of conflicting reports, or resolving late lineup updates close to kickoff), set the `next_model` key in the `{PREDICTIONS_PATH}` frontmatter to `Gemini 3.5 Flash (High)`.
-   - Otherwise, set the `next_model` key to `Gemini 3.5 Flash (Medium)`.
+   - If the next questions are predicted to be hard (e.g., they require deep tactical interpretation, complex analysis of conflicting reports, or resolving late lineup updates close to kickoff), set the `next_difficulty` key in the `{PREDICTIONS_PATH}` frontmatter to `high`.
+   - If the questions are very straightforward (e.g., just verifying a stable/unchanged lineup or monitoring a stable live match with no key changes expected), set the `next_difficulty` key to `low` to conserve tokens by running a cheaper model.
+   - Otherwise, set the `next_difficulty` key to `medium`.
 
 ## Important Rules
 
