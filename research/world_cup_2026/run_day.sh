@@ -235,6 +235,15 @@ while [ "${ITERATION}" -lt "${MAX_ITERATIONS}" ]; do
 
     rm -f "${SKILL_LINK}"
 
+    # Check if all matches have concluded or passed halftime to exit early
+    if [ -f "${PREDICTIONS_PATH}" ]; then
+        COVERED=$(grep -E '^matches_covered:' "${PREDICTIONS_PATH}" | head -n 1 | cut -d':' -f2 | tr -d ' ' || echo "1")
+        if [ "${COVERED}" = "0" ]; then
+            echo "[$(date -u +%H:%M:%S)] All matches for today have concluded or passed halftime (matches_covered: 0). Exiting prediction loop early."
+            break
+        fi
+    fi
+
     # Read interval from configuration file (defaults to 10 minutes, minimum 10 minutes)
     INTERVAL_MINS=$(cat "${SCRIPT_DIR}/prediction_interval.txt" 2>/dev/null | tr -d '[:space:]' || echo "10")
     if ! echo "${INTERVAL_MINS}" | grep -qE '^[0-9]+$' || [ "${INTERVAL_MINS}" -lt 10 ]; then
