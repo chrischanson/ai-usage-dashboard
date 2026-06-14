@@ -78,13 +78,20 @@ python3 ../../skills/run_skill.py postmortem --vars "DATE=$(date +%Y-%m-%d)"
 
 ### Automated (Full Tournament)
 
-Use the `/schedule` command in Antigravity IDE to set up recurring cron jobs, or run:
+Use the `/schedule` command in Antigravity IDE to set up recurring cron jobs, or run the orchestrator script:
 
 ```bash
+# Run the daily cascade with the default agy agent
 bash run_day.sh
+
+# Run the daily cascade with the opencode agent (ideal for test runs)
+bash run_day.sh --opencode
+
+# Run a specific date with the opencode agent
+bash run_day.sh 2026-06-14 --opencode
 ```
 
-The orchestrator handles the full daily cascade automatically.
+The orchestrator handles the full daily cascade automatically and falls back dynamically if the primary agent fails.
 
 ---
 

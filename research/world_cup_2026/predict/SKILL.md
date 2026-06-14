@@ -9,6 +9,7 @@ required_vars:
   - PREDICTIONS_PATH
   - CHANGELOG_PATH
   - INTERVAL_PATH
+  - AGENT
 ---
 
 # Instructions
@@ -25,7 +26,7 @@ Today for this run: `{DATE}`.
 4. Research current evidence, prioritizing official and recent sources.
 5. Update `{PREDICTIONS_PATH}` as the full current working prediction file.
 6. Append a concise, auditable entry to `{CHANGELOG_PATH}`.
-7. Write the next polling interval, as a single integer from 1 to 15, to `{INTERVAL_PATH}`.
+7. Write the next polling interval, as a single integer from 5 to 15, to `{INTERVAL_PATH}`.
 
 ## Step 1: Load And Triage
 
@@ -117,6 +118,8 @@ Avoid churn:
 
 Use this format in `{PREDICTIONS_PATH}`:
 
+> **CRITICAL LAYOUT RULE:** The `## 📊 Executive Summary Table` section MUST be the very first section after the title. It must list EVERY active match being predicted in a single table. Do NOT place any match-level analysis before this table. Agents that omit or delay this section are non-compliant.
+
 ```markdown
 ---
 date: "{DATE}"
@@ -124,12 +127,25 @@ iteration: <iteration_number>
 last_updated: "<current UTC timestamp>"
 matches_covered: <number of active predictions>
 overall_confidence: "<brief summary>"
-model: "<model name/version>"
+model: "{AGENT}: <your model name/version, e.g., Claude Sonnet 4.6 or Gemini 2.5 Flash>"
+next_interval_minutes: <determined interval integer, e.g., 5>
 ---
 
 # World Cup 2026 Predictions for {DATE} - Iteration <N>
 
-## Match: [Team A] vs. [Team B]
+## 📊 Executive Summary Table
+A quick-glance tracker of the predicted results and confidence levels for all active matches today.
+
+| Match | Status | Prediction | Confidence |
+|:------|:-------|:-----------|:-----------|
+| [Team A] vs. [Team B] | [not_started / live_pre_halftime] | [TEAM A WIN / TEAM B WIN / DRAW] | [High / Medium / Low] |
+| ... | ... | ... | ... |
+
+---
+
+## 🔍 Detailed Match Analysis
+
+### Match: [Team A] vs. [Team B]
 
 **Status:** [not_started / live_pre_halftime]
 **Kickoff:** HH:MM UTC | **Venue:** [venue] | **Group/Round:** [group/round]
@@ -164,13 +180,14 @@ model: "<model name/version>"
 
 ## Step 5: Changelog Entry
 
-Append one entry to `{CHANGELOG_PATH}`. If the file does not exist, create it with a short header.
+Prepend one entry to `{CHANGELOG_PATH}` directly under the file's main title header so that the newest iteration is always at the top of the file. If the file does not exist, create it with a title header (e.g. `# 📝 World Cup 2026 Prediction Changelog — {DATE}`) first, then prepend the entry.
 
-The changelog should be compact but auditable:
+The changelog entry should be compact but auditable:
 
 ```markdown
 ## Iteration <N> - <current UTC timestamp>
 **Model Used:** [model name/version]
+**Next Interval:** <minutes> minutes
 
 ### Eligible Matches
 - [Match]: [not_started/live_pre_halftime/skipped after halftime]
@@ -190,11 +207,11 @@ The changelog should be compact but auditable:
 ### New Questions Raised
 - [New outcome-linked question]
 
-### Next Interval
+### Next Interval Reason
 - Wrote `<minutes>` minutes to `{INTERVAL_PATH}` because [brief reason].
 ```
 
-Use a fresh UTC timestamp. Do not duplicate an iteration number. If a retry would create the same iteration twice, append a corrected entry that clearly supersedes the failed or partial run.
+Use a fresh UTC timestamp. Do not duplicate an iteration number. If a retry would create the same iteration twice, prepend a corrected entry that clearly supersedes the failed or partial run.
 
 ## Step 6: Tracker Updates
 
@@ -206,23 +223,25 @@ Never add a same-day pre-match observation to "Active Heuristics" as if it were 
 
 ## Step 7: Dynamic Interval
 
-Choose the next interval from 1 to 15 minutes based on the nearest eligible match and the information rate. Write only the integer to `{INTERVAL_PATH}` with no other text.
+Choose the next interval from 5 to 15 minutes based on the nearest eligible match and the information rate:
+1. Write only the determined integer to `{INTERVAL_PATH}` (the file must contain exactly one integer with no other text).
+2. Set the `next_interval_minutes` key in the `{PREDICTIONS_PATH}` frontmatter to this integer.
+3. Record `**Next Interval:** <minutes> minutes` in the `{CHANGELOG_PATH}` entry header.
 
 Default interval guide:
 
-- `1`: match is live before halftime; official lineups are expected within 15 minutes; breaking injury/team news; sharp odds move; unresolved high-impact uncertainty.
-- `2-3`: kickoff within 60 minutes; official lineups or warm-up reports are arriving; active conflicting reports.
-- `4-6`: kickoff within 2 hours, but information is mostly stable.
-- `7-10`: kickoff within 4 hours, quiet news cycle, no major unresolved questions.
-- `11-15`: next eligible match is more than 4 hours away, or all active matches are skipped/quiet.
+- `5`: match is live before halftime; kickoff within 60 minutes; official lineups or warm-up reports are expected or arriving; breaking injury/team news; sharp odds move; unresolved high-impact uncertainty.
+- `6-8`: kickoff within 2 hours, information is mostly stable, or active conflicting reports.
+- `9-11`: kickoff within 4 hours, quiet news cycle, no major unresolved questions.
+- `12-15`: next eligible match is more than 4 hours away, or all active matches are skipped/quiet.
 
 Adjust for information rate:
 
-- Shorten by 1-3 minutes if this iteration found material new evidence.
+- Shorten by 1-3 minutes if this iteration found material new evidence, but never go below 5 minutes.
 - Lengthen by 1-3 minutes if two consecutive iterations found no material new evidence.
 - Use `15` if there are no eligible matches left before halftime, and state this in the changelog.
 
-The file content must be exactly one integer between 1 and 15.
+The file content of `{INTERVAL_PATH}` must be exactly one integer between 5 and 15.
 
 ## Important Rules
 

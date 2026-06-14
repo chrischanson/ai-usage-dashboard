@@ -6,8 +6,9 @@
 #   3. Schedule postmortem after matches end
 #
 # Usage:
-#   bash run_day.sh              # Run for today
-#   bash run_day.sh 2026-06-14   # Run for a specific date
+#   bash run_day.sh              # Run for today with agy (default)
+#   bash run_day.sh 2026-06-14   # Run for a specific date with agy
+#   bash run_day.sh --opencode   # Run today with opencode primary agent
 
 set -euo pipefail
 
@@ -18,8 +19,31 @@ SKILLS_RUNNER="${WORKSPACE_DIR}/skills/run_skill.py"
 TRACKER_PATH="${SCRIPT_DIR}/prediction_tracker.md"
 INTERVAL_PATH="${SCRIPT_DIR}/prediction_interval.txt"
 
-# Date handling — use argument or default to today
-DATE="${1:-$(date -u +%Y-%m-%d)}"
+# --- Parse arguments ---
+AGENT="agy"
+FALLBACK_AGENT="opencode"
+DATE=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --opencode)
+            AGENT="opencode"
+            FALLBACK_AGENT="agy"
+            shift
+            ;;
+        *)
+            if [ -z "${DATE}" ]; then
+                DATE="$1"
+            else
+                echo "Error: Unknown argument '$1'" >&2
+                exit 1
+            fi
+            shift
+            ;;
+    esac
+done
+
+DATE="${DATE:-$(date -u +%Y-%m-%d)}"
 DAY_DIR="${SCRIPT_DIR}/runs/day_${DATE}"
 
 SCHEDULE_PATH="${DAY_DIR}/match_schedule.md"
@@ -36,6 +60,7 @@ echo "=========================================="
 echo "⚽ World Cup 2026 — Daily Orchestrator"
 echo "=========================================="
 echo "Date:        ${DATE}"
+echo "Agent:       ${AGENT}"
 echo "Day Dir:     ${DAY_DIR}"
 echo "Tracker:     ${TRACKER_PATH}"
 echo "=========================================="
@@ -56,6 +81,7 @@ echo "--- Step 1: Fetching Match Schedule ---"
 SCHEDULE_VARS="DATE=${DATE}"
 SCHEDULE_VARS="${SCHEDULE_VARS},TRACKER_PATH=${TRACKER_PATH}"
 SCHEDULE_VARS="${SCHEDULE_VARS},OUTPUT_DIR=${DAY_DIR}"
+SCHEDULE_VARS="${SCHEDULE_VARS},AGENT=${AGENT}"
 
 if [ -f "${SKILLS_RUNNER}" ]; then
     # Create a temporary symlink so run_skill.py can find our skills
@@ -63,8 +89,13 @@ if [ -f "${SKILLS_RUNNER}" ]; then
     if [ ! -e "${SKILL_LINK}" ]; then
         ln -sf "${SCRIPT_DIR}/daily_schedule" "${SKILL_LINK}"
     fi
-    OUTPUT=$(python3 "${SKILLS_RUNNER}" wc_daily_schedule --vars "${SCHEDULE_VARS}")
-    echo "${OUTPUT}"
+    if OUTPUT=$(python3 "${SKILLS_RUNNER}" wc_daily_schedule --agent "${AGENT}" --vars "${SCHEDULE_VARS}"); then
+        echo "${OUTPUT}"
+    else
+        echo "Warning: ${AGENT} daily schedule failed. Trying ${FALLBACK_AGENT} fallback..." >&2
+        OUTPUT=$(python3 "${SKILLS_RUNNER}" wc_daily_schedule --agent "${FALLBACK_AGENT}" --vars "${SCHEDULE_VARS}")
+        echo "${OUTPUT}"
+    fi
     # Extract the run directory from output
     RUN_DIR=$(echo "${OUTPUT}" | grep "Execution logs and metadata saved to:" | sed 's/Execution logs and metadata saved to: //')
     if [ -n "${RUN_DIR}" ] && [ -d "${RUN_DIR}" ]; then
@@ -76,14 +107,24 @@ if [ -f "${SKILLS_RUNNER}" ]; then
     # Clean up symlink
     rm -f "${SKILL_LINK}"
 else
-    echo "Warning: run_skill.py not found, invoking agy directly" >&2
+    echo "Warning: run_skill.py not found, invoking ${AGENT} directly" >&2
     # Read and compile the skill prompt manually
     SKILL_CONTENT=$(cat "${SCRIPT_DIR}/daily_schedule/SKILL.md")
     # Replace variables
     COMPILED="${SKILL_CONTENT//\{DATE\}/${DATE}}"
     COMPILED="${COMPILED//\{TRACKER_PATH\}/${TRACKER_PATH}}"
     COMPILED="${COMPILED//\{OUTPUT_DIR\}/${DAY_DIR}}"
-    agy --dangerously-skip-permissions --print "${COMPILED}"
+    if [ "${AGENT}" = "opencode" ]; then
+        opencode run --dangerously-skip-permissions "${COMPILED}" || {
+            echo "Warning: opencode failed. Trying agy fallback..." >&2
+            agy --dangerously-skip-permissions --print "${COMPILED}"
+        }
+    else
+        agy --dangerously-skip-permissions --print "${COMPILED}" || {
+            echo "Warning: agy failed. Trying opencode fallback..." >&2
+            opencode run --dangerously-skip-permissions "${COMPILED}"
+        }
+    fi
 fi
 
 echo "[$(date -u +%H:%M:%S)] Schedule fetched."
@@ -113,6 +154,7 @@ PREDICT_VARS="${PREDICT_VARS},PREDICTIONS_PATH=${PREDICTIONS_PATH}"
 PREDICT_VARS="${PREDICT_VARS},CHANGELOG_PATH=${CHANGELOG_PATH}"
 PREDICT_VARS="${PREDICT_VARS},INTERVAL_PATH=${INTERVAL_PATH}"
 PREDICT_VARS="${PREDICT_VARS},OUTPUT_DIR=${DAY_DIR}"
+PREDICT_VARS="${PREDICT_VARS},AGENT=${AGENT}"
 
 ITERATION=0
 MAX_ITERATIONS=40  # Safety limit: ~10 hours at 15-min intervals
@@ -129,8 +171,11 @@ while [ "${ITERATION}" -lt "${MAX_ITERATIONS}" ]; do
     fi
 
     if [ -f "${SKILLS_RUNNER}" ]; then
-        python3 "${SKILLS_RUNNER}" wc_predict --vars "${PREDICT_VARS}" || {
-            echo "Warning: Prediction iteration ${ITERATION} failed. Continuing." >&2
+        python3 "${SKILLS_RUNNER}" wc_predict --agent "${AGENT}" --vars "${PREDICT_VARS}" || {
+            echo "Warning: ${AGENT} predict failed. Trying ${FALLBACK_AGENT} fallback..." >&2
+            python3 "${SKILLS_RUNNER}" wc_predict --agent "${FALLBACK_AGENT}" --vars "${PREDICT_VARS}" || {
+                echo "Warning: Prediction iteration ${ITERATION} failed on both agents. Continuing." >&2
+            }
         }
     else
         SKILL_CONTENT=$(cat "${SCRIPT_DIR}/predict/SKILL.md")
@@ -141,16 +186,28 @@ while [ "${ITERATION}" -lt "${MAX_ITERATIONS}" ]; do
         COMPILED="${COMPILED//\{CHANGELOG_PATH\}/${CHANGELOG_PATH}}"
         COMPILED="${COMPILED//\{INTERVAL_PATH\}/${INTERVAL_PATH}}"
         COMPILED="${COMPILED//\{OUTPUT_DIR\}/${DAY_DIR}}"
-        agy --dangerously-skip-permissions --print "${COMPILED}" || {
-            echo "Warning: Prediction iteration ${ITERATION} failed. Continuing." >&2
-        }
+        if [ "${AGENT}" = "opencode" ]; then
+            opencode run --dangerously-skip-permissions "${COMPILED}" || {
+                echo "Warning: opencode predict failed. Trying agy fallback..." >&2
+                agy --dangerously-skip-permissions --print "${COMPILED}" || {
+                    echo "Warning: Prediction iteration ${ITERATION} failed on both command line agents. Continuing." >&2
+                }
+            }
+        else
+            agy --dangerously-skip-permissions --print "${COMPILED}" || {
+                echo "Warning: agy predict failed. Trying opencode fallback..." >&2
+                opencode run --dangerously-skip-permissions "${COMPILED}" || {
+                    echo "Warning: Prediction iteration ${ITERATION} failed on both command line agents. Continuing." >&2
+                }
+            }
+        fi
     fi
 
     rm -f "${SKILL_LINK}"
 
-    # Read interval from configuration file (defaults to 5 minutes, minimum 1 minute)
+    # Read interval from configuration file (defaults to 5 minutes, minimum 5 minutes)
     INTERVAL_MINS=$(cat "${SCRIPT_DIR}/prediction_interval.txt" 2>/dev/null | tr -d '[:space:]' || echo "5")
-    if ! echo "${INTERVAL_MINS}" | grep -qE '^[0-9]+$' || [ "${INTERVAL_MINS}" -lt 1 ]; then
+    if ! echo "${INTERVAL_MINS}" | grep -qE '^[0-9]+$' || [ "${INTERVAL_MINS}" -lt 5 ]; then
         INTERVAL_MINS=5
     fi
     echo "[$(date -u +%H:%M:%S)] Iteration ${ITERATION} complete. Next run in ${INTERVAL_MINS} minutes."
@@ -163,7 +220,7 @@ while [ "${ITERATION}" -lt "${MAX_ITERATIONS}" ]; do
         ELAPSED=$((ELAPSED + 60))
         # Re-read configuration in case it changed mid-sleep
         NEW_MINS=$(cat "${SCRIPT_DIR}/prediction_interval.txt" 2>/dev/null | tr -d '[:space:]' || echo "${INTERVAL_MINS}")
-        if ! echo "${NEW_MINS}" | grep -qE '^[0-9]+$' || [ "${NEW_MINS}" -lt 1 ]; then
+        if ! echo "${NEW_MINS}" | grep -qE '^[0-9]+$' || [ "${NEW_MINS}" -lt 5 ]; then
             NEW_MINS=${INTERVAL_MINS}
         fi
         if [ "${NEW_MINS}" -ne "${INTERVAL_MINS}" ]; then
@@ -189,6 +246,7 @@ POSTMORTEM_VARS="${POSTMORTEM_VARS},PREDICTIONS_PATH=${PREDICTIONS_PATH}"
 POSTMORTEM_VARS="${POSTMORTEM_VARS},CHANGELOG_PATH=${CHANGELOG_PATH}"
 POSTMORTEM_VARS="${POSTMORTEM_VARS},TRACKER_PATH=${TRACKER_PATH}"
 POSTMORTEM_VARS="${POSTMORTEM_VARS},OUTPUT_DIR=${DAY_DIR}"
+POSTMORTEM_VARS="${POSTMORTEM_VARS},AGENT=${AGENT}"
 
 SKILL_LINK="${WORKSPACE_DIR}/skills/wc_postmortem"
 if [ ! -e "${SKILL_LINK}" ]; then
@@ -196,8 +254,13 @@ if [ ! -e "${SKILL_LINK}" ]; then
 fi
 
 if [ -f "${SKILLS_RUNNER}" ]; then
-    OUTPUT=$(python3 "${SKILLS_RUNNER}" wc_postmortem --vars "${POSTMORTEM_VARS}")
-    echo "${OUTPUT}"
+    if OUTPUT=$(python3 "${SKILLS_RUNNER}" wc_postmortem --agent "${AGENT}" --vars "${POSTMORTEM_VARS}"); then
+        echo "${OUTPUT}"
+    else
+        echo "Warning: ${AGENT} postmortem failed. Trying ${FALLBACK_AGENT} fallback..." >&2
+        OUTPUT=$(python3 "${SKILLS_RUNNER}" wc_postmortem --agent "${FALLBACK_AGENT}" --vars "${POSTMORTEM_VARS}")
+        echo "${OUTPUT}"
+    fi
     # Extract the run directory from output
     RUN_DIR=$(echo "${OUTPUT}" | grep "Execution logs and metadata saved to:" | sed 's/Execution logs and metadata saved to: //')
     if [ -n "${RUN_DIR}" ] && [ -d "${RUN_DIR}" ]; then
@@ -213,7 +276,17 @@ else
     COMPILED="${COMPILED//\{CHANGELOG_PATH\}/${CHANGELOG_PATH}}"
     COMPILED="${COMPILED//\{TRACKER_PATH\}/${TRACKER_PATH}}"
     COMPILED="${COMPILED//\{OUTPUT_DIR\}/${DAY_DIR}}"
-    agy --dangerously-skip-permissions --print "${COMPILED}"
+    if [ "${AGENT}" = "opencode" ]; then
+        opencode run --dangerously-skip-permissions "${COMPILED}" || {
+            echo "Warning: opencode postmortem failed. Trying agy fallback..." >&2
+            agy --dangerously-skip-permissions --print "${COMPILED}"
+        }
+    else
+        agy --dangerously-skip-permissions --print "${COMPILED}" || {
+            echo "Warning: agy postmortem failed. Trying opencode fallback..." >&2
+            opencode run --dangerously-skip-permissions "${COMPILED}"
+        }
+    fi
 fi
 
 rm -f "${SKILL_LINK}"
