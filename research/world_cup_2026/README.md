@@ -26,8 +26,8 @@ Morning          During Matches         After Matches
 | Skill | Trigger | Frequency | Purpose |
 |:------|:--------|:----------|:--------|
 | `daily_schedule` | Morning cron | Once/day | Fetch today's match schedule from the web |
-| `predict` | After schedule is fetched | Every 5 min until halftime | Iteratively refine Win/Lose/Draw predictions with web research |
-| `postmortem` | ~2h after each match ends | Once per match | Evaluate accuracy, extract lessons, update tracker |
+| `predict` | After schedule is fetched | Dynamic interval until all scheduled matches end | Iteratively refine Win/Lose/Draw predictions with web research |
+| `postmortem` | ~2h after the final match ends | Once per day | Evaluate accuracy, extract lessons, update tracker |
 
 ---
 

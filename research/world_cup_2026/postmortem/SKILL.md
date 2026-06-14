@@ -8,6 +8,7 @@ required_vars:
   - CHANGELOG_PATH
   - TRACKER_PATH
   - OUTPUT_DIR
+  - PREDICT_SKILL_PATH
 ---
 
 # Instructions
@@ -72,6 +73,7 @@ For every match that was predicted, perform a detailed comparison:
 
 ### Root Cause Analysis
 A 2-3 sentence explanation of the fundamental reason the prediction was correct or incorrect. Go beyond surface-level — was it a research gap, a systematic bias, bad luck (e.g., a 90th-minute goal), or a genuine analytical miss?
+Check if the reasoning led to the right prediction matching the actual result. Did we get it right for the right reasons, or were we lucky (right prediction, wrong reasoning)? If it was incorrect, did the reasoning correctly identify the risk that eventually invalidated the prediction, or were we completely blindsided?
 
 ### Lessons Learned
 - **Concrete lesson:** [Actionable insight, e.g., "When Team A plays away in hot climates, their pressing intensity drops significantly after 60 minutes"]
@@ -129,6 +131,13 @@ model: "<the model name you are running on, e.g., Gemini 3.5 Flash>"
 
 Include all the analysis from Step 3 and statistics from Step 4.
 
+### 5a. Token and Iteration Efficiency Evaluation
+At the end of the postmortem, include a dedicated section evaluating whether the frequency of iterations and model calls was worth it:
+- Compare the initial prediction (Iteration 1) with the final prediction. Did the predictions or confidence levels change over time?
+- Did these changes improve accuracy/calibration, or did they introduce noise/churn while burning tokens?
+- Determine if the multiple prediction iterations and model calls are just wasting time and tokens compared to the results.
+- Provide a final recommendation on whether the prediction interval or iterations should be reduced or optimized.
+
 ---
 
 ## Step 6: Update the Prediction Tracker
@@ -164,6 +173,9 @@ Update the "Active Heuristics" section:
 Update the "Open Questions" section:
 - **Remove** questions that were answered by today's matches
 - **Add** new questions raised by today's results
+
+### 6f. Update predict/SKILL.md
+Read the match predictor skill at `{PREDICT_SKILL_PATH}`. If this postmortem revealed any gaps in the prediction guidelines—such as model selection heuristics, news-gathering requirements, interval rules, or how confidence is determined—directly update `{PREDICT_SKILL_PATH}` to incorporate these improvements so future iterations benefit from them. If no updates are needed, explain why in the postmortem report.
 
 ---
 

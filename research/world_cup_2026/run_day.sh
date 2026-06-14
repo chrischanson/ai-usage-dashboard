@@ -2,8 +2,9 @@
 # World Cup 2026 — Daily Orchestrator
 # Runs the full daily prediction cascade:
 #   1. Fetch today's match schedule
-#   2. Run prediction loop every 15 minutes
-#   3. Schedule postmortem after matches end
+#   2. Run the prediction/analysis loop on the configured dynamic interval
+#   3. Keep running until every scheduled match reaches its estimated end
+#   4. Run postmortem 2 hours after the final estimated match end
 #
 # Usage:
 #   bash run_day.sh              # Run for today with agy (default)
@@ -18,17 +19,162 @@ WORKSPACE_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 SKILLS_RUNNER="${WORKSPACE_DIR}/skills/run_skill.py"
 TRACKER_PATH="${SCRIPT_DIR}/prediction_tracker.md"
 INTERVAL_PATH="${SCRIPT_DIR}/prediction_interval.txt"
+DEFAULT_INTERVAL_MINS=15
+MIN_INTERVAL_MINS=15
+MAX_INTERVAL_MINS=45
+POSTMORTEM_DELAY_SECONDS=$((2 * 60 * 60))
+CLEANUP_LINKS=()
+POSTMORTEM_EPOCH=0
+
+log() {
+    echo "[$(date -u +%H:%M:%S)] $*"
+}
+
+cleanup() {
+    local link
+    for link in "${CLEANUP_LINKS[@]:-}"; do
+        rm -f "${link}"
+    done
+}
+trap cleanup EXIT
+
+ensure_skill_link() {
+    local name="$1"
+    local target="$2"
+
+    SKILL_LINK="${WORKSPACE_DIR}/skills/${name}"
+    ln -sfn "${target}" "${SKILL_LINK}"
+    CLEANUP_LINKS+=("${SKILL_LINK}")
+}
+
+read_interval_mins() {
+    local raw
+    raw=$(cat "${INTERVAL_PATH}" 2>/dev/null | tr -d '[:space:]' || true)
+    if ! echo "${raw}" | grep -qE '^[0-9]+$'; then
+        raw="${DEFAULT_INTERVAL_MINS}"
+    fi
+    if [ "${raw}" -lt "${MIN_INTERVAL_MINS}" ]; then
+        raw="${MIN_INTERVAL_MINS}"
+    fi
+    if [ "${raw}" -gt "${MAX_INTERVAL_MINS}" ]; then
+        raw="${MAX_INTERVAL_MINS}"
+    fi
+    echo "${raw}"
+}
+
+utc_epoch() {
+    date -u -d "$1" +%s
+}
+
+format_utc_epoch() {
+    date -u -d "@$1" "+%Y-%m-%d %H:%M:%S UTC"
+}
+
+derive_match_windows() {
+    local in_data=0
+    local prev_kickoff_epoch=0
+    local max_halftime_epoch=0
+    local max_end_epoch=0
+    local line kickoff halftime end match_date kickoff_epoch halftime_epoch end_epoch
+
+    while IFS= read -r line; do
+        case "${line}" in
+            *"<!-- MATCH_DATA_START -->"*) in_data=1; continue ;;
+            *"<!-- MATCH_DATA_END -->"*) in_data=0; continue ;;
+        esac
+        [ "${in_data}" -eq 1 ] || continue
+
+        kickoff=$(echo "${line}" | sed -n 's/.*kickoff_utc: "\([0-9][0-9]:[0-9][0-9]\)".*/\1/p')
+        halftime=$(echo "${line}" | sed -n 's/.*estimated_halftime_utc: "\([0-9][0-9]:[0-9][0-9]\)".*/\1/p')
+        end=$(echo "${line}" | sed -n 's/.*estimated_end_utc: "\([0-9][0-9]:[0-9][0-9]\)".*/\1/p')
+        [ -n "${kickoff}" ] && [ -n "${halftime}" ] && [ -n "${end}" ] || continue
+
+        match_date="${DATE}"
+        kickoff_epoch=$(utc_epoch "${match_date} ${kickoff}")
+        if [ "${prev_kickoff_epoch}" -gt 0 ] && [ "${kickoff_epoch}" -lt "${prev_kickoff_epoch}" ]; then
+            match_date=$(date -u -d "${match_date} +1 day" +%Y-%m-%d)
+            kickoff_epoch=$(utc_epoch "${match_date} ${kickoff}")
+        fi
+        prev_kickoff_epoch="${kickoff_epoch}"
+
+        halftime_epoch=$(utc_epoch "${match_date} ${halftime}")
+        end_epoch=$(utc_epoch "${match_date} ${end}")
+        if [ "${halftime_epoch}" -lt "${kickoff_epoch}" ]; then
+            halftime_epoch=$((halftime_epoch + 86400))
+        fi
+        if [ "${end_epoch}" -lt "${kickoff_epoch}" ]; then
+            end_epoch=$((end_epoch + 86400))
+        fi
+
+        if [ "${halftime_epoch}" -gt "${max_halftime_epoch}" ]; then
+            max_halftime_epoch="${halftime_epoch}"
+        fi
+        if [ "${end_epoch}" -gt "${max_end_epoch}" ]; then
+            max_end_epoch="${end_epoch}"
+        fi
+    done < "${SCHEDULE_PATH}"
+
+    if [ "${max_end_epoch}" -eq 0 ]; then
+        echo "Error: Could not parse match timing data from ${SCHEDULE_PATH}" >&2
+        return 1
+    fi
+
+    LAST_HALFTIME_EPOCH="${max_halftime_epoch}"
+    LAST_END_EPOCH="${max_end_epoch}"
+    POSTMORTEM_EPOCH=$((LAST_END_EPOCH + POSTMORTEM_DELAY_SECONDS))
+}
+
+sleep_until_or_interval_change() {
+    local target_epoch="$1"
+    local interval_mins="$2"
+    local target_interval_epoch=$(( $(date -u +%s) + interval_mins * 60 ))
+    local wake_epoch="${target_interval_epoch}"
+    local now remaining sleep_for new_mins new_interval_epoch
+
+    if [ "${target_epoch}" -lt "${wake_epoch}" ]; then
+        wake_epoch="${target_epoch}"
+    fi
+
+    while true; do
+        now=$(date -u +%s)
+        [ "${now}" -lt "${wake_epoch}" ] || break
+
+        remaining=$((wake_epoch - now))
+        sleep_for="${remaining}"
+        if [ "${sleep_for}" -gt 60 ]; then
+            sleep_for=60
+        fi
+        sleep "${sleep_for}"
+
+        new_mins=$(read_interval_mins)
+        if [ "${new_mins}" -ne "${interval_mins}" ]; then
+            log "Prediction interval changed from ${interval_mins} to ${new_mins} minutes."
+            interval_mins="${new_mins}"
+            new_interval_epoch=$(( $(date -u +%s) + interval_mins * 60 ))
+            if [ "${new_interval_epoch}" -lt "${target_epoch}" ]; then
+                wake_epoch="${new_interval_epoch}"
+            else
+                wake_epoch="${target_epoch}"
+            fi
+        fi
+    done
+}
 
 # --- Parse arguments ---
 AGENT="agy"
 FALLBACK_AGENT="opencode"
 DATE=""
+POSTMORTEM_ONLY=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --opencode)
             AGENT="opencode"
             FALLBACK_AGENT="agy"
+            shift
+            ;;
+        --postmortem)
+            POSTMORTEM_ONLY=1
             shift
             ;;
         *)
@@ -67,7 +213,9 @@ echo "=========================================="
 
 # --- Step 0: Create day directory ---
 mkdir -p "${DAY_DIR}"
-echo "[$(date -u +%H:%M:%S)] Created day directory: ${DAY_DIR}"
+log "Created day directory: ${DAY_DIR}"
+
+if [ "${POSTMORTEM_ONLY}" -eq 0 ]; then
 
 # --- Step 1: Fetch today's match schedule ---
 echo ""
@@ -84,11 +232,8 @@ SCHEDULE_VARS="${SCHEDULE_VARS},OUTPUT_DIR=${DAY_DIR}"
 SCHEDULE_VARS="${SCHEDULE_VARS},AGENT=${AGENT}"
 
 if [ -f "${SKILLS_RUNNER}" ]; then
-    # Create a temporary symlink so run_skill.py can find our skills
-    SKILL_LINK="${WORKSPACE_DIR}/skills/wc_daily_schedule"
-    if [ ! -e "${SKILL_LINK}" ]; then
-        ln -sf "${SCRIPT_DIR}/daily_schedule" "${SKILL_LINK}"
-    fi
+    # Create a temporary symlink so run_skill.py can find this project's skills.
+    ensure_skill_link "wc_daily_schedule" "${SCRIPT_DIR}/daily_schedule"
     if OUTPUT=$(python3 "${SKILLS_RUNNER}" wc_daily_schedule --agent "${AGENT}" --vars "${SCHEDULE_VARS}"); then
         echo "${OUTPUT}"
     else
@@ -101,11 +246,9 @@ if [ -f "${SKILLS_RUNNER}" ]; then
     if [ -n "${RUN_DIR}" ] && [ -d "${RUN_DIR}" ]; then
         if [ -f "${RUN_DIR}/match_schedule.md" ]; then
             cp -f "${RUN_DIR}/match_schedule.md" "${DAY_DIR}/"
-            echo "[$(date -u +%H:%M:%S)] Copied match_schedule.md to ${DAY_DIR}/"
+            log "Copied match_schedule.md to ${DAY_DIR}/"
         fi
     fi
-    # Clean up symlink
-    rm -f "${SKILL_LINK}"
 else
     echo "Warning: run_skill.py not found, invoking ${AGENT} directly" >&2
     # Read and compile the skill prompt manually
@@ -127,7 +270,7 @@ else
     fi
 fi
 
-echo "[$(date -u +%H:%M:%S)] Schedule fetched."
+log "Schedule fetched."
 
 # --- Step 2: Check if there are matches today ---
 if [ ! -f "${SCHEDULE_PATH}" ]; then
@@ -143,9 +286,14 @@ fi
 
 echo "Matches found for today. Starting prediction loop."
 
+derive_match_windows
+echo "Last estimated halftime: $(format_utc_epoch "${LAST_HALFTIME_EPOCH}")"
+echo "Last estimated match end: $(format_utc_epoch "${LAST_END_EPOCH}")"
+echo "Postmortem target:        $(format_utc_epoch "${POSTMORTEM_EPOCH}")"
+
 # --- Step 3: Prediction Loop ---
 echo ""
-echo "--- Step 3: Prediction Loop (every 15 minutes) ---"
+echo "--- Step 3: Prediction Loop (dynamic interval until all games end) ---"
 
 PREDICT_VARS="DATE=${DATE}"
 PREDICT_VARS="${PREDICT_VARS},SCHEDULE_PATH=${SCHEDULE_PATH}"
@@ -157,18 +305,13 @@ PREDICT_VARS="${PREDICT_VARS},OUTPUT_DIR=${DAY_DIR}"
 PREDICT_VARS="${PREDICT_VARS},AGENT=${AGENT}"
 
 ITERATION=0
-MAX_ITERATIONS=40  # Safety limit: ~10 hours at 15-min intervals
 
-while [ "${ITERATION}" -lt "${MAX_ITERATIONS}" ]; do
+while [ "$(date -u +%s)" -lt "${LAST_END_EPOCH}" ]; do
     ITERATION=$((ITERATION + 1))
     echo ""
     echo "=== Prediction Iteration ${ITERATION} — $(date -u +%H:%M:%S) UTC ==="
 
-    # Create symlink for run_skill.py
-    SKILL_LINK="${WORKSPACE_DIR}/skills/wc_predict"
-    if [ ! -e "${SKILL_LINK}" ]; then
-        ln -sf "${SCRIPT_DIR}/predict" "${SKILL_LINK}"
-    fi
+    ensure_skill_link "wc_predict" "${SCRIPT_DIR}/predict"
 
     # Read the next model to use from predictions.md if it exists, default to Gemini 3.5 Flash (Medium)
     MODEL="Gemini 3.5 Flash (Medium)"
@@ -178,7 +321,7 @@ while [ "${ITERATION}" -lt "${MAX_ITERATIONS}" ]; do
             MODEL="Gemini 3.5 Flash (High)"
         fi
     fi
-    echo "[$(date -u +%H:%M:%S)] Selected model for iteration: ${MODEL}"
+    log "Selected model for iteration: ${MODEL}"
 
     # Map model name for each agent type
     EXEC_MODEL="${MODEL}"
@@ -204,7 +347,7 @@ while [ "${ITERATION}" -lt "${MAX_ITERATIONS}" ]; do
         if [ -n "${RUN_DIR}" ] && [ -d "${RUN_DIR}" ]; then
             if [ -f "${RUN_DIR}/run_metadata.json" ]; then
                 TOKENS_TEXT=$(python3 -c "import json; m=json.load(open('${RUN_DIR}/run_metadata.json')); u=m.get('token_usage'); print(f\"Tokens Used: {u['input_tokens']} input, {u['output_tokens']} output (Total: {u['total_tokens']})\" if u else 'Tokens Used: Unknown')")
-                echo "[$(date -u +%H:%M:%S)] ${TOKENS_TEXT}"
+                log "${TOKENS_TEXT}"
             fi
         fi
     else
@@ -233,50 +376,36 @@ while [ "${ITERATION}" -lt "${MAX_ITERATIONS}" ]; do
         fi
     fi
 
-    rm -f "${SKILL_LINK}"
-
-    # Check if all matches have concluded or passed halftime to exit early
+    # If the skill reports no matches left to cover, skip future invocations
+    # and just wait out the remaining time until the final whistle window.
+    # This avoids burning tokens on runs that would produce no useful output.
     if [ -f "${PREDICTIONS_PATH}" ]; then
         COVERED=$(grep -E '^matches_covered:' "${PREDICTIONS_PATH}" | head -n 1 | cut -d':' -f2 | tr -d ' ' || echo "1")
         if [ "${COVERED}" = "0" ]; then
-            echo "[$(date -u +%H:%M:%S)] All matches for today have concluded or passed halftime (matches_covered: 0). Exiting prediction loop early."
+            log "Prediction skill reports no matches left to cover; skipping further invocations and waiting until all games end at $(format_utc_epoch "${LAST_END_EPOCH}")."
+            sleep_until_or_interval_change "${LAST_END_EPOCH}" "${MAX_INTERVAL_MINS}"
             break
         fi
     fi
 
-    # Read interval from configuration file (defaults to 10 minutes, minimum 10 minutes)
-    INTERVAL_MINS=$(cat "${SCRIPT_DIR}/prediction_interval.txt" 2>/dev/null | tr -d '[:space:]' || echo "10")
-    if ! echo "${INTERVAL_MINS}" | grep -qE '^[0-9]+$' || [ "${INTERVAL_MINS}" -lt 10 ]; then
-        INTERVAL_MINS=10
-    fi
-    echo "[$(date -u +%H:%M:%S)] Iteration ${ITERATION} complete. Next run in ${INTERVAL_MINS} minutes."
-
-    # Wait for INTERVAL_MINS minutes, checking config every 60 seconds
-    ELAPSED=0
-    TARGET_SECONDS=$((INTERVAL_MINS * 60))
-    while [ "${ELAPSED}" -lt "${TARGET_SECONDS}" ]; do
-        sleep 60
-        ELAPSED=$((ELAPSED + 60))
-        # Re-read configuration in case it changed mid-sleep
-        NEW_MINS=$(cat "${SCRIPT_DIR}/prediction_interval.txt" 2>/dev/null | tr -d '[:space:]' || echo "${INTERVAL_MINS}")
-        if ! echo "${NEW_MINS}" | grep -qE '^[0-9]+$' || [ "${NEW_MINS}" -lt 10 ]; then
-            NEW_MINS=${INTERVAL_MINS}
-        fi
-        if [ "${NEW_MINS}" -ne "${INTERVAL_MINS}" ]; then
-            echo "[$(date -u +%H:%M:%S)] Prediction interval changed from ${INTERVAL_MINS} to ${NEW_MINS} minutes."
-            INTERVAL_MINS=${NEW_MINS}
-            TARGET_SECONDS=$((INTERVAL_MINS * 60))
-        fi
-    done
+    INTERVAL_MINS=$(read_interval_mins)
+    log "Iteration ${ITERATION} complete. Next run in ${INTERVAL_MINS} minutes, unless all games end first."
+    sleep_until_or_interval_change "${LAST_END_EPOCH}" "${INTERVAL_MINS}"
 done
 
-echo "Prediction loop completed (${MAX_ITERATIONS} iterations max)."
+log "Prediction loop completed after ${ITERATION} iterations; all scheduled games have reached the estimated end window."
+
+fi # end if [ "${POSTMORTEM_ONLY}" -eq 0 ]
 
 # --- Step 4: Postmortem ---
 echo ""
-echo "--- Step 4: Postmortem (waiting 2 hours after last match) ---"
-echo "Sleeping 2 hours for matches to conclude..."
-sleep 7200
+echo "--- Step 4: Postmortem (2 hours after last match end) ---"
+NOW_EPOCH=$(date -u +%s)
+if [ "${POSTMORTEM_ONLY}" -eq 0 ] && [ "${NOW_EPOCH}" -lt "${POSTMORTEM_EPOCH}" ]; then
+    WAIT_SECONDS=$((POSTMORTEM_EPOCH - NOW_EPOCH))
+    log "Waiting until $(format_utc_epoch "${POSTMORTEM_EPOCH}") for final results to settle (${WAIT_SECONDS}s)."
+    sleep "${WAIT_SECONDS}"
+fi
 
 echo "Running postmortem analysis..."
 
@@ -286,11 +415,9 @@ POSTMORTEM_VARS="${POSTMORTEM_VARS},CHANGELOG_PATH=${CHANGELOG_PATH}"
 POSTMORTEM_VARS="${POSTMORTEM_VARS},TRACKER_PATH=${TRACKER_PATH}"
 POSTMORTEM_VARS="${POSTMORTEM_VARS},OUTPUT_DIR=${DAY_DIR}"
 POSTMORTEM_VARS="${POSTMORTEM_VARS},AGENT=${AGENT}"
+POSTMORTEM_VARS="${POSTMORTEM_VARS},PREDICT_SKILL_PATH=${SCRIPT_DIR}/predict/SKILL.md"
 
-SKILL_LINK="${WORKSPACE_DIR}/skills/wc_postmortem"
-if [ ! -e "${SKILL_LINK}" ]; then
-    ln -sf "${SCRIPT_DIR}/postmortem" "${SKILL_LINK}"
-fi
+ensure_skill_link "wc_postmortem" "${SCRIPT_DIR}/postmortem"
 
 if [ -f "${SKILLS_RUNNER}" ]; then
     if OUTPUT=$(python3 "${SKILLS_RUNNER}" wc_postmortem --agent "${AGENT}" --vars "${POSTMORTEM_VARS}"); then
@@ -305,7 +432,7 @@ if [ -f "${SKILLS_RUNNER}" ]; then
     if [ -n "${RUN_DIR}" ] && [ -d "${RUN_DIR}" ]; then
         if [ -f "${RUN_DIR}/postmortem.md" ]; then
             cp -f "${RUN_DIR}/postmortem.md" "${DAY_DIR}/"
-            echo "[$(date -u +%H:%M:%S)] Copied postmortem.md to ${DAY_DIR}/"
+            log "Copied postmortem.md to ${DAY_DIR}/"
         fi
     fi
 else
@@ -315,6 +442,7 @@ else
     COMPILED="${COMPILED//\{CHANGELOG_PATH\}/${CHANGELOG_PATH}}"
     COMPILED="${COMPILED//\{TRACKER_PATH\}/${TRACKER_PATH}}"
     COMPILED="${COMPILED//\{OUTPUT_DIR\}/${DAY_DIR}}"
+    COMPILED="${COMPILED//\{PREDICT_SKILL_PATH\}/${SCRIPT_DIR}/predict/SKILL.md}"
     if [ "${AGENT}" = "opencode" ]; then
         opencode run --dangerously-skip-permissions "${COMPILED}" || {
             echo "Warning: opencode postmortem failed. Trying agy fallback..." >&2
@@ -327,8 +455,6 @@ else
         }
     fi
 fi
-
-rm -f "${SKILL_LINK}"
 
 echo ""
 echo "=========================================="

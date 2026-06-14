@@ -79,7 +79,8 @@ Brief notes on any prior predictions involving today's teams:
 Summary of when the prediction loop should run:
 - First match kickoff: HH:MM UTC
 - Last match estimated halftime: HH:MM UTC
-- Prediction loop window: HH:MM to HH:MM UTC
+- Last match estimated end: HH:MM UTC
+- Prediction/analysis loop window: HH:MM to HH:MM UTC
 - Postmortem target time: HH:MM UTC (2h after last match ends)
 ```
 
