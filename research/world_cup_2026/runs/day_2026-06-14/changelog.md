@@ -1,5 +1,317 @@
 # 📝 World Cup 2026 Prediction Changelog — 2026-06-14
 
+## Iteration 18 - 2026-06-14T02:25:23Z
+**Model Used:** Gemini 3.5 Flash
+**Next Interval:** 7 minutes
+
+### Eligible Matches
+- Australia vs. Türkiye: not_started
+- Germany vs. Curaçao: not_started
+- Netherlands vs. Japan: not_started
+- Côte d'Ivoire vs. Ecuador: not_started
+
+### Changes
+- Australia vs. Türkiye: No change — prediction reinforced. Ferdi Kadıoğlu's availability is confirmed, but Kenan Yıldız remains a major starting doubt, preserving a low-confidence outlook.
+- Germany vs. Curaçao: No change — prediction reinforced. Germany's 9-match win streak, Manuel Neuer's fitness, and guaranteed closed-roof conditions support a high-confidence win.
+- Netherlands vs. Japan: No change — prediction reinforced. Goalkeeper Bart Verbruggen is confirmed fully fit and expected to start, resolving Dutch goalkeeper doubts.
+- Côte d'Ivoire vs. Ecuador: No change — prediction reinforced. Enner Valencia is now expected to start after participating in a practice match, but both sides remain defensively organized, pointing to a tight draw.
+
+### Search Queries Executed
+- Australia vs. Türkiye: `Australia vs Turkey Vincenzo Montella starting XI news June 14 2026`, `Australia vs Turkey BC Place temporary grass pitch report June 14 2026`, `Australia vs Turkey betting odds pinnacle bet365 June 14 2026`
+- Germany vs. Curaçao: `Germany vs Curacao World Cup team news predicted starting XI June 14 2026`, `Germany vs Curacao NRG Stadium pitch roof June 14 2026`, `Germany vs Curacao betting odds Pinnacle bet365 June 14 2026`
+- Netherlands vs. Japan: `Netherlands vs Japan World Cup team news predicted starting XI June 14 2026`, `Bart Verbruggen injury fitness Netherlands starting goalkeeper Japan June 14 2026`, `Japan national team midfield Moriyasu double pivot June 14 2026`, `Netherlands vs Japan betting odds pinnacle bet365 June 14 2026`
+- Côte d'Ivoire vs. Ecuador: `Ivory Coast vs Ecuador World Cup team news predicted starting XI June 14 2026`, `Ivory Coast central defense Kossounou Singo Agbadou Fae June 14 2026`, `Ivory Coast vs Ecuador Valencia injury calf update June 14 2026`, `Ivory Coast vs Ecuador betting odds pinnacle bet365 June 14 2026`
+
+### New Evidence
+- Australia vs. Türkiye: [strong] BC Place's temporary grass surface is locally sourced and maintained with automated UV lights and irrigation under a closed roof to ensure stability.
+- Germany vs. Curaçao: [official] Houston Stadium retractable roof is confirmed to be closed, ensuring stable climate-controlled playing conditions.
+- Netherlands vs. Japan: [official] Ronald Koeman confirmed goalkeeper Bart Verbruggen and Memphis Depay are fully fit to start. [strong] Tactical previews project Tanaka and Morita to start in Japan's double pivot to replace injured Wataru Endo.
+- Côte d'Ivoire vs. Ecuador: [strong] Enner Valencia successfully played 45 minutes in a practice match on June 12 and trained well, making him expected to start.
+
+### Open Questions Resolved
+- [Does the official starting XI at ~03:00 UTC confirm Kenan Yıldız starts on the bench, and does Ferdi Kadıoğlu start at left-back?]: Unresolved — lineups not yet released (expected ~03:00 UTC), but Kadıoğlu is fit to start while Yıldız is expected on the bench.
+- [Does the temporary grass pitch at NRG Stadium show signs of slickness or tearing?]: Resolved — [official] The retractable roof at Houston Stadium will be closed, ensuring stable climate-controlled turf conditions.
+- [Does Moriyasu deploy Ao Tanaka or Kaishu Sano alongside Daichi Kamada?]: Partially resolved — [strong] projections point to a double pivot of Ao Tanaka and Hidemasa Morita to handle midfield duties.
+- [Will the Agbadou-Kossounou partnership suffer from lack of coordination?]: Unresolved (match not started).
+- [Does Enner Valencia play any role or remain completely on the bench due to calf management?]: Partially resolved — [strong] Valencia played 45 minutes in a practice match on June 12, trained well, and is expected to start.
+
+### New Questions Raised
+- Australia vs. Türkiye: Does Vincenzo Montella name Kenan Yıldız on the bench or omit him completely in the official XI at ~03:00 UTC?
+- Germany vs. Curaçao: Does Julian Nagelsmann rest key outfield starters early in the second half if Germany establishes a multi-goal lead?
+- Netherlands vs. Japan: How does Japan's depleted midfield manage the tempo against a strong Dutch double pivot?
+- Côte d'Ivoire vs. Ecuador: Does Emerse Faé start Odilon Kossounou, Wilfried Singo, or Ousmane Diomande next to Emmanuel Agbadou in central defense?
+
+### Next Interval Reason
+- Wrote `7` minutes to `/home/dev/workspace/main/research/world_cup_2026/prediction_interval.txt` because kickoff for Australia vs. Türkiye is within 2 hours (04:00 UTC) with official lineups expected in about 35 minutes (~03:00 UTC), and we need to monitor breaking lineup announcements and late betting line movements.
+
+## Iteration 17 - 2026-06-14T02:18:00Z
+**Model Used:** Gemini 3.5 Flash
+**Next Interval:** 7 minutes
+
+### Eligible Matches
+- Australia vs. Türkiye: not_started
+- Germany vs. Curaçao: not_started
+- Netherlands vs. Japan: not_started
+- Côte d'Ivoire vs. Ecuador: not_started
+
+### Changes
+- Australia vs. Türkiye: No change — prediction reinforced. Ferdi Kadıoğlu's availability is confirmed, but Kenan Yıldız remains a major starting doubt, preserving a low-confidence outlook.
+- Germany vs. Curaçao: No change — prediction reinforced. Germany's 9-match win streak and Curaçao's debutant status under controlled stadium roof conditions support a high-confidence win.
+- Netherlands vs. Japan: No change — prediction reinforced. Wataru Endo, Kaoru Mitoma, and Takumi Minamino are all confirmed out for Japan, while the Netherlands only misses Xavi Simons from their key core.
+- Côte d'Ivoire vs. Ecuador: No change — prediction reinforced. Enner Valencia's doubtful calf status and Evan Ndicka's thigh injury point to a low-scoring, defensive draw.
+
+### Search Queries Executed
+- Australia vs. Türkiye: `Australia Turkey World Cup 2026 starting lineups June 14`, `Australia Turkey "June 14" 2026 lineup update Yildiz Kadioglu Toure`, `Australia vs Turkey betting odds sharp money Pinnacle bet365 June 14 2026`
+- Germany vs. Curaçao: `Germany vs Curacao World Cup 2026 team news lineups June 14`, `Germany vs Curacao World Cup pitch report NRG Stadium Houston June 14`, `Germany vs Curacao betting odds handicap movement June 14 2026`
+- Netherlands vs. Japan: `Netherlands vs Japan World Cup 2026 team news lineups June 14`, `Netherlands vs Japan Ronald Koeman Hajime Moriyasu press conference June 14 2026`, `Netherlands vs Japan betting odds movement June 14 2026`, `Xavi Simons injury Netherlands World Cup 2026 June 14`
+- Côte d'Ivoire vs. Ecuador: `Ivory Coast vs Ecuador World Cup 2026 team news lineups June 14`, `Ivory Coast vs Ecuador press conference Emerse Fae Beccacece June 14 2026`, `Ivory Coast vs Ecuador betting odds movement June 14 2026`
+
+### New Evidence
+- Australia vs. Türkiye: [strong] Ferdi Kadıoğlu is confirmed healthy and available, but Kenan Yıldız continues individual training and is expected to start on the bench.
+- Germany vs. Curaçao: [strong] Germany enters in elite form with 9 straight wins; Houston Stadium's closed roof ensures stable turf and windless conditions.
+- Netherlands vs. Japan: [strong] Xavi Simons is confirmed out of the tournament with an ACL rupture from April. [official] Moriyasu took responsibility for Endo's withdrawal, and Koeman confirmed Verbruggen/Depay fit.
+- Côte d'Ivoire vs. Ecuador: [strong] Enner Valencia remains doubtful with a calf injury; both managers emphasize defensive preparation and tactical discipline.
+
+### Open Questions Resolved
+- [Does the official starting XI at ~03:00 UTC confirm Kenan Yıldız starts on the bench, and does Ferdi Kadıoğlu start at left-back?]: Partially resolved — Official lineup not yet released, but Kadıoğlu is confirmed fit and Yıldız continues individual training (unlikely to start).
+- [Does Germany's technical passing look sharp on the fast temporary grass in the first 15 minutes?]: Unresolved (match not started).
+- [Does Japan's Sano-Kamada midfield pivot successfully hold off the Netherlands' central playmakers?]: Unresolved (match not started).
+- [How does the new Agbadou-Kossounou central defensive partnership handle Ecuador's press under Letexier's officiating?]: Unresolved (match not started).
+
+### New Questions Raised
+- Australia vs. Türkiye: Does Vincenzo Montella name Kenan Yıldız on the bench or omit him completely in the official XI at ~03:00 UTC?
+- Germany vs. Curaçao: Does Nagelsmann rest key outfield starters early in the second half if Germany establishes a multi-goal lead?
+- Netherlands vs. Japan: How does Japan's depleted midfield manage the tempo against a strong Dutch double pivot?
+- Côte d'Ivoire vs. Ecuador: Does Enner Valencia play any role or remain completely on the bench due to calf management?
+
+### Next Interval Reason
+- Wrote `7` minutes to `/home/dev/workspace/main/research/world_cup_2026/prediction_interval.txt` because the kickoff of the nearest match (Australia vs. Türkiye) is within 2 hours (04:00 UTC) with official lineups expected at ~03:00 UTC, and we need to monitor breaking lineup announcements and late betting line movement.
+
+## Iteration 16 - 2026-06-14T02:10:00Z
+**Model Used:** Gemini 3.5 Flash
+**Next Interval:** 7 minutes
+
+### Eligible Matches
+- Australia vs. Türkiye: not_started
+- Germany vs. Curaçao: not_started
+- Netherlands vs. Japan: not_started
+- Côte d'Ivoire vs. Ecuador: not_started
+
+### Changes
+- Australia vs. Türkiye: No change — prediction reinforced. Ferdi Kadıoğlu's return to training strengthens Türkiye's left side, but Kenan Yıldız's doubtful starting status and the heavy pitch keep the outcome low-confidence.
+- Germany vs. Curaçao: No change — prediction reinforced. Houston Stadium's specialized temporary grass system is climate-controlled and expected to play fast and true, directly benefiting Germany's technical passing game.
+- Netherlands vs. Japan: No change — prediction reinforced. Goalkeeper Bart Verbruggen is officially cleared to start, resolving the primary Dutch injury concern.
+- Côte d'Ivoire vs. Ecuador: No change — prediction reinforced. Enner Valencia is listed as doubtful due to careful calf management, reducing Ecuador's attacking threat and reinforcing a low-scoring draw prediction.
+
+### Search Queries Executed
+- Australia vs. Türkiye: `Australia vs Turkiye World Cup 2026 starting XI lineup news June 14`, `Australia Turkey World Cup 2026 Kenan Yildiz injury update June 14`, `Australia vs Turkey betting odds movement pinnacle bet365 June 14`
+- Germany vs. Curaçao: `Germany vs Curaçao World Cup 2026 starting XI line-up news June 14`, `Germany vs Curacao betting odds movement pinnacle bet365 June 14`, `Germany vs Curacao Houston Stadium pitch grass conditions June 14`
+- Netherlands vs. Japan: `Netherlands vs Japan World Cup 2026 starting XI line-up news June 14`, `Bart Verbruggen injury Netherlands starting goalkeeper Japan June 14`, `Japan national team double pivot Kamada Sano Tanaka Moriyasu press conference June 14`, `Netherlands vs Japan betting odds movement AT&T Stadium June 14`
+- Côte d'Ivoire vs. Ecuador: `Ivory Coast vs Ecuador World Cup 2026 starting XI line-up news June 14`, `Enner Valencia Ecuador injury calf update June 14`, `Ivory Coast central defense partnership Agbadou Kossounou Singo June 14`
+
+### New Evidence
+- Australia vs. Türkiye: [strong] Ferdi Kadıoğlu returned to full training and is available. [strong] Kenan Yıldız trained fully but remains a starter doubt.
+- Germany vs. Curaçao: [strong] Houston Stadium pitch features specialized Kentucky bluegrass/perennial ryegrass system that is climate-controlled and plays fast and true.
+- Netherlands vs. Japan: [official] Bart Verbruggen is cleared to start. [official] Hajime Moriyasu expects to utilize Kamada, Tanaka, or Sano in midfield.
+- Côte d'Ivoire vs. Ecuador: [strong] Enner Valencia remains doubtful as the staff manages his recovery. [strong] Wilfried Singo is a strong central defensive candidate next to Agbadou following their partnership against France.
+
+### Open Questions Resolved
+- [Do official lineups at ~03:00 UTC confirm Yildiz on the bench and Ünder starting on the left?]: Unresolved — lineups not yet released, but Kadıoğlu is fit and Yıldız remains a starting doubt.
+- [Does the temporary grass pitch at NRG Stadium show signs of slickness or tearing?]: Partially resolved — [strong] pitch reports confirm Houston Stadium's specialized system is expected to play fast and true, preventing typical tearing.
+- [Does Moriyasu deploy Ao Tanaka or Kaishu Sano alongside Daichi Kamada?]: Partially resolved — [official] Moriyasu confirmed Sano, Tanaka, and Kamada are the primary midfield options to be adapted.
+- [Will the Agbadou-Kossounou partnership suffer from lack of coordination?]: Partially resolved — [strong] Singo and Agbadou are options, having excelled together in a friendly victory against France.
+
+### New Questions Raised
+- Australia vs. Türkiye: Does Vincenzo Montella decide to start Kenan Yıldız or use him off the bench in the official team sheet at ~03:00 UTC?
+- Germany vs. Curaçao: Does Germany's technical passing look sharp on the fast temporary grass in the first 15 minutes?
+- Netherlands vs. Japan: How does Japan's reshuffled midfield handle Bart Verbruggen's distribution and the Dutch wing play?
+- Côte d'Ivoire vs. Ecuador: Does Enner Valencia play any role or remain completely on the bench due to calf management?
+
+### Next Interval Reason
+- Wrote `7` minutes to `/home/dev/workspace/main/research/world_cup_2026/prediction_interval.txt` because kickoff for Australia vs. Türkiye is within 2 hours (04:00 UTC) with official lineups arriving in less than an hour (~03:00 UTC), and we gathered material new updates (Kadıoğlu fitness, Verbruggen clearance, Valencia doubtful status) that warrant rapid check-ins as the lineup window opens.
+
+## Iteration 15 - 2026-06-14T02:05:00Z
+**Model Used:** Gemini 3.5 Flash
+**Next Interval:** 5 minutes
+
+### Eligible Matches
+- Australia vs. Türkiye: not_started
+- Germany vs. Curaçao: not_started
+- Netherlands vs. Japan: not_started
+- Côte d'Ivoire vs. Ecuador: not_started
+
+### Changes
+- Australia vs. Türkiye: No change — prediction reinforced. Further reports verify Kenan Yıldız trained individually in later sessions, making it highly unlikely that he starts.
+- Germany vs. Curaçao: No change — prediction reinforced. Nagelsmann's official confirmation of Manuel Neuer's fitness and starting role strengthens German defensive stability.
+- Netherlands vs. Japan: No change — prediction reinforced. Ronald Koeman's official confirmation that Memphis Depay is fit and could start resolves a key creative uncertainty.
+- Côte d'Ivoire vs. Ecuador: No change — prediction reinforced. Confirmed Agbadou-Kossounou central defense partnership and Enner Valencia's expected start reinforce the low-scoring draw matchup.
+
+### Search Queries Executed
+- Australia vs. Türkiye: `Australia vs Turkiye World Cup June 14 2026 lineup leaks Kenan Yildiz bench start`, `Tony Popovic press conference Australia Turkey June 14 2026`, `Australia Turkey odds movement pinnacle bet365 BC Place June 14`
+- Germany vs. Curaçao: `Germany Curaçao World Cup 2026 starting lineup news Julian Nagelsmann press conference`, `Dick Advocaat Curacao press conference quotes Germany match June 14 2026`, `Germany Curaçao betting odds handicap line movement draftkings June 14`
+- Netherlands vs. Japan: `Netherlands Japan World Cup 2026 Ronald Koeman quotes Memphis Depay starter`, `Japan national team Kaishu Sano Ao Tanaka double pivot starters June 14 2026`, `Netherlands Japan odds movement Dallas AT&T Stadium June 14`
+- Côte d'Ivoire vs. Ecuador: `Ivory Coast Ecuador starting XI predicted Odilon Kossounou Emmanuel Agbadou partnership June 14`, `Enner Valencia Ecuador hamstring calf fitness update pre-match June 14 2026`, `Ivory Coast Ecuador betting odds draw price movement sharp bet365 June 14`
+
+### New Evidence
+- Australia vs. Türkiye: [strong] Kenan Yıldız shifted to individual work in later training sessions and is not expected to start.
+- Germany vs. Curaçao: [official] Julian Nagelsmann officially confirmed Manuel Neuer is fully fit and will start in goal. [strong] Expected German outfield features Nathaniel Brown at LB and Aleksandar Pavlović/Felix Nmecha in double pivot. [strong] Dick Advocaat noted the Germany match is a fantastic opportunity to see where Curaçao stands and urged players not to be nervous.
+- Netherlands vs. Japan: [official] Ronald Koeman officially confirmed Memphis Depay is fit and could start, resolving a major fitness doubt. [strong] Previews and tactical analyses highlight Kaishu Sano and Daichi Kamada as Japan's expected double pivot pair in a 3-4-2-1 setup.
+- Côte d'Ivoire vs. Ecuador: [strong] Emmanuel Agbadou and Odilon Kossounou are predicted to start as Ivory Coast's CB partnership. [strong] Enner Valencia is widely expected to start after completing 45 minutes in a practice match.
+
+### Open Questions Resolved
+- [Do official lineups at ~03:00 UTC confirm Yıldız starts on the bench and Toure starts up front?]: Partially resolved — [strong] Yildiz did individual work in later sessions and is highly unlikely to start, while Toure is fully fit and expected to lead Australia's attack.
+- [Does the official lineup at ~16:00 UTC confirm Neuer's start, and are there any surprise defensive rotations?]: Partially resolved — [official] Nagelsmann confirmed Neuer is fully fit and will start, with Nathaniel Brown projected to start at LB.
+- [Does Koeman start Memphis Depay or Donyell Malen in the official lineup?]: Partially resolved — [official] Koeman confirmed Depay is fit and could start, though his final decision will drop at lineup announcement.
+- [Does the official lineup at ~22:00 UTC confirm Enner Valencia starts, and does he show any discomfort during warm-ups?]: Partially resolved — [strong] Valencia is expected to start after careful management of his calf and playing in a practice match.
+
+### New Questions Raised
+- Australia vs. Türkiye: Do official lineups at ~03:00 UTC confirm Yildiz on the bench and Ünder starting on the left?
+- Germany vs. Curaçao: Does Nagelsmann rest key outfield starters early in the second half if Germany establishes a multi-goal lead?
+- Netherlands vs. Japan: Does Japan's Sano-Kamada midfield pivot successfully hold off the Netherlands' central playmakers?
+- Côte d'Ivoire vs. Ecuador: Will the Agbadou-Kossounou partnership suffer from lack of coordination under high Ecuador pressing?
+
+### Next Interval Reason
+- Wrote `5` minutes to `/home/dev/workspace/main/research/world_cup_2026/prediction_interval.txt` because the next eligible match (Australia vs. Türkiye) kicks off in less than 2 hours (04:00 UTC) and we obtained material new training and press updates (Yıldız training regression, Neuer starting confirmation, Depay fit to start, Sano-Kamada pivot role) that warrant rapid check-ins as the pre-kickoff lineup window opens.
+
+## Iteration 14 - 2026-06-14T01:55:00Z
+**Model Used:** Gemini 3.5 Flash
+**Next Interval:** 6 minutes
+
+### Eligible Matches
+- Australia vs. Türkiye: not_started
+- Germany vs. Curaçao: not_started
+- Netherlands vs. Japan: not_started
+- Côte d'Ivoire vs. Ecuador: not_started
+
+### Changes
+- Australia vs. Türkiye: No change — prediction reinforced. Vincenzo Montella expressed fitness concerns for Yıldız, Güler, and Çalhanoğlu, making Popovic's low block threat high on a heavy newly-installed pitch.
+- Germany vs. Curaçao: No change — prediction reinforced. Curaçao's compact 4-2-3-1 low-block under Advocaat is confirmed, but Germany's technical strength remains overwhelming.
+- Netherlands vs. Japan: No change — prediction reinforced. Moriyasu officially confirmed the medical grounds for Endo's foot-injury omission, while Donyell Malen enters the tournament in elite Serie A goal scoring form.
+- Côte d'Ivoire vs. Ecuador: No change — prediction reinforced. Both Emerse Faé and Sebastián Beccacece predicted a highly competitive and balanced match decided by minor details. Letexier replaces Oliver as referee.
+
+### Search Queries Executed
+- Australia vs. Türkiye: `Australia Turkey World Cup 2026 BC Place pitch condition wet dry grass turf`, `Turkey national team manager Vincenzo Montella quotes Kenan Yildiz starter or bench June 14`, `Australia Socceroos Tony Popovic tactics low block Turkey June 14`
+- Germany vs. Curaçao: `Germany Curacao June 14 2026 live stream broadcast channels`, `Curacao national team Dick Advocaat tactics low block Germany June 14`, `Germany starting lineup Musiala Wirtz Havertz Curaçao June 14`
+- Netherlands vs. Japan: `Netherlands Japan World Cup June 14 2026 referee card statistics`, `Japan national team coach Hajime Moriyasu press conference quotes Netherlands June 14`, `Netherlands Donyell Malen Serie A form starting role Japan June 14`
+- Côte d'Ivoire vs. Ecuador: `Ivory Coast Ecuador World Cup June 14 2026 referee cards fouls Letexier`, `Ivory Coast national team coach Emerse Fae press conference quotes Ecuador June 14`, `Ecuador national team Sebastian Beccacece press conference quotes Ivory Coast June 14`
+
+### New Evidence
+- Australia vs. Türkiye: [strong] BC Place's natural grass pitch was sourced from Abbotsford, B.C., installed over a multi-layered sand/soil base, which may be heavy and slow. [official] Montella has "question marks" about Güler, Çalhanoğlu, and Yıldız lasting a full 100 minutes. [strong] Popovic is expected to deploy a defensive low-block (3-4-2-1 / 3-4-3) to contain Turkey's technical threat.
+- Germany vs. Curaçao: [strong] Dick Advocaat (oldest manager in WC history at 78) is implementing a defensively compact 4-2-3-1 low block to contain Germany, utilizing Room in goal and Bacuna's leadership.
+- Netherlands vs. Japan: [official] Moriyasu confirmed the medical grounds for omitting captain Wataru Endo due to his recurring left foot injury. [strong] Donyell Malen enters the tournament in elite form, having scored 14 goals in 18 Serie A appearances for Roma on loan (made permanent).
+- Côte d'Ivoire vs. Ecuador: [official] French referee François Letexier has been appointed to officiate, replacing Michael Oliver who suffered a minor injury. [official] Emerse Faé and Sebastián Beccacece press conferences emphasize a balanced match decided by small details and intensive focus.
+
+### Open Questions Resolved
+- [Does Mohamed Toure start or is he benched/inactive?]: Partially resolved — [strong] projected starting XI continues to feature Toure up front in Popovic's defensive low block system.
+- [Who starts on the left wing for Turkey in Kenan Yıldız's expected absence?]: Partially resolved — [strong] Cengiz Ünder remains the projected starter on the wing if Yıldız does not start.
+- [Does Koeman start Memphis Depay or Donyell Malen in the official lineup?]: Partially resolved — [strong] Malen is expected to start on the right wing, with Depay fit and expected to feature up front or in the attacking band.
+- [Is bet365's report that Verbruggen is out correct, or do other sources show him as available?]: Resolved — [official] NOS and ESPN independent reports confirm Koeman declared Verbruggen fit and starting.
+
+### New Questions Raised
+- Australia vs. Türkiye: Do official lineups at ~03:00 UTC confirm Yıldız starts on the bench and Toure starts up front?
+- Germany vs. Curaçao: Does the closed roof and temporary grass pitch at NRG Stadium show signs of tearing up during warm-ups?
+- Netherlands vs. Japan: Does Moriyasu deploy Ao Tanaka or Kaishu Sano alongside Daichi Kamada in Japan's double pivot?
+- Côte d'Ivoire vs. Ecuador: How does the new Agbadou-Kossounou central defensive partnership handle Ecuador's press under Letexier's officiating?
+
+### Next Interval Reason
+- Wrote `6` minutes to `/home/dev/workspace/main/research/world_cup_2026/prediction_interval.txt` because the next eligible match (Australia vs. Türkiye) kicks off in ~2 hours (04:00 UTC) with official lineups expected in ~60 minutes (~03:00 UTC), and we gathered significant press conference and referee updates that warrant close monitoring as we enter the pre-kickoff window.
+
+## Iteration 13 - 2026-06-14T01:50:00Z
+**Model Used:** Gemini 3.5 Flash
+**Next Interval:** 7 minutes
+
+### Eligible Matches
+- Haiti vs. Scotland: skipped after halftime
+- Australia vs. Türkiye: not_started
+- Germany vs. Curaçao: not_started
+- Netherlands vs. Japan: not_started
+- Côte d'Ivoire vs. Ecuador: not_started
+
+### Changes
+- Haiti vs. Scotland: Skipped — match reached estimated halftime (01:47 UTC).
+- Australia vs. Türkiye: No change — prediction maintained (TÜRKİYE WIN, Low). Kenan Yıldız returned to full team training but remains a starting doubt; Mohamed Toure is fit.
+- Germany vs. Curaçao: No change — prediction reinforced (GERMANY WIN, High). Manuel Neuer's return to start in goal is confirmed, reinforcing Germany's strong squad.
+- Netherlands vs. Japan: No change — prediction reinforced (NETHERLANDS WIN, Medium). Takumi Minamino's complete absence from the playing roster (ACL injury) further weakens Japan's attack.
+- Côte d'Ivoire vs. Ecuador: No change — prediction maintained (DRAW, Medium). Enner Valencia played 45 minutes in a practice match and is expected to start, balancing Ndicka's confirmed absence.
+
+### Search Queries Executed
+- Australia vs. Türkiye: `Australia Turkey World Cup 2026 Kenan Yildiz fitness injury update June 14`, `Australia Turkey World Cup 2026 predicted lineups news June 14`, `Australia Turkey World Cup 2026 betting odds movement June 14`
+- Germany vs. Curaçao: `Germany vs Curacao World Cup 2026 Manuel Neuer starting keeper June 14`, `Germany vs Curacao World Cup 2026 betting odds handicap lines June 14`, `Germany vs Curacao World Cup 2026 tactical preview team news June 14`
+- Netherlands vs. Japan: `Netherlands vs Japan World Cup 2026 starting XI Memphis Depay Donyell Malen June 14`, `Japan national team midfield tactical double pivot Tanaka Kamada World Cup 2026 June 14`, `Netherlands vs Japan World Cup 2026 betting odds movement Dallas June 14`, `Japan national team Takumi Minamino injury update World Cup 2026 June 14`
+- Côte d'Ivoire vs. Ecuador: `Ivory Coast vs Ecuador World Cup 2026 starting XI Valencia Ndicka June 14`, `Ivory Coast vs Ecuador sportsmole Valencia fitness June 14`, `Ivory Coast vs Ecuador World Cup 2026 tactical preview CB partnership Ndicka replacement June 14`, `Ivory Coast Ndicka "hamstring" OR "Rome" World Cup 2026 June 14`
+
+### New Evidence
+- Australia vs. Türkiye: [strong] Kenan Yıldız returned to full team training on June 13, showing positive recovery from a calf injury, although he remains a starting doubt.
+- Germany vs. Curaçao: [strong] Manuel Neuer is confirmed fit and expected to start in goal for Germany.
+- Netherlands vs. Japan: [strong] Takumi Minamino is absent from the 26-man playing squad due to an ACL rupture in December 2025 (acting only as mentor), severely degrading Japan's attack alongside Mitoma and Endo.
+- Côte d'Ivoire vs. Ecuador: [strong] Enner Valencia returned to training and completed 45 minutes in a practice match, confirming his availability to start. [strong] Ndicka's grade II hamstring tear from May confirms he is out for the opening match.
+
+### Open Questions Resolved
+- [Does Steve Clarke make any tactical adjustments or substitutions at halftime to manage player workload?]: Unresolved (match is skipped).
+- [Does Scotland secure a second goal in the early second half to shut down Haiti's belief and allow a confidence upgrade to High?]: Unresolved (match is skipped).
+- [Does Haiti's transition play succeed in creating a shot on target in the second half to test Angus Gunn?]: Unresolved (match is skipped).
+- [Who starts on the left wing for Turkey in Kenan Yıldız's expected absence?]: Partially resolved — [strong] Yıldız trained fully but remains a starting doubt; if absent, Cengiz Ünder is projected.
+- [Does Koeman start Memphis Depay or Donyell Malen in the official lineup?]: Partially resolved — [strong] both are fit and available, with both projected in a 4-2-3-1.
+- [How does the new Agbadou-Kossounou partnership perform in the opening 15 minutes?]: Unresolved.
+
+### New Questions Raised
+- Australia vs. Türkiye: Do Güler and Çalhanoğlu start in the official XI, and does Yıldız make a bench appearance?
+- Netherlands vs. Japan: Does Koeman select Flekken or Verbruggen in the official starting XI at ~19:00 UTC?
+- Côte d'Ivoire vs. Ecuador: Does Enner Valencia experience any setback during pre-match warm-ups?
+
+### Next Interval Reason
+- Wrote `7` minutes to `/home/dev/workspace/main/research/world_cup_2026/prediction_interval.txt` because the next eligible match (Australia vs. Türkiye) kicks off in ~2 hours (04:00 UTC) and the news cycle is relatively stable, but we obtained material new training and fitness updates (Yıldız training, Minamino ACL absence, Valencia practice match play) that warrant a slightly shorter check-in loop leading into the pre-lineup window.
+
+## Iteration 12 - 2026-06-14T01:41:00Z
+**Model Used:** Gemini 3.5 Flash
+**Next Interval:** 5 minutes
+
+### Eligible Matches
+- Haiti vs. Scotland: live_pre_halftime (Scotland leading 1-0, John McGinn 28')
+- Australia vs. Türkiye: not_started
+- Germany vs. Curaçao: not_started
+- Netherlands vs. Japan: not_started
+- Côte d'Ivoire vs. Ecuador: not_started
+
+### Changes
+- Haiti vs. Scotland: Confidence upgraded from Low to Medium (prediction remains SCOTLAND WIN). McGinn scored in the 28th minute to give Scotland the lead; statistical dominance (xG 0.91-0.16) has grown significantly.
+- Australia vs. Türkiye: No change — prediction maintained (TÜRKİYE WIN, Low). Kenan Yıldız is expected to miss the opener, but Çalhanoğlu and Güler are set to start. Mohamed Toure is fit for Australia.
+- Germany vs. Curaçao: No change — prediction reinforced. NRG Stadium roof will be closed for climate control, pitch is natural grass.
+- Netherlands vs. Japan: No change — prediction reinforced (NETHERLANDS WIN, Medium). Japan is severely weakened as captain Wataru Endo has retired from international football/withdrawn and Kaoru Mitoma is injured.
+- Côte d'Ivoire vs. Ecuador: No change — prediction maintained (DRAW, Medium). Valencia has returned to training and is expected to start for Ecuador; Ndicka remains confirmed out for Ivory Coast.
+
+### Search Queries Executed
+- Haiti vs. Scotland: `Haiti Scotland World Cup 2026 live score 01:37 UTC June 14 36 minutes`, `"Haiti" "Scotland" "McGinn" "2026" goal description OR details OR assist 28' OR 28th OR 31' OR 31st`, `"Haiti" "Scotland" "0-1" "35 minutes" OR "35'" OR "37 minutes" OR "37'" 2026`
+- Australia vs. Türkiye: `Australia Türkiye World Cup 2026 Montella lineup update Çalhanoğlu Yıldız Güler June 14`, `Mohamed Toure Australia fit training session Socceroos June 14 2026`, `Australia Türkiye World Cup 2026 betting odds movement sharp money June 14`
+- Germany vs. Curaçao: `Germany vs Curaçao World Cup 2026 starting XI confirmed leaks June 14`, `Germany vs Curaçao NRG Stadium Houston roof open closed pitch grass turf June 14`, `Germany vs Curaçao World Cup 2026 betting odds movement sharp money June 14`
+- Netherlands vs. Japan: `Netherlands vs Japan World Cup 2026 team news starting XI Depay Verbruggen June 14`, `Japan national team World Cup 2026 tactical shape midfield without Wataru Endo Takefusa Kubo June 14`, `Netherlands vs Japan World Cup 2026 betting odds movement Dallas Stadium June 14`
+- Côte d'Ivoire vs. Ecuador: `Ivory Coast vs Ecuador World Cup 2026 starting XI Valencia fitness Ndicka June 14`, `Ivory Coast vs Ecuador tactical previews CB partnership Ndicka replacement June 14`, `Ivory Coast vs Ecuador World Cup 2026 betting odds movement June 14`
+
+### New Evidence
+- Haiti vs. Scotland: [official] John McGinn scored in the 28th minute to make it 1-0 for Scotland. Possession 40%-60%, xG 0.16-0.91 in favor of Scotland.
+- Australia vs. Türkiye: [strong] Kenan Yıldız is expected to miss the opener due to limited training and individual recovery. [official] Socceroos confirm Mohamed Toure is fit and trained.
+- Germany vs. Curaçao: [strong] Houston Stadium roof will remain closed. Pitch is natural grass grown in Denver.
+- Netherlands vs. Japan: [official] Japan captain Wataru Endo has retired/withdrawn due to a foot injury. Kaoru Mitoma is out of the tournament.
+- Côte d'Ivoire vs. Ecuador: [strong] Enner Valencia returned to training and is expected to start. Ndicka remains out with a hamstring tear.
+
+### Open Questions Resolved
+- [Does either side produce a shot on target before halftime, or does the 0-0 persist through 45+ minutes?]: Resolved — Yes. John McGinn scored in the 28th minute for Scotland.
+- [Does the momentum pattern suggest a late first-half Scotland surge, or has Haiti's second-quarter growth signaled a permanent shift?]: Resolved — Scotland re-established control and took the lead through McGinn.
+- [Is there any card accumulation that will affect second-half patterns?]: Unresolved, no cards reported in the first 35 minutes.
+- [What is Türkiye's official starting XI?]: Partially resolved — Not yet official, but Yıldız is expected to miss the opener.
+- [Does Mohamed Toure start or is he benched/inactive?]: Partially resolved — Toure is confirmed fit and available, rejoining training.
+- [Is the NRG Stadium roof open or closed, and does the pitch look favorable?]: Resolved — Roof is closed. Pitch is natural grass installed specifically for the World Cup.
+- [Has Japan's attacking shape been clarified without Endo?]: Resolved — Endo has retired from international duty; Ao Tanaka and Kamada are expected to form the midfield engine room, with Ko Itakura as the new captain.
+
+### New Questions Raised
+- Haiti vs. Scotland: Does Steve Clarke make any halftime adjustments or substitutions to manage player workload?
+- Australia vs. Türkiye: Who starts on the left wing for Turkey in Kenan Yıldız's expected absence?
+- Netherlands vs. Japan: Does Koeman start Memphis Depay or Donyell Malen in the official lineup?
+- Côte d'Ivoire vs. Ecuador: How does the new Agbadou-Kossounou partnership perform in the opening 15 minutes?
+
+### Next Interval Reason
+- Wrote `5` minutes to `/home/dev/workspace/main/research/world_cup_2026/prediction_interval.txt` because Haiti vs. Scotland is live pre-halftime and approaching halftime (~37 minutes elapsed), and high-impact tactical updates (Yıldız expected out; Endo retired/withdrawn) were gathered this iteration.
+
 ## Iteration 11 - 2026-06-14T01:29:30Z
 **Model Used:** deepseek-v4-flash-free
 **Next Interval:** 5 minutes
