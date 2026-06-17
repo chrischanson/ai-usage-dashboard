@@ -19,12 +19,26 @@ The competition is open to Wisconsin high school students (grades 9–12) who un
 ---
 
 ## 🎼 Repertoire & Soloists
-The program featured the four young soloists performing single movements from major concertos:
+The program featured the four young soloists performing single movements/selections from major concertos:
 
-*   **Lorenz Fradkin-Annen** (Violin): Performed a movement from a major violin concerto.
-*   **Cordelia Momo Fredrickson** (Violin): Performed a movement from a major violin concerto.
-*   **Zachary Lemke** (Marimba): Performed a movement from a major percussion/marimba concerto.
-*   **André Peck** (Piano): Performed a movement from a major piano concerto.
+*   **Lorenz Fradkin-Annen** (Violin - Oregon High School): Performed the Cadenza and 4th movement of Dmitry Shostakovich’s *Violin Concerto No. 1 in A minor, Op. 77*.
+*   **Cordelia Momo Fredrickson** (Violin - Wisconsin Virtual Academy): Performed the 1st movement of Serge Prokofiev’s *Violin Concerto No. 1 in D Major, Op. 19*.
+*   **Zachary Lemke** (Marimba - Oregon High School): Performed Keiko Abe’s *Prism Rhapsody* for Marimba and Orchestra.
+*   **André Peck** (Piano - Logan High School): Performed the 1st movement of Serge Prokofiev’s *Piano Concerto No. 1 in D-flat major, Op. 10* — **First Place Winner (Marian Bolz Prize)**.
+
+---
+
+## 🏆 Competition Results & Awards
+
+Following the performances, the judges awarded the prizes for the 2026 Bolz Young Artist Competition:
+
+*   **First Place (Marian Bolz Prize for Distinguished Musical Achievement):** **André Peck** (Piano, Logan High School) — received a $2,000 scholarship and performed as a featured soloist the following day at the MSO's Spring Young People's Concert.
+*   **Finalists:** The other three finalists performed exceptionally and received either the **Steenbock Youth Music Award** ($2,000 scholarship) or **Honorable Mentions** ($1,000 scholarship):
+    *   **Lorenz Fradkin-Annen** (Violin, Oregon High School)
+    *   **Cordelia Momo Fredrickson** (Violin, Wisconsin Virtual Academy)
+    *   **Zachary Lemke** (Marimba, Oregon High School)
+
+*(Note: While André Peck's first-place win is recorded, the specific individual placement for the second-place Steenbock Youth Music Award vs. the Honorable Mentions among the other three finalists is not distinguished in available public records. All three runner-up finalists are recognized for their outstanding performances.)*
 
 ---
 
