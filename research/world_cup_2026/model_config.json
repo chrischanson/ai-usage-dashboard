@@ -1,14 +1,14 @@
 {
-  "min_interval_minutes": 15,
-  "max_interval_minutes": 45,
-  "default_interval_minutes": 15,
+  "min_interval_minutes": 60,
+  "max_interval_minutes": 180,
+  "default_interval_minutes": 60,
   "high": {
-    "agent": "agy",
-    "model": "Gemini 3.5 Flash (High)"
+    "agent": "opencode",
+    "model": ""
   },
   "medium": {
-    "agent": "agy",
-    "model": "Gemini 3.5 Flash (Medium)"
+    "agent": "opencode",
+    "model": ""
   },
   "low": {
     "agent": "opencode",

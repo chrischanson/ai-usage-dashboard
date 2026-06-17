@@ -19,9 +19,9 @@ WORKSPACE_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 SKILLS_RUNNER="${WORKSPACE_DIR}/skills/run_skill.py"
 TRACKER_PATH="${SCRIPT_DIR}/prediction_tracker.md"
 INTERVAL_PATH="${SCRIPT_DIR}/prediction_interval.txt"
-DEFAULT_INTERVAL_MINS=15
-MIN_INTERVAL_MINS=15
-MAX_INTERVAL_MINS=45
+DEFAULT_INTERVAL_MINS=60
+MIN_INTERVAL_MINS=60
+MAX_INTERVAL_MINS=180
 POSTMORTEM_DELAY_SECONDS=$((2 * 60 * 60))
 CLEANUP_LINKS=()
 POSTMORTEM_EPOCH=0
@@ -316,11 +316,25 @@ PREDICT_VARS_BASE="${PREDICT_VARS_BASE},INTERVAL_PATH=${INTERVAL_PATH}"
 PREDICT_VARS_BASE="${PREDICT_VARS_BASE},OUTPUT_DIR=${DAY_DIR}"
 
 ITERATION=0
+STALENESS_COUNT=0
+PREV_PREDICTIONS_HASH=""
+
+# Compute md5 hash of predictions file for change detection
+predictions_hash() {
+    if [ -f "${PREDICTIONS_PATH}" ]; then
+        md5sum "${PREDICTIONS_PATH}" | cut -d' ' -f1
+    else
+        echo "empty"
+    fi
+}
 
 while [ "$(date -u +%s)" -lt "${LAST_END_EPOCH}" ]; do
     ITERATION=$((ITERATION + 1))
     echo ""
-    echo "=== Prediction Iteration ${ITERATION} — $(date -u +%H:%M:%S) UTC ==="
+    echo "=== Prediction Iteration ${ITERATION} — $(date -u +%H:%M:%S) UTC (staleness: ${STALENESS_COUNT}) ==="
+
+    # Snapshot the predictions hash before this iteration
+    PREV_PREDICTIONS_HASH=$(predictions_hash)
 
     ensure_skill_link "wc_predict" "${SCRIPT_DIR}/predict"
 
@@ -333,6 +347,12 @@ while [ "$(date -u +%s)" -lt "${LAST_END_EPOCH}" ]; do
         fi
     fi
 
+    # Staleness override: if 3+ consecutive iterations had no changes, force low difficulty
+    if [ "${STALENESS_COUNT}" -ge 3 ]; then
+        log "Staleness override: ${STALENESS_COUNT} consecutive unchanged iterations. Forcing difficulty=low."
+        DIFFICULTY="low"
+    fi
+
     # Read agent and model from model_config.json
     CONFIG_PATH="${SCRIPT_DIR}/model_config.json"
     if [ -f "${CONFIG_PATH}" ]; then
@@ -342,16 +362,16 @@ while [ "$(date -u +%s)" -lt "${LAST_END_EPOCH}" ]; do
         # Fallback if config is missing
         EXEC_AGENT="agy"
         if [ "${DIFFICULTY}" = "high" ]; then
-            EXEC_MODEL="Gemini 3.5 Flash (High)"
-        else
             EXEC_MODEL="Gemini 3.5 Flash (Medium)"
+        else
+            EXEC_MODEL="Gemini 3.5 Flash (Low)"
         fi
     fi
 
     # Determine fallback agent and model
     if [ "${EXEC_AGENT}" = "opencode" ]; then
         FALLBACK_EXEC_AGENT="agy"
-        FALLBACK_EXEC_MODEL="Gemini 3.5 Flash (Medium)"
+        FALLBACK_EXEC_MODEL="Gemini 3.5 Flash (Low)"
     else
         FALLBACK_EXEC_AGENT="opencode"
         FALLBACK_EXEC_MODEL="google/gemini-3.5-flash"
@@ -419,7 +439,29 @@ while [ "$(date -u +%s)" -lt "${LAST_END_EPOCH}" ]; do
         fi
     fi
 
+    # Detect whether predictions actually changed this iteration
+    CURRENT_HASH=$(predictions_hash)
+    if [ "${CURRENT_HASH}" = "${PREV_PREDICTIONS_HASH}" ]; then
+        STALENESS_COUNT=$((STALENESS_COUNT + 1))
+        log "Predictions unchanged (staleness: ${STALENESS_COUNT})."
+    else
+        if [ "${STALENESS_COUNT}" -gt 0 ]; then
+            log "Predictions changed — resetting staleness counter (was ${STALENESS_COUNT})."
+        fi
+        STALENESS_COUNT=0
+    fi
+
     INTERVAL_MINS=$(read_interval_mins)
+
+    # Staleness override: if 3+ consecutive unchanged, force max interval
+    if [ "${STALENESS_COUNT}" -ge 3 ]; then
+        MAX_INT=$(python3 -c "import json; c=json.load(open('${SCRIPT_DIR}/model_config.json')); print(c.get('max_interval_minutes', 45))" 2>/dev/null || echo "${MAX_INTERVAL_MINS}")
+        if [ "${INTERVAL_MINS}" -lt "${MAX_INT}" ]; then
+            log "Staleness override: forcing interval from ${INTERVAL_MINS} to ${MAX_INT} minutes."
+            INTERVAL_MINS="${MAX_INT}"
+        fi
+    fi
+
     log "Iteration ${ITERATION} complete. Next run in ${INTERVAL_MINS} minutes, unless all games end first."
     sleep_until_or_interval_change "${LAST_END_EPOCH}" "${INTERVAL_MINS}"
 done

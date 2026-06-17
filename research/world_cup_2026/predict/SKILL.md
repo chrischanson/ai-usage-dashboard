@@ -26,7 +26,7 @@ Today for this run: `{DATE}`.
 4. Research current evidence, prioritizing official and recent sources.
 5. Update `{PREDICTIONS_PATH}` as the full current working prediction file.
 6. Append a concise, auditable entry to `{CHANGELOG_PATH}`.
-7. Write the next polling interval, as a single integer from 15 to 45, to `{INTERVAL_PATH}`.
+7. Write the next polling interval, as a single integer from 60 to 180, to `{INTERVAL_PATH}`.
 
 ## Step 1: Load And Triage
 
@@ -37,7 +37,7 @@ Read `{SCHEDULE_PATH}` first. Use the current UTC time and the schedule's kickof
 - `live_post_halftime`: estimated halftime has arrived but estimated full time has not.
 - `complete`: estimated full time has arrived.
 
-Only create or update predictions for `not_started` and `live_pre_halftime` matches. For `live_post_halftime`, keep the last prediction/confidence unchanged and record live evidence that will matter for the postmortem. For `complete`, state that the match is complete only if it was previously tracked today.
+Only create or update predictions for `not_started` and `live_pre_halftime` matches. For `live_post_halftime`, apply the Weighted Halftime Rule (see Important Rules #7). For `complete`, state that the match is complete only if it was previously tracked today.
 
 Then read `{TRACKER_PATH}`. Treat these as long-term memory:
 
@@ -84,6 +84,25 @@ For each eligible match, choose targeted searches in this order:
 
 Run at least 3 distinct searches per eligible match unless official lineups and all high-impact uncertainties are already resolved. Never reuse an exact query from prior search history. Prefer refined queries that add a player, source type, timestamp, language, venue, or tactical uncertainty.
 
+### Pre-Match Window Gating
+
+Do NOT search for "starting lineup", "starting XI", "confirmed lineup", or "official team sheet" for a match whose kickoff is more than 75 minutes away. Before that window, limit searches to:
+- Injury and fitness updates
+- Betting odds movements
+- Tactical previews and press conference quotes
+- Weather and pitch condition reports
+
+This prevents wasting tokens on lineup queries that will return stale projections. Official lineups are typically released 60 minutes before kickoff.
+
+### Evidence Staleness Detection
+
+Before running full research for a match, check if the previous iteration's "Questions for Next Iteration" can actually be answered with new information (e.g., a lineup release window has opened, a match has kicked off, or a press conference has occurred). If ALL of the following are true:
+- The match status has not changed since the last iteration.
+- No new articles or data sources published since the last iteration's timestamp are found in the first 2 search queries.
+- No match is within 75 minutes of kickoff or currently live.
+
+Then output a minimal changelog entry: `No new evidence available — skipping full analysis. Prediction unchanged.` and set the interval to the maximum. This avoids burning tokens to rediscover the same stale information.
+
 ## Step 3: Evidence Discipline
 
 Every material claim must be traceable to a source or search result. Record enough detail that a future postmortem can audit the reasoning.
@@ -125,6 +144,8 @@ Apply validated heuristic adjustments to confidence:
 - If the match is on a temporary grass pitch, a high-possession technical team should rarely receive `High` confidence unless their opponent is significantly weaker.
 - If the favored team's playmaking core is on restricted workloads, downgrade confidence by one level to account for late-game vulnerability.
 - When a defensive-block team has strong xG efficiency despite low possession in recent matches, treat them as a genuine upset threat—do not dismiss them based on possession stats alone.
+- **Live-Monitoring Overreaction Rule**: For heavy favorites (e.g., moneyline < 1.15), do not adjust predictions/confidence during the first half (live_pre_halftime) based on scoreline fluctuations alone. Live adjustments must wait until halftime or require major structural changes (such as red cards or key injuries).
+- **Draw Prediction Volatility Rule**: Draw predictions are highly volatile and subject to stoppage-time goals. Always restrict Draw predictions to Low confidence unless there are clear mutual advancement table incentives.
 
 Move confidence by at most one level per iteration unless official or live evidence decisively changes the match.
 
@@ -243,22 +264,23 @@ Never add a same-day pre-match observation to "Active Heuristics" as if it were 
 
 ## Step 7: Dynamic Interval and Model Selection
 
-1. Choose the next interval from 15 to 45 minutes based on the nearest eligible match or live match and the information rate, prioritizing token efficiency and avoiding unnecessary calls:
+1. Choose the next interval from 60 to 180 minutes based on the nearest eligible match or live match and the information rate, prioritizing token efficiency and avoiding unnecessary calls:
    - Write only the determined integer to `{INTERVAL_PATH}` (the file must contain exactly one integer with no other text).
    - Set the `next_interval_minutes` key in the `{PREDICTIONS_PATH}` frontmatter to this integer.
    - Record `**Next Interval:** <minutes> minutes` in the `{CHANGELOG_PATH}` entry header.
 
 Default interval guide (optimized for token efficiency):
-- `15-20`: ONLY when a match is live and fast-changing with high-impact events (e.g., a red card, multiple goals, or major injury in the first half) that immediately alter the postmortem evidence trail, OR during the lineup and warm-up window (kickoff is within 60 minutes) when official lineups or late fitness tests are actively arriving.
-- `21-30`: Kickoff is within 2 hours, or a live match is in progress but stable with no major events (avoid rapid checks during quiet live play).
-- `31-45`: Kickoff is more than 2 hours away, the news cycle is quiet, or two consecutive runs yielded no new material evidence.
+- `60-80`: ONLY when a match is live and fast-changing with high-impact events (e.g., a red card or major injury in the first half) that immediately alter the prediction state, OR during the lineup and warm-up window (kickoff is within 60 minutes) when official lineups are actively arriving.
+- `84-120`: Kickoff is within 2 hours.
+- `124-180`: Kickoff is more than 2 hours away, the news cycle is quiet, a live match is in progress but stable with no major events, or the live match prediction has been frozen under the Weighted Halftime Rule, or two consecutive runs yielded no new material evidence.
 
 Adjust for information rate and token efficiency:
-- Shorten by 2-5 minutes if this iteration found material new evidence (e.g., official lineup sheet published), but never go below 15 minutes.
-- Lengthen by 5-10 minutes if two consecutive iterations found no material new evidence, pushing quickly to 45 minutes to conserve tokens.
-- Use `45` if there are no eligible or live matches left before estimated full time, and state this in the changelog.
+- Shorten by 8-20 minutes if this iteration found material new evidence (e.g., official lineup sheet published), but never go below 60 minutes.
+- Lengthen by 20-40 minutes if two consecutive iterations found no material new evidence, pushing quickly to 180 minutes to conserve tokens.
+- If the orchestrator indicates this is a staleness-override iteration (staleness ≥ 3), default to 180 minutes unless a match is live or about to kick off within 60 minutes.
+- Use `180` if there are no eligible or live matches left before estimated full time, and state this in the changelog.
 
-The file content of `{INTERVAL_PATH}` must be exactly one integer between 15 and 45.
+The file content of `{INTERVAL_PATH}` must be exactly one integer between 60 and 180.
 
 2. Predict the complexity/difficulty of the questions for the next iteration:
    - If the next questions are predicted to be hard (e.g., they require deep tactical interpretation, complex analysis of conflicting reports, or resolving late lineup updates close to kickoff), set the `next_difficulty` key in the `{PREDICTIONS_PATH}` frontmatter to `high`.
@@ -273,8 +295,13 @@ The file content of `{INTERVAL_PATH}` must be exactly one integer between 15 and
 4. **Treat draws as normal group-stage outcomes.** Actively evaluate whether tactical conservatism, table incentives, or lineup weakness make a draw the best prediction.
 5. **Keep questions actionable and causal.** Every question must explain how its answer could change the winner or confidence.
 6. **Keep source provenance visible.** A future postmortem should be able to tell which claims came from official facts, strong reporting, market movement, or analysis.
-7. **Stop changing a match prediction at halftime.** From halftime until estimated full time, keep gathering concise live evidence for audit and postmortem context.
+7. **Weighted Halftime Rule.** At halftime, evaluate whether the live score is consistent with the pre-halftime analytical prediction:
+   - **If live score CONFIRMS the prediction** (e.g., predicted TEAM A WIN and Team A is leading): Freeze the prediction — keep gathering live evidence for audit but do not change the outcome or confidence.
+   - **If live score CONTRADICTS the prediction** (e.g., predicted TEAM A WIN but Team A is trailing or drawing against a much weaker opponent): Do NOT automatically flip the prediction. Instead, weigh the live score against the pre-match analytical foundation. Only change the prediction if the live evidence reveals a *structural* reason the pre-match analysis was wrong (e.g., a red card, a key injury, or a fundamental tactical mismatch not anticipated). A temporary scoreline alone — especially in the first half against a weaker team — is insufficient to override a well-founded analytical prediction.
+   - From halftime until estimated full time, keep gathering concise live evidence for audit and postmortem context.
 8. **Use the dynamic interval every run.** The loop frequency is part of the prediction system, not an afterthought.
-9. **Prevent live-monitoring churn.** During live-match tracking, do not fluctuate confidence levels or predictions based on temporary in-game momentum shifts (e.g., possession dominance or standard corner kicks). Only adjust predictions or confidence if a high-impact event (such as a red card, injury to a key playmaker, or a goal) occurs.
-10. **Token efficiency discipline.** Do not run intervals below 30 minutes if the nearest kickoff is more than 2 hours away. If there are no active lineup releases or live matches, the interval must remain at 45 minutes to prevent wasting resources on a static news cycle.
+9. **Prevent live-monitoring churn and panic.** During live-match tracking, do not fluctuate confidence levels or predictions based on temporary in-game momentum shifts. For heavy favorites (e.g., moneyline < 1.15 or handicap > 2.5 goals), ignore temporary first-half equalizers or slow starts. Do not adjust predictions or confidence during the first half (live_pre_halftime) based on scoreline fluctuations alone. Live adjustments must wait until halftime or require major structural changes (such as red cards or key player injuries).
+10. **Token efficiency discipline.** Do not run intervals below 120 minutes if the nearest kickoff is more than 2 hours away. If there are no active lineup releases or live matches, or if live matches are stable or frozen under the Weighted Halftime Rule, the interval should default to 180 minutes to prevent wasting resources on a static news cycle.
+11. **Rigorous result verification.** At the end of the matchday (or once a match is complete), you must verify the final score, goalscorers, and key match events using at least two independent official or strong sources (e.g., FIFA.com, ESPN, BBC) rather than relying on live updates or partial blogs, to prevent miscoding late/stoppage-time goals.
+12. **Live-play scoreline verification.** During live-match monitoring, never rely on a single source or live blog for the current score or match events. Verify the score, cards, and goals across at least two independent sports databases (e.g., FotMob, Sofascore, ESPN Match Center) before making decisions under the Weighted Halftime Rule. If sources conflict or seem outdated, run a targeted search for the latest minute of the match to resolve the discrepancy.
 
