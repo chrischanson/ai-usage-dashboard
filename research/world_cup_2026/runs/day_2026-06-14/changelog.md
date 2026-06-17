@@ -1,5 +1,495 @@
 # 📝 World Cup 2026 Prediction Changelog — 2026-06-14
 
+## Iteration 53 - 2026-06-15T03:49:04Z
+**Model Used:** opencode: DeepSeek V4 Flash Free
+**Next Interval:** 45 minutes
+
+### Eligible Matches
+- Sweden vs. Tunisia: complete (full time reached — Sweden won 4-1)
+
+### Changes
+- Sweden vs. Tunisia: Moved to complete. SWEDEN WIN (Medium) was correct — confirmed by final 4-1 scoreline. Sweden dominated with 4 goals (Ayari 6', Isak 29', Gyökeres 58', Svanberg 86') to Tunisia's 1 (Rekik 42'). Weighted Halftime Rule correctly applied; prediction frozen at 2-1 halftime lead and Sweden extended in the second half.
+
+### Search Queries Executed
+- Sweden vs. Tunisia: `Sweden vs Tunisia World Cup 2026 final score result June 15 2026`, `"Sweden" "Tunisia" "World Cup 2026" "full time" score`, `Sweden Tunisia 3-1 full time result World Cup 2026 June 15`, `Marca Sweden Tunisia live blog`
+
+### New Evidence
+- Sweden vs. Tunisia: [official] MARCA live blog confirms final score 4-1 Sweden, with full timeline: Gyökeres (58') and Svanberg (86') added to Ayari (6') and Isak (29'). Tunisia's lone goal: Rekik header (42').
+- Sweden vs. Tunisia: [official] No red cards. Only yellow card: Khedira (TUN, 53').
+- Sweden vs. Tunisia: [official] Gudmundsson subbed off with injury (64'), replaced by Stroud. Bergvall replaced Nygren (64'). Svanberg replaced Karlström (83').
+- Sweden vs. Tunisia: [official] Tunisia made 5 substitutions (Mahmoud, Tounekti, Achouri, Chaouat, Gharbi).
+
+### Open Questions Resolved
+- [What is the final score — did Sweden hold onto their 2-1 lead or did Tunisia equalize in the final 30 minutes?]: Resolved — [official] Sweden won 4-1. Sweden extended to 3-1 (Gyökeres 58') and 4-1 (Svanberg 86'). Tunisia did not equalize.
+- [Were there any late substitutions, red cards, or injuries in the final phase of the match?]: Resolved — [official] Gudmundsson subbed off with a 64th-minute injury. No red cards. Multiple late substitutions for both sides.
+- [Did Tunisia generate any clear second-half chances despite the xG gap, and how did Sweden manage the game's final stages?]: Resolved — [official] Tunisia had a corner and free kick chance (Mejbri shot over bar, 51') in the early second half but created little after Gyökeres made it 3-1. Sweden controlled the final stages.
+
+### New Questions Raised
+- Postmortem: How should the NED-JPN 2-2 draw error (predicted NED Win) be weighted against pre-match Temporary Grass Pitch heuristic? Netherlands dominated 70% possession but conceded an 89th-minute equalizer.
+- Postmortem: Was the Workload Management heuristic a factor? No key workload-restricted players in the SWE-TUN match; Isak and Gyökeres both played past 83 minutes.
+
+### Next Interval Reason
+- Wrote `45` minutes to `/home/dev/workspace/main/research/world_cup_2026/prediction_interval.txt` because all 4 matches for the day are complete. No eligible or live matches remain before estimated full time. Maximum interval set for token efficiency.
+
+## Iteration 52 - 2026-06-15T03:17:17Z
+**Model Used:** opencode: DeepSeek V4 Flash Free
+**Next Interval:** 30 minutes
+
+### Eligible Matches
+- Sweden vs. Tunisia: live_post_halftime (Sweden leads 2-1, 58th minute)
+
+### Changes
+- Sweden vs. Tunisia: No change — SWEDEN WIN (Medium) maintained and frozen under the Weighted Halftime Rule. Halftime score (2-1) confirms pre-match prediction. Second half stable with no structural events.
+
+### Search Queries Executed
+- Sweden vs. Tunisia: `Sweden vs Tunisia World Cup 2026 live score June 15 2026 second half`, `Sweden Tunisia World Cup 2026 goal red card injury second half June 15`, `Sweden vs Tunisia live score second half 60th minute June 15 2026`, `BBC sport Sweden Tunisia live`, `FotMob Sweden Tunisia match centre`
+
+### New Evidence
+- Sweden vs. Tunisia: [official] BBC Sport confirms score still 2-1 at 58th minute, no second-half goals, no substitutions.
+- Sweden vs. Tunisia: [official] Only yellow card: Rani Khedira (54').
+- Sweden vs. Tunisia: [strong] xG 0.40-0.19 (FotMob/ESPN), possession 50-50, shots 6-5, shots on target 3-1 — Sweden's analytical edge intact.
+- Sweden vs. Tunisia: [strong] All starting XI players still on the pitch — no workload management substitutions yet.
+
+### Open Questions Resolved
+- [What is the score around the 70th-75th minute, and has Sweden maintained their lead or has Tunisia mounted a comeback in the second half?]: Partially resolved — [official] Score remains 2-1 Sweden at 58th minute; match is approaching the 70th minute window with Sweden still leading.
+- [Have there been any high-impact events like red cards, key player injuries, or tactical shifts in the second half?]: Resolved — [official] No red cards, no injuries, no second-half goals. Only a Khedira yellow card.
+- [What is the status of workload management for Sweden's key players — have players like Gyökeres or Isak been substituted to rest them?]: Resolved — [official] No substitutions have been made by either side through 58 minutes. Gyökeres and Isak remain on the pitch.
+
+### New Questions Raised
+- Sweden vs. Tunisia: What is the final score — did Sweden hold onto their 2-1 lead or did Tunisia equalize in the final 30 minutes? [Causal: Determines whether the frozen SWEDEN WIN prediction was correct at full time.]
+
+### Next Interval Reason
+- Wrote `30` minutes to `/home/dev/workspace/main/research/world_cup_2026/prediction_interval.txt` because Sweden vs. Tunisia is live but stable at 2-1 with no major events. A 30-minute interval (~03:47 UTC) aligns the next run with the estimated full time (03:50 UTC), capturing the final result.
+
+## Iteration 51 - 2026-06-15T02:46:30Z
+**Model Used:** Gemini 3.5 Flash
+**Next Interval:** 30 minutes
+
+### Eligible Matches
+- Sweden vs. Tunisia: live_post_halftime (Sweden leads 2-0 at halftime)
+
+### Changes
+- Sweden vs. Tunisia: No change — SWEDEN WIN (Medium) maintained and frozen under the Weighted Halftime Rule. Sweden's 2-0 halftime lead confirms the pre-match prediction.
+
+### Search Queries Executed
+- Sweden vs. Tunisia: `Sweden vs Tunisia live score halftime commentary June 15 2026`, `Sweden vs Tunisia card injury substitution halftime June 15 2026`, `Sweden vs Tunisia 2-0 halftime details card injury June 15 2026`
+
+### New Evidence
+- Sweden vs. Tunisia: [official] Sweden led Tunisia 2-0 at halftime with goals from Yasin Ayari (7') and Alexander Isak (30').
+- Sweden vs. Tunisia: [strong] First half concluded with no red cards or notable injuries reported.
+
+### Open Questions Resolved
+- [What is the halftime score, and does the game state continue to favor Sweden or has Tunisia adjusted tactically to create counter-attacking threats?]: Resolved — [official] Sweden leads 2-0 at halftime through Yasin Ayari and Alexander Isak, continuing to dominate.
+- [Have any player substitutions, tactical shifts, or disciplinary cards (e.g. red cards) occurred by halftime?]: Resolved — [strong] No cards, major tactical shifts, or substitutions reported.
+- [Are there any physical issues or injury concerns reported for key players like Gyökeres, Isak, or Skhiri at the break?]: Resolved — [strong] No injuries reported; Isak and Gyökeres are active and collaborated on the second goal.
+
+### New Questions Raised
+- Sweden vs. Tunisia: What is the score around the 70th-75th minute, and has Sweden maintained their lead or has Tunisia mounted a comeback in the second half? [Causal: A stable Swedish lead would lock in the final prediction; any Tunisian goals would increase late-match draw/upset risk and lower confidence.]
+- Sweden vs. Tunisia: Have there been any high-impact events like red cards, key player injuries, or tactical shifts in the second half? [Causal: A red card or injury to a key defender would weaken Sweden's late-game stability, potentially shifting confidence.]
+- Sweden vs. Tunisia: What is the status of workload management for Sweden's key players — have players like Gyökeres or Isak been substituted to rest them? [Causal: Rest substitutions would reduce Sweden's offensive threat but might consolidate their defensive block, affecting late-game dynamics.]
+
+### Next Interval Reason
+- Wrote `30` minutes to `/home/dev/workspace/main/research/world_cup_2026/prediction_interval.txt` because the match is live and stable. A 30-minute interval aligns the next run with the 75th-80th minute of the match to verify game state progression.
+
+## Iteration 50 - 2026-06-15T02:18:00Z
+**Model Used:** Gemini 3.5 Flash
+**Next Interval:** 30 minutes
+
+### Eligible Matches
+- Sweden vs. Tunisia: live_pre_halftime (Sweden leads 1-0, approx. 15th minute)
+
+### Changes
+- Sweden vs. Tunisia: No change — SWEDEN WIN (Medium) maintained. Sweden took an early lead in the 7th minute via Yasin Ayari's long-range strike. Confidence is kept at Medium because the game is in its early stages.
+
+### Search Queries Executed
+- Sweden vs. Tunisia: `Sweden vs Tunisia live score World Cup June 15 2026`, `Sweden vs Tunisia Yasin Ayari goal minute live update World Cup June 15 2026`, `Sweden vs Tunisia Estadio BBVA rain pitch condition match updates June 15 2026`, `Sweden vs Tunisia red card yellow card injury June 15 2026`, `Sweden vs Tunisia World Cup 2026 halftime score update`
+
+### New Evidence
+- Sweden vs. Tunisia: [official] Live match sources confirm Yasin Ayari scored a long-range strike in the 7th minute to put Sweden up 1-0.
+- Sweden vs. Tunisia: [official] Sweden started aggressively with Gyökeres missing an early shot in the 5th minute.
+- Sweden vs. Tunisia: [strong] Weather is dry and Estadio BBVA permanent hybrid grass is playing fine after a brief 5-minute kickoff delay.
+- Sweden vs. Tunisia: [strong] No cards or injuries reported in the first 15 minutes of play.
+
+### Open Questions Resolved
+- [What is the early tactical shape in the first 15 minutes — is Sweden dominating possession and creating chances, or is Tunisia's block holding firm?]: Resolved — [official/strong] Sweden started aggressively, creating a chance in the 5th minute and scoring in the 7th minute.
+- [Are there any goals, red cards, or injuries to key playmakers in the first half?]: Partially resolved — [official] Yasin Ayari scored a goal in the 7th minute. No red cards or injuries reported yet.
+- [Has any rain developed at Estadio BBVA, and is the pitch surface affecting play?]: Resolved — [strong] No rain has developed; the pitch is dry and playing well.
+
+### New Questions Raised
+- Sweden vs. Tunisia: What is the halftime score, and does the game state continue to favor Sweden or has Tunisia adjusted tactically to create counter-attacking threats? [Causal: A 1-0 or higher Swedish lead at halftime would freeze the prediction under the Weighted Halftime Rule; a Tunisia equalizer would require evaluating structural factors to see if Sweden Win remains viable.]
+- Sweden vs. Tunisia: Have any player substitutions, tactical shifts, or disciplinary cards (e.g. red cards) occurred by halftime? [Causal: A red card for either side would structurally alter the match's probability profile.]
+- Sweden vs. Tunisia: Are there any physical issues or injury concerns reported for key players like Gyökeres, Isak, or Skhiri at the break? [Causal: Injuries to Sweden's top strikers would severely impact their second-half transition and defensive containment efficiency, lowering confidence.]
+
+### Next Interval Reason
+- Wrote `30` minutes to `/home/dev/workspace/main/research/world_cup_2026/prediction_interval.txt` because the match is live and stable. A 30-minute interval aligns the next run with the estimated halftime (approx. 02:47 UTC, where kickoff was at 02:00 with a 5-minute delay), which is the perfect time to evaluate the halftime score and apply the Weighted Halftime Rule.
+
+## Iteration 49 - 2026-06-15T01:53:00Z
+**Model Used:** opencode: DeepSeek V4 Flash Free
+**Next Interval:** 20 minutes
+
+### Eligible Matches
+- Sweden vs. Tunisia: not_started (kickoff 02:00 UTC, ~5 min away)
+
+### Changes
+- Sweden vs. Tunisia: No change — SWEDEN WIN (Medium) maintained. Lineups confirmed unchanged from official Sky Sports data. Weather dry at 27°C (60% rain risk from prior iteration appears not to have materialized). Betting odds stable. Match about to go live.
+
+### Search Queries Executed
+- Sweden vs. Tunisia: `Sweden Tunisia World Cup 2026 confirmed starting lineup warmup injury June 15 2026 02:00`, `Sweden Tunisia betting odds live movement June 15 2026`, `Monterrey Mexico weather live radar June 15 2026 Sweden Tunisia 02:00 UTC`, `Sweden vs Tunisia World Cup 2026 starting XI official lineups kickoff`, `"Sweden" "Tunisia" "kick off" OR "kicks off" OR "underway" "World Cup" June 15 2026`
+
+### New Evidence
+- Sweden vs. Tunisia: [official] Sky Sports match center confirms starting XIs with shirt numbers — lineups unchanged from iteration 48.
+- Sweden vs. Tunisia: [official] FIFA match center confirms 02:00 UTC kickoff, referee Yael Falcón Pérez.
+- Sweden vs. Tunisia: [strong] Betting odds stable: Sweden -104 to -115, draw +240 to +270 across multiple books.
+- Sweden vs. Tunisia: [strong] FotMob venue weather: 27°C, no rain — lowers prior 60% thunderstorm risk.
+
+### Open Questions Resolved
+- [Has there been any late warmup injury or last-minute change to the starting XIs?]: Resolved — [official] Sky Sports confirms lineups unchanged; no warmup injuries reported.
+- [Has the Monterrey rain materialized?]: Partially resolved — [strong] Current venue temp 27°C with no rain radar alerts; the 60% thunderstorm forecast appears not to have materialized.
+
+### New Questions Raised
+- Sweden vs. Tunisia: What is the early tactical shape in the first 15 minutes — is Sweden dominating possession and creating chances? [Causal: Determines if pre-match analysis is borne out in live play.]
+- Sweden vs. Tunisia: Are there any goals, red cards, or injuries to key playmakers in the first half? [Causal: High-impact events alter the predicted outcome.]
+- Sweden vs. Tunisia: Has any rain developed at Estadio BBVA, and how is the pitch surface affecting play? [Causal: Wet pitch slows passing, increases randomness, favoring underdog.]
+
+### Next Interval Reason
+- Wrote `20` minutes to `/home/dev/workspace/main/research/world_cup_2026/prediction_interval.txt` because the match kicks off in ~5 minutes. A 20-minute interval places the next run at ~02:13 UTC (~13 minutes into the match), catching early match flow and any high-impact events in the opening phase. This is appropriate for live-match monitoring startup.
+
+## Iteration 48 - 2026-06-15T01:21:36Z
+**Model Used:** opencode: DeepSeek V4 Flash Free
+**Next Interval:** 30 minutes
+
+### Eligible Matches
+- Sweden vs. Tunisia: not_started (kickoff 02:00 UTC, 38 min away)
+
+### Changes
+- Sweden vs. Tunisia: No change — SWEDEN WIN (Medium). Lineups confirmed stable.
+- Netherlands vs. Japan: Match result corrected from 2-1 NED win to 2-2 draw (previously miscoded).
+
+### Search Queries Executed
+- Sweden vs. Tunisia: `Sweden vs Tunisia World Cup 2026 starting lineup late change injury warmup June 15 2026`, `Sweden Tunisia betting odds live movement June 15 2026 World Cup`, `Monterrey Mexico weather June 15 2026 Sweden Tunisia Estadio BBVA`, `Sweden Tunisia warmup injury last minute lineup change June 15 2026 World Cup`
+- Netherlands vs. Japan: `Netherlands Japan World Cup 2026 final score result June 14 2026`
+
+### New Evidence
+- Sweden vs. Tunisia: [strong] Lineups confirmed unchanged from iteration 47 (FotMob/Sofascore/Yahoo Sports) — no late warmup changes or injuries.
+- Sweden vs. Tunisia: [strong] Monterrey weather forecast updated to 60% rain/thunderstorms (Milenio), up from ~30% in prior iterations.
+- Netherlands vs. Japan: [official] Match confirmed as 2-2 draw (ESPN, Sky Sports, FotMob). Prior file incorrectly recorded 2-1 Dutch win.
+
+### Open Questions Resolved
+- [Are there any late warmup injuries or last-minute changes to Sweden's or Tunisia's starting XI before kickoff?]: Resolved — [strong] Multiple sources confirm lineups unchanged; no warmup injuries reported.
+- [Has there been any sharp late money movement in the final pre-match window?]: Resolved — [strong] Betting odds stable at Sweden -110 to -115, no sharp shifts.
+- [What was the actual result of Netherlands vs. Japan?]: Resolved — [official] 2-2 draw. Prior record of 2-1 was incorrect.
+
+### New Questions Raised
+- Sweden vs. Tunisia: What is the early tactical shape in the first 15 minutes — is Sweden dominating possession and creating chances? [Causal: Determines whether the pre-match analysis is being borne out in live play.]
+- Sweden vs. Tunisia: Has the Monterrey rain materialized, and is the pitch showing signs of heavy surface water affecting play? [Causal: Heavy rain increases randomness and draw risk.]
+- Sweden vs. Tunisia: Are there any goals, red cards, or injuries to key playmakers in the first half? [Causal: High-impact events alter the predicted outcome.]
+
+### Next Interval Reason
+- Wrote `30` minutes to `/home/dev/workspace/main/research/world_cup_2026/prediction_interval.txt` because Sweden vs. Tunisia kickoff is 38 minutes away. A 30-minute interval places the next run at ~01:51 UTC (9 minutes before kickoff), catching any final pre-match developments, after which the match goes live and we can monitor early play. Interval stays at 30 (not shorter) since lineups are stable and no high-impact events are pending.
+
+## Iteration 47 - 2026-06-15T00:56:20Z
+**Model Used:** Gemini 3.5 Flash
+**Next Interval:** 25 minutes
+
+### Eligible Matches
+- Sweden vs. Tunisia: not_started (kickoff 02:00 UTC June 15)
+
+### Changes
+- Sweden vs. Tunisia: No change — SWEDEN WIN (Medium) reinforced by confirmed starting XI.
+- Côte d'Ivoire vs. Ecuador: Match is now complete (drew 0-0). Moved to previously tracked matches.
+
+### Search Queries Executed
+- Sweden vs. Tunisia: `Sweden starting XI vs Tunisia World Cup June 14 2026 lineups`, `Sweden vs Tunisia World Cup 2026 Gudmundsson fit starter lineup news`, `Sweden vs Tunisia confirmed starting lineup June 15 2026 World Cup`, `Sweden vs Tunisia lineup Gudmundsson OR Svensson June 15 2026`, `Sweden vs Tunisia betting odds market movement June 15 2026 sharp money`
+
+### New Evidence
+- Sweden vs. Tunisia: [official] Official starting lineup confirmed. Gudmundsson starts at LWB/LM, and the Isak + Gyökeres duo starts up front. [strong] Betting odds remain stable with Sweden favored at -115 to -110.
+- Côte d'Ivoire vs. Ecuador: [official] Match completed 0-0.
+
+### Open Questions Resolved
+- [Do the official starting lineups confirm Gudmundsson is starting at LWB or is Daniel Svensson deputizing?]: Resolved — [official] Gudmundsson is in the confirmed starting XI at LWB.
+- [Does Potter start the expected Isak + Gyökeres front two, and are there any late warmup injuries?]: Resolved — [official] Yes, both Isak and Gyökeres start up front. No late warmup injuries reported.
+- [Has there been any sharp late money movement in the betting market in the 60 minutes before kickoff?]: Resolved — [strong] Odds are stable at -115 to -110 with no sharp late shifts.
+
+### New Questions Raised
+- Sweden vs. Tunisia: Are there any late warmup injuries or last-minute changes to Sweden's or Tunisia's starting XI before kickoff? [Causal: Warmup injury to a key starter reduces win expectancy and confidence.]
+- Sweden vs. Tunisia: Has there been any sharp late money movement in the final 30 minutes before kickoff? [Causal: Sudden late line movement signals squad or tactical concerns.]
+- Sweden vs. Tunisia: What is the early tactical shape and momentum in the first few minutes after kickoff? [Causal: Early red card or goals impact live predictions.]
+
+### Next Interval Reason
+- Wrote `25` minutes to `/home/dev/workspace/main/research/world_cup_2026/prediction_interval.txt` because Sweden vs. Tunisia's kickoff is 64 minutes away. Since lineups are confirmed, this 25-minute interval sets the next run inside the 40-minute pre-match warmup window to check for late injuries or sharp betting movements.
+
+## Iteration 46 - 2026-06-15T00:25:20Z
+**Model Used:** Gemini 3.5 Flash
+**Next Interval:** 30 minutes
+
+### Eligible Matches
+- Côte d'Ivoire vs. Ecuador: live_post_halftime (Match completed 0-0 draw, under live_post_halftime classification window)
+- Sweden vs. Tunisia: not_started (kickoff 02:00 UTC June 15)
+
+### Changes
+- Côte d'Ivoire vs. Ecuador: No change — DRAW (Medium) confirmed by the final 0-0 scoreline. Match was frozen per the Weighted Halftime Rule after a 0-0 halftime, and the second half concluded with no goals or red cards.
+- Sweden vs. Tunisia: No change — SWEDEN WIN (Medium). Alexander Isak is fit; Gabriel Gudmundsson is back in training but remains a slight workload risk due to a virus. Betting odds stable at -115.
+
+### Search Queries Executed
+- Côte d'Ivoire vs. Ecuador: `Ivory Coast Ecuador World Cup 2026 live score goal red card June 14 2026`, `"Ivory Coast" "Ecuador" full time June 14 2026`, `"Ivory Coast" "Ecuador" Vavel live commentary June 14 2026`, `"Ivory Coast" "Ecuador" "0-0" OR "1-0" OR "0-1" OR "1-1" OR "2-1" OR "1-2" OR "2-0" OR "0-2" "World Cup" 2026`, `"Ivory Coast" "Ecuador" "Valencia" subbed out OR replaced OR played 90 minutes June 14 2026`, `"Enner Valencia" subbed off OR subbed out OR replaced OR substituted vs "Ivory Coast" June 14 2026`, `"Enner Valencia" "minutes" OR "mins" "Ivory Coast" June 14 2026`
+- Sweden vs. Tunisia: `Sweden Tunisia World Cup 2026 injury news Gudmundsson fitness June 14 2026`, `Sweden Tunisia betting odds market movement June 14 2026`, `Sweden Tunisia weather forecast Estadio BBVA Monterrey June 14 2026`, `Sweden vs Tunisia World Cup 2026 tactical preview Graham Potter formation`
+
+### New Evidence
+- Côte d'Ivoire vs. Ecuador: [official] Match ended in a 0-0 draw. [strong] Match commentary notes Moisés Caicedo hit the crossbar in the second half. [official] Enner Valencia started the match, captained Ecuador, and was involved in play throughout.
+- Sweden vs. Tunisia: [strong] Gudmundsson returned to full training on June 12 after virus isolation. [strong] Betting market snapshot shows Sweden stable as -115 favorite. [strong] Monterrey evening weather forecast shows high humidity and temperatures around 25-30°C at kickoff.
+
+### Open Questions Resolved
+- [What is the final score and were there any second-half goals, red cards, or injuries?]: Resolved — [official] The match ended in a 0-0 draw with no goals, no red cards, and no major second-half injuries.
+- [Did Enner Valencia play the full 90 or was he subbed off early?]: Resolved — [official] Enner Valencia started and played the full first half, and match sheets confirm he captained the side throughout the match.
+
+### New Questions Raised
+- Sweden vs. Tunisia: Do the official starting lineups confirm Gudmundsson is starting at LWB or is Daniel Svensson deputizing? [Causal: If Gudmundsson is out, Sweden's progressiveness on the left flank decreases, lowering confidence in Sweden Win.]
+- Sweden vs. Tunisia: Does Potter start the expected Isak + Gyökeres front two, and are there any late warmup injuries? [Causal: Benching Isak or Gyökeres would significantly reduce Sweden's offensive threat, potentially shifting prediction to a Draw.]
+- Sweden vs. Tunisia: Has there been any sharp late money movement in the betting market in the 60 minutes before kickoff? [Causal: A sharp move towards Tunisia would suggest squad issues or team news concerns for Sweden.]
+
+### Next Interval Reason
+- Wrote `30` minutes to `/home/dev/workspace/main/research/world_cup_2026/prediction_interval.txt` because Sweden vs. Tunisia's kickoff is 96 minutes away. The next interval (starting at ~00:54 UTC) will fall within the 75-minute pre-match window, allowing us to fetch confirmed starting lineups, late market shifts, and warm-up news.
+
+## Iteration 45 - 2026-06-14T23:52:17Z
+**Model Used:** opencode: DeepSeek V4 Flash Free
+**Next Interval:** 30 minutes
+
+### Eligible Matches
+- Côte d'Ivoire vs. Ecuador: live_post_halftime (0-0 at HT, second half ongoing)
+- Sweden vs. Tunisia: not_started (kickoff 02:00 UTC June 15)
+
+### Changes
+- Côte d'Ivoire vs. Ecuador: No change — DRAW (Medium) frozen per Weighted Halftime Rule. 0-0 at HT with near-parity xG (0.62-0.54) confirms the pre-match analytical prediction. No structural events (no red cards, no goals, no injuries).
+- Sweden vs. Tunisia: No change — SWEDEN WIN (Medium). Isak fully fit confirmed; Gudmundsson remains doubtful with virus; Hannibal Mejbri doubt resolved to fully fit (neutral impact). Betting odds stable.
+
+### Search Queries Executed
+- Côte d'Ivoire vs. Ecuador: `Côte d'Ivoire Ecuador World Cup 2026 live score halftime result June 14 23:45`, `Ivory Coast Ecuador live score second half 2026 World Cup June 14 goal red card`, `"Ivory Coast" "Ecuador" goal score "0-0" OR "1-0" OR "0-1" World Cup June 14 2026 50th minute`
+- Sweden vs. Tunisia: `Sweden Tunisia World Cup 2026 official starting lineup lineup news June 14 2026`, `Sweden Tunisia Pinnacle betting odds lineups Isak Gyokeres June 14 2026`, `Sweden Tunisia World Cup 2026 injury news Gudmundsson Hannibal Mejbri fitness June 14`, `Estadio BBVA Monterrey pitch conditions weather Sweden Tunisia June 14 2026`, `Sweden Tunisia performance-impairing heat World Cup 2026 Climate Central`
+
+### New Evidence
+- Côte d'Ivoire vs. Ecuador: [strong] FotMob/Sofascore confirm 0-0 HT. xG 0.62-0.54, shots 4-6, SOT 1-0. 3 yellow cards (all CIV), 0 red cards. Both teams had 1 big chance and missed both.
+- Sweden vs. Tunisia: [strong] Gudmundsson still doubtful with virus (missed consecutive training, per OneFootball). [strong] Hannibal Mejbri now fully fit (resolves prior doubt). [strong] Estadio BBVA confirmed as permanent hybrid grass (SIS Air + Aqua) — no temporary grass discount. [strong] Betting odds stable (Sweden -104 to -115). [strong] Climate Central confirms 79% heat risk.
+
+### Open Questions Resolved
+- [Is Hannibal Mejbri fit to start for Tunisia?]: Resolved — [strong] Multiple sources confirm Mejbri is fully fit and expected to start.
+- [Has the pitch at Estadio BBVA been upgraded for the World Cup?]: Resolved — [official] Estadio BBVA features a permanent SIS-installed hybrid grass system with advanced aeration and irrigation — NOT temporary sod over artificial turf.
+
+### New Questions Raised
+- Côte d'Ivoire vs. Ecuador: What is the final score and were there any second-half structural events (red cards, key injuries)? [Causal: For postmortem audit.]
+- Sweden vs. Tunisia: Do the official starting lineups (~01:00 UTC) confirm Potter's dual-striker system and Gudmundsson's availability? [Causal: Gudmundsson's absence would weaken Sweden's left flank; Isak/Gyökeres benching reduces attacking threat.]
+
+### Next Interval Reason
+- Wrote `30` minutes to `/home/dev/workspace/main/research/world_cup_2026/prediction_interval.txt` because CIV-ECU is live_post_halftime but stable (0-0, no structural events), and SWE-TUN kickoff is 2h8m away. A 30-minute interval (~00:22 UTC) catches ~28 min of remaining CIV-ECU second half and approaches the SWE-TUN lineup window (~00:45 UTC, 75 min before kickoff) without polling too early.
+
+## Iteration 43 - 2026-06-14T20:47:57Z
+**Model Used:** opencode: DeepSeek V4 Flash Free
+**Next Interval:** 30 minutes
+
+### Eligible Matches
+- Netherlands vs. Japan: live_post_halftime (0-0 at HT, now second half ongoing)
+- Côte d'Ivoire vs. Ecuador: not_started
+- Sweden vs. Tunisia: not_started
+
+### Changes
+- Netherlands vs. Japan: No change — NETHERLANDS WIN (Medium) frozen per Weighted Halftime Rule. Halftime 0-0 with Dutch dominance (70% poss, 0.34 xG vs 0.03). No structural reasons to override.
+- Côte d'Ivoire vs. Ecuador: No change — DRAW (Medium). Valencia still a game-time decision; no new evidence.
+- Sweden vs. Tunisia: No change — SWEDEN WIN (Medium). Weather outlook stable; no severe storms expected.
+
+### Search Queries Executed
+- Netherlands vs. Japan: `Netherlands Japan World Cup 2026 live halftime score June 14`, `Netherlands Japan 2026 World Cup score goal halftime result`, `"Netherlands" "Japan" "World Cup" 2026 "goal" OR "score" OR "red card" June 14 2026 20:45`, `Netherlands Japan 0-0 second half 50th minute goal World Cup 2026 June 14 20:50`
+- Côte d'Ivoire vs. Ecuador: `Enner Valencia Ecuador lineup Ivory Coast World Cup latest update June 14 2026`, `Ivory Coast Ecuador World Cup 2026 Enner Valencia injury betting odds June 14`
+- Sweden vs. Tunisia: `Sweden Tunisia World Cup 2026 Monterrey weather forecast June 14 15`, `Monterrey Nuevo León Mexico weather today June 14 91°F`
+
+### New Evidence
+- Netherlands vs. Japan: [strong] FotMob halftime stats confirm 0-0, 70% possession, 0.34 xG NED vs 0.03 JPN, 4 shots to 1, 2 on target to 0. No cards, no injuries. [strong] Goals365 confirms 0-0 in 50th minute — second half in progress.
+- Côte d'Ivoire vs. Ecuador: [strong] Multiple sources (CBS, Sports Mole, RotoWire) confirm same pre-match picture — Valencia doubtful, Ndicka out. No new betting line movement.
+- Sweden vs. Tunisia: [strong] Mexican weather service confirms scattered rain ~30% probability, evening temp 25-27°C, no severe thunderstorm warnings. Downgrades earlier thunderstorm concerns.
+
+### Open Questions Resolved
+- [What is the halftime score for Netherlands vs. Japan?]: Resolved — [strong] 0-0 at halftime. Dutch dominant but unable to score. Per Weighted Halftime Rule, prediction frozen.
+- [Have there been any high-impact events in the first half?]: Resolved — [strong] No goals, red cards, or injuries reported.
+- [Has the Monterrey weather forecast changed — are thunderstorms still predicted?]: Partially resolved — [strong] No severe storms expected for evening kickoff; rain probability ~30% dropping. Heat still a factor (79% performance-impairing heat).
+
+### New Questions Raised
+- Netherlands vs. Japan: Has the second-half score changed, and what was the nature of the event? [Causal: Dutch goal confirms; Japan goal is a structural contradiction.]
+- Netherlands vs. Japan: Have any substitutions been made (Depay introduction)? [Causal: Depay adds creative threat in the final 30 minutes.]
+- Côte d'Ivoire vs. Ecuador: Has the market moved significantly in the final pre-match hours? [Causal: Late sharp movement signals information.]
+
+### Next Interval Reason
+- Wrote `30` minutes to `/home/dev/workspace/main/research/world_cup_2026/prediction_interval.txt` because NED-JPN is live_post_halftime but stable (0-0, no events in second half yet). A 30-minute interval lands at ~21:18 UTC, catching ~25-30 minutes of second-half action for NED-JPN, while staying ~1h42m before CIV-ECU kickoff (lineups still not expected until ~22:00). This conserves tokens on a quiet live match and avoids unnecessary polling before the CIV-ECU lineup window.
+
+## Iteration 42 - 2026-06-14T20:24:58Z
+**Model Used:** Gemini 3.5 Flash
+**Next Interval:** 21 minutes
+
+### Eligible Matches
+- Netherlands vs. Japan: live_pre_halftime (0-0, ~25th min)
+- Côte d'Ivoire vs. Ecuador: not_started
+- Sweden vs. Tunisia: not_started
+
+### Changes
+- Netherlands vs. Japan: No change — NETHERLANDS WIN (Medium). Still 0-0. BBC, Sky Sports, Yahoo Sports confirm no goals, red cards, or injuries. Match progressing quietly.
+- Côte d'Ivoire vs. Ecuador: No change — DRAW (Medium). Pinnacle draw odds shifted marginally from 2.82 to 2.90 but no material new evidence. Lineups still pending (~22:00 UTC).
+- Sweden vs. Tunisia: No change — SWEDEN WIN (Medium). No new evidence.
+
+### Search Queries Executed
+- Netherlands vs. Japan: `Netherlands Japan World Cup 2026 live score 20:25 UTC June 14 goal red card injury`, `Netherlands Japan World Cup 2026 live match updates first half minute`, `Netherlands Japan 2026 World Cup live score 0-0 goal 25th minute first half`
+- Côte d'Ivoire vs. Ecuador: `Ivory Coast Ecuador World Cup 2026 Enner Valencia injury betting odds June 14`
+- Sweden vs. Tunisia: `Sweden Tunisia World Cup 2026 Monterrey weather thunderstorm forecast June 14`
+
+### New Evidence
+- Netherlands vs. Japan: [strong] BBC Sport live page: 0-0, match in early stages, no events. Sky Sports confirms 0-0 at 20:23 UTC. Yahoo Sports confirms early match flow: Suzuki save on Malen, Japan settling after nervy start.
+- Côte d'Ivoire vs. Ecuador: [strong] Pinnacle odds: Draw 2.90 (from 2.82), Ecuador 2.58, Ivory Coast 3.33 — slight draw lengthening but consistent with low-scoring expectations.
+- Sweden vs. Tunisia: [strong] No new weather data found; Monterrey seasonal conditions remain warm/humid.
+
+### Open Questions Resolved
+- (None — only ~3.5 minutes elapsed since iteration 41)
+
+### New Questions Raised
+- (None — same open questions carried forward)
+
+### Next Interval Reason
+- Wrote `21` minutes to `/home/dev/workspace/main/research/world_cup_2026/prediction_interval.txt` because NED vs JPN is live but stable (0-0, no events). A 21-minute interval lands at ~20:45 UTC, exactly at estimated halftime — the natural checkpoint. This stays within the 21-30 range for stable live matches while capturing the halftime update efficiently.
+
+## Iteration 41 - 2026-06-14T20:21:19Z
+**Model Used:** Gemini 3.5 Flash
+**Next Interval:** 30 minutes
+
+### Eligible Matches
+- Netherlands vs. Japan: live_pre_halftime (0-0, ~22nd min)
+- Côte d'Ivoire vs. Ecuador: not_started
+- Sweden vs. Tunisia: not_started
+
+### Changes
+- Netherlands vs. Japan: No change — NETHERLANDS WIN (Medium). Still 0-0 with no new events. Only ~1 minute since last run.
+- Côte d'Ivoire vs. Ecuador: No change — DRAW (Medium). Lineups still pending (~21:45-22:00 UTC).
+- Sweden vs. Tunisia: No change — SWEDEN WIN (Medium). No new evidence.
+
+### Search Queries Executed
+- Netherlands vs. Japan: `Netherlands vs Japan live score updates 20:20 UTC June 14`, `Netherlands Japan World Cup 2026 goal red card injury first half minute`
+- Côte d'Ivoire vs. Ecuador: `Ivory Coast Ecuador World Cup 2026 Enner Valencia starting lineup news June 14`
+- Sweden vs. Tunisia: `Sweden Tunisia World Cup 2026 Monterrey weather heat thunderstorm June 14 15`
+
+### New Evidence
+- Netherlands vs. Japan: [strong] FotMob confirms 0-0 continued, 67-33 possession, 0.06 xG NED, 0 shots Japan. No cards or injuries. Match quiet.
+
+### Open Questions Resolved
+- (None — only ~1 minute elapsed; no questions could be resolved)
+
+### New Questions Raised
+- (None — same open questions carried forward)
+
+### Next Interval Reason
+- Wrote `30` minutes to `/home/dev/workspace/main/research/world_cup_2026/prediction_interval.txt` because NED vs JPN is live but stable (0-0, no events). A 30-min interval lands at ~20:51 UTC, just after estimated halftime (20:45 UTC) — the natural checkpoint. The previous run was only ~1 minute ago; extending to 30 conserves tokens on a quiet live match.
+
+## Iteration 40 - 2026-06-14T20:20:00Z
+**Model Used:** Gemini 3.5 Flash (Medium)
+**Next Interval:** 30 minutes
+
+### Eligible Matches
+- Netherlands vs. Japan: live_pre_halftime (0-0, ~20th min)
+- Côte d'Ivoire vs. Ecuador: not_started
+- Sweden vs. Tunisia: not_started
+
+### Changes
+- Netherlands vs. Japan: No change — prediction remains NETHERLANDS WIN (Medium). Match is live at 0-0, Dutch dominating possession (62%) but only 1 shot (Malen saved by Suzuki). No high-impact events.
+- Côte d'Ivoire vs. Ecuador: No change — prediction remains DRAW (Medium). Official lineups still pending (~21:45-22:00 UTC); Valencia remains a game-time decision with calf issue.
+- Sweden vs. Tunisia: No change — prediction remains SWEDEN WIN (Medium). Newly identified Climate Central data shows 79% chance of performance-impairing heat at Estadio Monterrey, but not enough to change predicted winner.
+
+### Search Queries Executed
+- Netherlands vs. Japan: `Netherlands vs Japan live score first half 20 June 14`, `Netherlands Japan World Cup 2026 goal scorer red card injury first half`, `Netherlands Japan Dallas Stadium pitch condition grass 2026 World Cup`, `Netherlands Japan halftime result June 14 2026 Dallas Stadium`
+- Côte d'Ivoire vs. Ecuador: `Côte d'Ivoire Ecuador Pinnacle betting odds movement 14 June 2026`, `Ivory Coast Ecuador World Cup 2026 Enner Valencia lineup fitness news 14 June`
+- Sweden vs. Tunisia: `Sweden Tunisia World Cup 2026 Hannibal Mejbri injury status lineup 14 June`, `Sweden Tunisia Pinnacle odds Monterrey weather 14 June 2026`, `Sweden Tunisia performance-impairing heat World Cup 2026 Climate Central`
+
+### New Evidence
+- Netherlands vs. Japan: [strong] FotMob live data: 0-0, NED 62% possession, 0.06 xG, 1 shot on target. Japan 0 shots. No cards. [strong] BBC: Malen chance saved, Japan defending deep, "entertaining opening."
+- Côte d'Ivoire vs. Ecuador: [strong] Valencia calf status unchanged (game-time decision). Official lineups expected ~21:45-22:00 UTC per multiple sources.
+- Sweden vs. Tunisia: [strong] Climate Central: 79% chance of performance-impairing heat at Estadio Monterrey (+14% from climate change). Current conditions: 90°F, thunderstorm, 51% humidity. [strong] Hannibal Mejbri remains a major doubt.
+
+### Open Questions Resolved
+- [How is the Netherlands vs. Japan match progressing in the opening 20 minutes?]: Resolved — [strong] 0-0, Dutch dominate but cannot break through, Malen had best chance saved. No goals/cards/injuries.
+- [Are there any high-impact events in the first 20 minutes of Netherlands vs. Japan?]: Resolved — [strong] No goals, red cards, or injuries reported.
+
+### New Questions Raised
+- Netherlands vs. Japan: What is the halftime score and have there been any goals, cards, or injuries in the rest of the first half? [Causal: A Dutch goal would reinforce the prediction; a Japan lead or red card would require adjustment.]
+- Netherlands vs. Japan: Has the Dallas Stadium pitch shown any signs of tearing or slowing play? [Causal: Surface degradation would discount Dutch technical play.]
+- Sweden vs. Tunisia: Has the Monterrey weather worsened or improved — are thunderstorm forecasts still active and will pitch conditions be affected? [Causal: Heavy rain or extreme heat introduces randomness favoring an upset or draw.]
+
+### Next Interval Reason
+- Wrote `30` minutes to `/home/dev/workspace/main/research/world_cup_2026/prediction_interval.txt` because Netherlands vs. Japan is live at 0-0 with no major events — a 30-minute interval sets the next run at ~20:50 UTC, just after estimated halftime, which is the natural checkpoint. No material evidence found that would shorten the interval below 30.
+## Iteration 39 - 2026-06-14T20:00:00Z
+**Model Used:** Gemini 3.5 Flash (Medium)
+**Next Interval:** 20 minutes
+
+### Eligible Matches
+- Netherlands vs. Japan: not_started (kicks off in <1 min)
+- Côte d'Ivoire vs. Ecuador: not_started
+- Sweden vs. Tunisia: not_started
+
+### Changes
+- Netherlands vs. Japan: No change — prediction remains NETHERLANDS WIN (Medium). Lineups confirmed, match about to kick off.
+- Côte d'Ivoire vs. Ecuador: No change — prediction remains DRAW (Medium). Lineups not yet released; information picture stable.
+- Sweden vs. Tunisia: No change — prediction remains SWEDEN WIN (Medium). Hannibal Mejbri identified as a doubt for Tunisia; Monterrey rain probability revised down to ~30%.
+
+### Search Queries Executed
+- Netherlands vs. Japan: `Netherlands vs Japan World Cup 2026 live score updates kickoff June 14`, `Netherlands Japan World Cup 2026 confirmed starting lineups June 14 2026`, `Netherlands vs Japan World Cup 2026 live score 14 June first half minute`
+- Côte d'Ivoire vs. Ecuador: `Côte d'Ivoire vs Ecuador World Cup 2026 starting lineup Enner Valencia June 14`, `Ivory Coast Ecuador official starting lineup confirmed June 14 2026 World Cup`
+- Sweden vs. Tunisia: `Sweden vs Tunisia World Cup 2026 team news starting lineup June 14 15 2026`, `Monterrey weather forecast thunderstorms June 14 15 2026 Sweden Tunisia`, `Hannibal Mejbri Tunisia injury fitness Sweden World Cup June 2026`
+
+### New Evidence
+- Netherlands vs. Japan: [strong] Multiple sources cross-verify same starting XIs — no last-min changes. [strong] Netherlands have not lost a World Cup group match in 16 games (W12 D4). [strong] Japan won opening matches in 2018 and 2022 but are missing 4 key players this tournament.
+- Côte d'Ivoire vs. Ecuador: [medium] Official lineups still pending; no new tactical or injury developments since iteration 38.
+- Sweden vs. Tunisia: [medium] Hannibal Mejbri is a doubt for Tunisia after sustaining an injury in the pre-tournament friendly vs Austria. [strong] Monterrey local forecasts show ~30% rain probability on match evening, lower than previously cited high-risk thunderstorms.
+
+### Open Questions Resolved
+- [What is Hannibal Mejbri's fitness status for Tunisia?]: Partially resolved — [medium] ESPN reports he is a doubt after a pre-tournament friendly injury; official lineup will confirm.
+
+### New Questions Raised
+- Netherlands vs. Japan: Are there any goals, red cards, or injuries to key playmakers in the opening 20 minutes? [Causal: A Dutch goal would reinforce; a red card or Japan goal requires adjustment.]
+- Netherlands vs. Japan: How is the temporary grass pitch at Dallas Stadium performing in live play? [Causal: Poor pitch would discount Dutch technical play.]
+- Sweden vs. Tunisia: Are there any updates on Hannibal Mejbri's fitness — is he cleared to start? [Causal: If Mejbri is ruled out, Tunisia's midfield creativity drops, reinforcing Sweden's advantage.]
+- Sweden vs. Tunisia: Will the Monterrey weather remain dry or worsen closer to kickoff? [Causal: Rain changes surface conditions.]
+
+### Next Interval Reason
+- Wrote `20` minutes to `/home/dev/workspace/main/research/world_cup_2026/prediction_interval.txt` because Netherlands vs. Japan kicks off at 20:00 UTC. A 20-minute interval sets the next run at ~20:20 UTC, which is 20 minutes into the first half — ideal for catching early goals, red cards, or injuries while avoiding unnecessary pre-kickoff polling.
+
+## Iteration 38 - 2026-06-14T19:59:00Z
+**Model Used:** Gemini 3.5 Flash (Medium)
+**Next Interval:** 20 minutes
+
+### Eligible Matches
+- Netherlands vs. Japan: not_started
+- Côte d'Ivoire vs. Ecuador: not_started
+- Sweden vs. Tunisia: not_started
+
+### Changes
+- Netherlands vs. Japan: No change — prediction remains NETHERLANDS WIN (Medium confidence), reinforced by confirmed lineups and stable pre-match reports.
+- Côte d'Ivoire vs. Ecuador: No change — prediction remains DRAW (Medium confidence), reinforced by stable betting markets and Enner Valencia's calf management keeping his workload restricted.
+- Sweden vs. Tunisia: No change — prediction remains SWEDEN WIN (Medium confidence), reinforced by Potter's expected dual strikers and stable favorite odds.
+
+### Search Queries Executed
+- Netherlands vs. Japan: `Netherlands vs Japan live score updates red card goal injury June 14 2026`, `Netherlands vs Japan AT&T Dallas Stadium grass pitch quality comments June 14 2026`, `Netherlands vs Japan Moriyasu Kubo Koeman tactical lineup adjustment June 14 2026`
+- Côte d'Ivoire vs. Ecuador: `Ivory Coast vs Ecuador lineup injury news training updates Valencia Haller Adingra June 14 2026`, `Ivory Coast vs Ecuador Pinnacle odds movement June 14 2026`, `Ivory Coast vs Ecuador Lincoln Financial Field pitch conditions weather June 14 2026`
+- Sweden vs. Tunisia: `Sweden vs Tunisia starting lineup prediction Potter Isak Gyokeres squad news June 14 15 2026`, `Sweden vs Tunisia Pinnacle betting odds sharp moves June 14 15 2026`, `Sweden vs Tunisia BBVA Monterrey Stadium pitch weather updates June 14 15 2026`
+
+### New Evidence
+- Netherlands vs. Japan: [official] Confirmed starting lineups show 4-2-3-1 for Netherlands (Verbruggen starts, Depay benched, Malen starts) and 3-4-2-1 for Japan (Kubo starts, Mitoma/Endo/Minamino/Morita officially absent). [strong] Dallas Stadium hybrid grass pitch reports no major warm-up tearing, but Temporary Grass Pitch Heuristic continues to apply.
+- Côte d'Ivoire vs. Ecuador: [strong] Enner Valencia successfully completed a 45-minute practice match and is expected to start, resolving his doubtful status, though calf management remains under monitoring (Workload Management Heuristic). [strong] Sébastien Haller is officially omitted from Ivory Coast's World Cup squad. [strong] Pinnacle odds remain stable at 2.82 for a Draw, indicating low-scoring expectations.
+- Sweden vs. Tunisia: [strong] Graham Potter is expected to deploy a 3-4-1-2 with Isak and Gyökeres up front. [strong] Pinnacle odds favor Sweden at 1.925. [strong] High risk of thunderstorms forecasted for Estadio Monterrey, adding potential surface uncertainty.
+
+### Open Questions Resolved
+- [Does the official starting XI confirm if Enner Valencia starts or starts on the bench for Ecuador?]: Resolved — [strong] Enner Valencia is fit and expected to start, although his workload could still be managed.
+- [Are there any late pre-match injury reports or tactical shifts during warm-ups for either side?]: Resolved — [strong] Starting lineups for Netherlands vs. Japan are confirmed; warm-ups for Netherlands vs. Japan were completed with no new injuries or major pitch tearing reported.
+- [Does the official starting lineup confirm Graham Potter's 3-4-1-2 with Isak and Gyökeres?]: Resolved — [strong] Graham Potter is expected to use a 3-4-1-2 with both Isak and Gyökeres starting.
+
+### New Questions Raised
+- Netherlands vs. Japan: Does the live match flow of Netherlands vs. Japan show any early signs of the temporary grass pitch tearing up or playing extremely slow? [Causal: Poor pitch conditions would reduce the Dutch passing efficiency, increasing the likelihood of a draw or defensive transition upset].
+- Netherlands vs. Japan: Are there any high-impact events (such as a goal, red card, or injury to a key playmaker like Frenkie de Jong or Takefusa Kubo) in the first 15 minutes of Netherlands vs. Japan? [Causal: A red card or key injury would immediately force a downward adjustment in confidence or a change in the predicted winner].
+- Sweden vs. Tunisia: Will the predicted thunderstorms in Monterrey materialize and cause wet/muddy pitch conditions at Estadio BBVA? [Causal: Heavy rain could slow down passing but favor the physical aerial and hold-up play of Isak and Gyökeres, potentially reinforcing Sweden's advantage or introducing random errors leading to a draw].
+
+### Next Interval Reason
+- Wrote `20` minutes to `/home/dev/workspace/main/research/world_cup_2026/prediction_interval.txt` because Netherlands vs. Japan kicks off in 2 minutes, meaning the next run (at 20:19 UTC) will allow us to check the live match flow and early high-impact events during the first half while preserving token efficiency.
+
 ## Iteration 37 - 2026-06-14T19:35:50Z
 **Model Used:** Gemini 3.5 Flash (Medium)
 **Next Interval:** 40 minutes
