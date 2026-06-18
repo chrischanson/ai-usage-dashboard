@@ -65,7 +65,7 @@ def get_token_usage_from_db(max_id_before):
         cursor = conn.cursor()
         
         cursor.execute(
-            "SELECT feedback_log_body FROM logs WHERE id > ? AND feedback_log_body LIKE '%\"usage\":%'", 
+            "SELECT feedback_log_body FROM logs WHERE id > ? AND feedback_log_body LIKE '%codex.turn.token_usage.input_tokens=%'", 
             (max_id_before,)
         )
         rows = cursor.fetchall()
@@ -76,10 +76,11 @@ def get_token_usage_from_db(max_id_before):
         import re
         for row in rows:
             body = row[0]
-            m_in = re.findall(r'"input_tokens"\s*:\s*(\d+)', body)
-            m_out = re.findall(r'"output_tokens"\s*:\s*(\d+)', body)
-            if m_in and m_out:
+            m_in = re.findall(r'codex\.turn\.token_usage\.input_tokens=(\d+)', body)
+            m_out = re.findall(r'codex\.turn\.token_usage\.output_tokens=(\d+)', body)
+            if m_in:
                 total_input_tokens += sum(int(x) for x in m_in)
+            if m_out:
                 total_output_tokens += sum(int(x) for x in m_out)
                 
         conn.close()
@@ -187,7 +188,7 @@ def compile_prompt(instructions, variables):
         
     return compiled
 
-def execute_agent(agent_type, model, prompt, dry_run=False):
+def execute_agent(agent_type, model, prompt, dry_run=False, continue_session=False, session_id=None, title=None):
     """Executes the agent CLI tool and captures output."""
     if agent_type == "agy":
         cmd = [
@@ -196,6 +197,10 @@ def execute_agent(agent_type, model, prompt, dry_run=False):
         ]
         if model:
             cmd.extend(["--model", model])
+        if continue_session:
+            cmd.append("--continue")
+        elif session_id:
+            cmd.extend(["--conversation", session_id])
         cmd.extend([
             "--print",
             prompt
@@ -208,6 +213,12 @@ def execute_agent(agent_type, model, prompt, dry_run=False):
         ]
         if model:
             cmd.extend(["--model", model])
+        if continue_session:
+            cmd.append("--continue")
+        if session_id:
+            cmd.extend(["-s", session_id])
+        if title:
+            cmd.extend(["--title", title])
         cmd.append(prompt)
     else:
         print(f"Error: Unsupported agent type '{agent_type}'", file=sys.stderr)
@@ -257,6 +268,9 @@ def main():
     parser.add_argument("--model", help="Override default agent model")
     parser.add_argument("--vars", help="Comma-separated variables, e.g. COMPONENT_NAME=UserCard,SPEC='A simple card'")
     parser.add_argument("--dry-run", action="store_true", help="Print the compiled prompt without executing the agent")
+    parser.add_argument("--continue", action="store_true", dest="continue_session", help="Continue the last session")
+    parser.add_argument("--session", help="Session ID to continue")
+    parser.add_argument("--title", help="Title for the session")
     
     args = parser.parse_args()
     
@@ -311,14 +325,21 @@ def main():
         max_id_before = get_max_log_id()
             
     # Execute
-    return_code, full_output, duration = execute_agent(agent, model, compiled_prompt, args.dry_run)
+    return_code, full_output, duration = execute_agent(
+        agent, model, compiled_prompt, args.dry_run,
+        continue_session=args.continue_session,
+        session_id=args.session,
+        title=args.title
+    )
     
     if not args.dry_run:
         # Write logs
         with open(os.path.join(run_dir, "output.log"), "w", encoding="utf-8") as f:
             f.write(full_output)
             
-        token_usage = get_token_usage_from_db(max_id_before)
+        # Token accounting is agent-specific. The old implementation read
+        # Codex's sqlite logs, which misattributes usage for agy/opencode runs.
+        token_usage = None
             
         # Write execution metadata
         metadata_summary = {
@@ -337,6 +358,49 @@ def main():
         with open(os.path.join(run_dir, "run_metadata.json"), "w", encoding="utf-8") as f:
             json.dump(metadata_summary, f, indent=2)
             
+        # Resolve and print session/conversation ID for the caller to reuse
+        current_session_id = args.session
+        if agent == "opencode" and not current_session_id:
+            try:
+                result = subprocess.run(
+                    ["opencode", "session", "list", "--format", "json", "-n", "10"],
+                    capture_output=True, text=True, timeout=10
+                )
+                sessions = json.loads(result.stdout)
+                if args.title:
+                    for s in sessions:
+                        if s.get("title") == args.title:
+                            current_session_id = s["id"]
+                            break
+                if not current_session_id and sessions:
+                    current_session_id = sessions[0]["id"]
+            except Exception:
+                pass
+        if agent == "agy" and not current_session_id:
+            match = re.search(
+                r"Print mode: conversation=([0-9a-fA-F-]{36})",
+                full_output,
+            )
+            if match:
+                current_session_id = match.group(1)
+            else:
+                try:
+                    log_path = os.path.expanduser("~/.gemini/antigravity-cli/cli.log")
+                    with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+                        log_tail = f.read()[-20000:]
+                    matches = re.findall(
+                        r"Print mode: conversation=([0-9a-fA-F-]{36})",
+                        log_tail,
+                    )
+                    if matches:
+                        current_session_id = matches[-1]
+                except Exception:
+                    pass
+        if current_session_id and agent == "opencode":
+            print(f"OPENCODE_SESSION_ID: {current_session_id}")
+        elif current_session_id and agent == "agy":
+            print(f"AGY_CONVERSATION_ID: {current_session_id}")
+
         print(f"Execution logs and metadata saved to: {run_dir}")
         sys.exit(return_code)
 

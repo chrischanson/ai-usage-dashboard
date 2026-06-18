@@ -25,6 +25,8 @@ MAX_INTERVAL_MINS=180
 POSTMORTEM_DELAY_SECONDS=$((2 * 60 * 60))
 CLEANUP_LINKS=()
 POSTMORTEM_EPOCH=0
+OPENCODE_SESSION_FILE=""
+AGY_CONVERSATION_FILE=""
 
 log() {
     echo "[$(date -u +%H:%M:%S)] $*"
@@ -172,6 +174,81 @@ sleep_until_or_interval_change() {
     done
 }
 
+# --- Session Helpers ---
+get_session_id() {
+    local agent="$1"
+    local file
+    file="$(session_file_for_agent "${agent}")"
+    if [ -n "${file}" ] && [ -f "${file}" ]; then
+        cat "${file}"
+    fi
+}
+
+save_session_id() {
+    local agent="$1"
+    local id="$2"
+    local file
+    file="$(session_file_for_agent "${agent}")"
+    if [ -n "${id}" ]; then
+        echo "${id}" > "${file}"
+        log "Saved ${agent} session ID: ${id}"
+    fi
+}
+
+save_session_ids_from_output() {
+    local output="$1"
+    local sid
+
+    sid=$(echo "${output}" | grep -E "OPENCODE_SESSION_ID:" | head -1 | sed 's/.*: //' || true)
+    save_session_id "opencode" "${sid}"
+
+    sid=$(echo "${output}" | grep -E "AGY_CONVERSATION_ID:" | head -1 | sed 's/.*: //' || true)
+    save_session_id "agy" "${sid}"
+}
+
+clear_session_id() {
+    rm -f "${OPENCODE_SESSION_FILE}" "${AGY_CONVERSATION_FILE}"
+}
+
+session_file_for_agent() {
+    local agent="$1"
+    case "${agent}" in
+        opencode) echo "${OPENCODE_SESSION_FILE}" ;;
+        agy) echo "${AGY_CONVERSATION_FILE}" ;;
+        *) echo "" ;;
+    esac
+}
+
+session_args() {
+    local agent="$1"
+    local id
+    id=$(get_session_id "${agent}")
+    if [ -n "${id}" ]; then
+        echo "--session ${id}"
+    fi
+}
+
+cli_session_args() {
+    local agent="$1"
+    local id
+    id=$(get_session_id "${agent}")
+    if [ -z "${id}" ]; then
+        return 0
+    fi
+    case "${agent}" in
+        opencode) echo "-s ${id}" ;;
+        agy) echo "--conversation ${id}" ;;
+    esac
+}
+
+# Determine if this is the first invocation (no session file yet)
+is_first_session() {
+    local agent="$1"
+    local file
+    file="$(session_file_for_agent "${agent}")"
+    [ -z "${file}" ] || [ ! -f "${file}" ]
+}
+
 # --- Parse arguments ---
 AGENT="agy"
 FALLBACK_AGENT="opencode"
@@ -203,6 +280,8 @@ done
 
 DATE="${DATE:-$(date -u +%Y-%m-%d)}"
 DAY_DIR="${SCRIPT_DIR}/runs/day_${DATE}"
+OPENCODE_SESSION_FILE="${DAY_DIR}/.opencode_session_id"
+AGY_CONVERSATION_FILE="${DAY_DIR}/.agy_conversation_id"
 
 SCHEDULE_PATH="${DAY_DIR}/match_schedule.md"
 PREDICTIONS_PATH="${DAY_DIR}/predictions.md"
@@ -246,13 +325,23 @@ SCHEDULE_VARS="${SCHEDULE_VARS},AGENT=${AGENT}"
 if [ -f "${SKILLS_RUNNER}" ]; then
     # Create a temporary symlink so run_skill.py can find this project's skills.
     ensure_skill_link "wc_daily_schedule" "${SCRIPT_DIR}/daily_schedule"
-    if OUTPUT=$(python3 "${SKILLS_RUNNER}" wc_daily_schedule --agent "${AGENT}" --vars "${SCHEDULE_VARS}"); then
+
+    SCHEDULE_SESSION_ARGS=""
+    if [ "${AGENT}" = "opencode" ] && is_first_session "${AGENT}"; then
+        SCHEDULE_SESSION_ARGS='--title "world cup prediction"'
+    else
+        SCHEDULE_SESSION_ARGS="$(session_args "${AGENT}")"
+    fi
+
+    if OUTPUT=$(python3 "${SKILLS_RUNNER}" wc_daily_schedule --agent "${AGENT}" ${SCHEDULE_SESSION_ARGS} --vars "${SCHEDULE_VARS}"); then
         echo "${OUTPUT}"
     else
         echo "Warning: ${AGENT} daily schedule failed. Trying ${FALLBACK_AGENT} fallback..." >&2
+        # Fallback starts fresh — no session reuse
         OUTPUT=$(python3 "${SKILLS_RUNNER}" wc_daily_schedule --agent "${FALLBACK_AGENT}" --vars "${SCHEDULE_VARS}")
         echo "${OUTPUT}"
     fi
+    save_session_ids_from_output "${OUTPUT}"
     # Extract the run directory from output
     RUN_DIR=$(echo "${OUTPUT}" | grep "Execution logs and metadata saved to:" | sed 's/Execution logs and metadata saved to: //')
     if [ -n "${RUN_DIR}" ] && [ -d "${RUN_DIR}" ]; then
@@ -270,14 +359,59 @@ else
     COMPILED="${COMPILED//\{TRACKER_PATH\}/${TRACKER_PATH}}"
     COMPILED="${COMPILED//\{OUTPUT_DIR\}/${DAY_DIR}}"
     if [ "${AGENT}" = "opencode" ]; then
-        opencode run --dangerously-skip-permissions "${COMPILED}" || {
+        SESSION_ARGS=""
+        if is_first_session "${AGENT}"; then
+            SESSION_ARGS='--title "world cup prediction"'
+        else
+            SID=$(get_session_id "${AGENT}")
+            if [ -n "${SID}" ]; then
+                SESSION_ARGS="-s ${SID}"
+            fi
+        fi
+        # shellcheck disable=SC2086
+        opencode run --dangerously-skip-permissions ${SESSION_ARGS} "${COMPILED}" || {
             echo "Warning: opencode failed. Trying agy fallback..." >&2
             agy --dangerously-skip-permissions --print "${COMPILED}"
         }
+        # Capture session ID from most recent session if first invocation
+        if is_first_session "${AGENT}"; then
+            SID=$(opencode session list --format json -n 5 2>/dev/null | python3 -c "
+import json, sys
+sessions = json.load(sys.stdin)
+for s in sessions:
+    if s.get('title') == 'world cup prediction':
+        print(s['id'])
+        break
+" 2>/dev/null)
+            save_session_id "${AGENT}" "${SID}"
+        fi
     else
-        agy --dangerously-skip-permissions --print "${COMPILED}" || {
+        AGY_SESSION_ARGS="$(cli_session_args "${AGENT}")"
+        # shellcheck disable=SC2086
+        agy --dangerously-skip-permissions ${AGY_SESSION_ARGS} --print "${COMPILED}" || {
             echo "Warning: agy failed. Trying opencode fallback..." >&2
-            opencode run --dangerously-skip-permissions "${COMPILED}"
+            SESSION_ARGS=""
+            if is_first_session "opencode"; then
+                SESSION_ARGS='--title "world cup prediction"'
+            else
+                SID=$(get_session_id "opencode")
+                if [ -n "${SID}" ]; then
+                    SESSION_ARGS="-s ${SID}"
+                fi
+            fi
+            # shellcheck disable=SC2086
+            opencode run --dangerously-skip-permissions ${SESSION_ARGS} "${COMPILED}"
+            if is_first_session "opencode"; then
+                SID=$(opencode session list --format json -n 5 2>/dev/null | python3 -c "
+import json, sys
+sessions = json.load(sys.stdin)
+for s in sessions:
+    if s.get('title') == 'world cup prediction':
+        print(s['id'])
+        break
+" 2>/dev/null)
+                save_session_id "opencode" "${SID}"
+            fi
         }
     fi
 fi
@@ -383,21 +517,48 @@ while [ "$(date -u +%s)" -lt "${LAST_END_EPOCH}" ]; do
     PREDICT_VARS_FALLBACK="${PREDICT_VARS_BASE},AGENT=${FALLBACK_EXEC_AGENT}"
 
     if [ -f "${SKILLS_RUNNER}" ]; then
-        if OUTPUT=$(python3 "${SKILLS_RUNNER}" wc_predict --agent "${EXEC_AGENT}" --model "${EXEC_MODEL}" --vars "${PREDICT_VARS_PRIMARY}"); then
+        PREDICT_SESSION_ARGS="$(session_args "${EXEC_AGENT}")"
+
+        if OUTPUT=$(python3 "${SKILLS_RUNNER}" wc_predict --agent "${EXEC_AGENT}" --model "${EXEC_MODEL}" ${PREDICT_SESSION_ARGS} --vars "${PREDICT_VARS_PRIMARY}"); then
             echo "${OUTPUT}"
         else
             echo "Warning: ${EXEC_AGENT} predict failed. Trying ${FALLBACK_EXEC_AGENT} fallback..." >&2
             OUTPUT=$(python3 "${SKILLS_RUNNER}" wc_predict --agent "${FALLBACK_EXEC_AGENT}" --model "${FALLBACK_EXEC_MODEL}" --vars "${PREDICT_VARS_FALLBACK}")
             echo "${OUTPUT}"
         fi
+        save_session_ids_from_output "${OUTPUT}"
         
-        # Extract run directory and read token usage
+        # Extract run directory, read token usage, and inject into changelog
         RUN_DIR=$(echo "${OUTPUT}" | grep "Execution logs and metadata saved to:" | sed 's/Execution logs and metadata saved to: //')
-        if [ -n "${RUN_DIR}" ] && [ -d "${RUN_DIR}" ]; then
-            if [ -f "${RUN_DIR}/run_metadata.json" ]; then
-                TOKENS_TEXT=$(python3 -c "import json; m=json.load(open('${RUN_DIR}/run_metadata.json')); u=m.get('token_usage'); print(f\"Tokens Used: {u['input_tokens']} input, {u['output_tokens']} output (Total: {u['total_tokens']})\" if u else 'Tokens Used: Unknown')")
-                log "${TOKENS_TEXT}"
-            fi
+        if [ -n "${RUN_DIR}" ] && [ -d "${RUN_DIR}" ] && [ -f "${RUN_DIR}/run_metadata.json" ]; then
+            python3 -c "
+import json, sys, os
+m = json.load(open('${RUN_DIR}/run_metadata.json'))
+u = m.get('token_usage')
+if u:
+    line = f\"**Tokens:** {u['input_tokens']} input + {u['output_tokens']} output = {u['total_tokens']} total\n\"
+    cl = '${CHANGELOG_PATH}'
+    if os.path.exists(cl):
+        with open(cl) as f:
+            content = f.read()
+        # Insert after the first blank line following '## Iteration'
+        idx = content.find('## Iteration')
+        if idx >= 0:
+            nl = content.find('\n\n', idx)
+            if nl >= 0:
+                content = content[:nl+2] + line + content[nl+2:]
+                with open(cl, 'w') as f:
+                    f.write(content)
+                print(f'Tokens: {u[\"input_tokens\"]}i + {u[\"output_tokens\"]}o = {u[\"total_tokens\"]}t')
+            else:
+                print('Tokens: Unknown (no gap after header)')
+        else:
+            print('Tokens: Unknown (no iteration header)')
+    else:
+        print('Tokens: Unknown (no changelog yet)')
+else:
+    print('Tokens: Unknown (no token data)')
+" | while read -r line; do log "${line}"; done
         fi
     else
         SKILL_CONTENT=$(cat "${SCRIPT_DIR}/predict/SKILL.md")
@@ -408,17 +569,22 @@ while [ "$(date -u +%s)" -lt "${LAST_END_EPOCH}" ]; do
         COMPILED="${COMPILED//\{CHANGELOG_PATH\}/${CHANGELOG_PATH}}"
         COMPILED="${COMPILED//\{INTERVAL_PATH\}/${INTERVAL_PATH}}"
         COMPILED="${COMPILED//\{OUTPUT_DIR\}/${DAY_DIR}}"
+        PREDICT_SESSION_ARGS="$(cli_session_args "${EXEC_AGENT}")"
         if [ "${EXEC_AGENT}" = "opencode" ]; then
-            opencode run --dangerously-skip-permissions --model "${EXEC_MODEL}" "${COMPILED}" || {
+            # shellcheck disable=SC2086
+            opencode run --dangerously-skip-permissions --model "${EXEC_MODEL}" ${PREDICT_SESSION_ARGS} "${COMPILED}" || {
                 echo "Warning: opencode predict failed. Trying agy fallback..." >&2
                 agy --dangerously-skip-permissions --model "${FALLBACK_EXEC_MODEL}" --print "${COMPILED}" || {
                     echo "Warning: Prediction iteration ${ITERATION} failed on both command line agents. Continuing." >&2
                 }
             }
         else
-            agy --dangerously-skip-permissions --model "${EXEC_MODEL}" --print "${COMPILED}" || {
+            # shellcheck disable=SC2086
+            agy --dangerously-skip-permissions --model "${EXEC_MODEL}" ${PREDICT_SESSION_ARGS} --print "${COMPILED}" || {
                 echo "Warning: agy predict failed. Trying opencode fallback..." >&2
-                opencode run --dangerously-skip-permissions --model "${FALLBACK_EXEC_MODEL}" "${COMPILED}" || {
+                PREDICT_FALLBACK_SESSION_ARGS="$(cli_session_args "opencode")"
+                # shellcheck disable=SC2086
+                opencode run --dangerously-skip-permissions --model "${FALLBACK_EXEC_MODEL}" ${PREDICT_FALLBACK_SESSION_ARGS} "${COMPILED}" || {
                     echo "Warning: Prediction iteration ${ITERATION} failed on both command line agents. Continuing." >&2
                 }
             }
@@ -493,13 +659,15 @@ POSTMORTEM_VARS="${POSTMORTEM_VARS},PREDICT_SKILL_PATH=${SCRIPT_DIR}/predict/SKI
 ensure_skill_link "wc_postmortem" "${SCRIPT_DIR}/postmortem"
 
 if [ -f "${SKILLS_RUNNER}" ]; then
-    if OUTPUT=$(python3 "${SKILLS_RUNNER}" wc_postmortem --agent "${AGENT}" --vars "${POSTMORTEM_VARS}"); then
+    POSTMORTEM_SESSION_ARGS="$(session_args "${AGENT}")"
+    if OUTPUT=$(python3 "${SKILLS_RUNNER}" wc_postmortem --agent "${AGENT}" ${POSTMORTEM_SESSION_ARGS} --vars "${POSTMORTEM_VARS}"); then
         echo "${OUTPUT}"
     else
         echo "Warning: ${AGENT} postmortem failed. Trying ${FALLBACK_AGENT} fallback..." >&2
         OUTPUT=$(python3 "${SKILLS_RUNNER}" wc_postmortem --agent "${FALLBACK_AGENT}" --vars "${POSTMORTEM_VARS}")
         echo "${OUTPUT}"
     fi
+    save_session_ids_from_output "${OUTPUT}"
     # Extract the run directory from output
     RUN_DIR=$(echo "${OUTPUT}" | grep "Execution logs and metadata saved to:" | sed 's/Execution logs and metadata saved to: //')
     if [ -n "${RUN_DIR}" ] && [ -d "${RUN_DIR}" ]; then
@@ -516,15 +684,20 @@ else
     COMPILED="${COMPILED//\{TRACKER_PATH\}/${TRACKER_PATH}}"
     COMPILED="${COMPILED//\{OUTPUT_DIR\}/${DAY_DIR}}"
     COMPILED="${COMPILED//\{PREDICT_SKILL_PATH\}/${SCRIPT_DIR}/predict/SKILL.md}"
+    POSTMORTEM_SESSION_ARGS="$(cli_session_args "${AGENT}")"
     if [ "${AGENT}" = "opencode" ]; then
-        opencode run --dangerously-skip-permissions "${COMPILED}" || {
+        # shellcheck disable=SC2086
+        opencode run --dangerously-skip-permissions ${POSTMORTEM_SESSION_ARGS} "${COMPILED}" || {
             echo "Warning: opencode postmortem failed. Trying agy fallback..." >&2
             agy --dangerously-skip-permissions --print "${COMPILED}"
         }
     else
-        agy --dangerously-skip-permissions --print "${COMPILED}" || {
+        # shellcheck disable=SC2086
+        agy --dangerously-skip-permissions ${POSTMORTEM_SESSION_ARGS} --print "${COMPILED}" || {
             echo "Warning: agy postmortem failed. Trying opencode fallback..." >&2
-            opencode run --dangerously-skip-permissions "${COMPILED}"
+            POSTMORTEM_FALLBACK_SESSION_ARGS="$(cli_session_args "opencode")"
+            # shellcheck disable=SC2086
+            opencode run --dangerously-skip-permissions ${POSTMORTEM_FALLBACK_SESSION_ARGS} "${COMPILED}"
         }
     fi
 fi

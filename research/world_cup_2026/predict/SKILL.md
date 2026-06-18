@@ -229,6 +229,7 @@ The changelog entry should be compact but auditable:
 ## Iteration <N> - <current UTC timestamp>
 **Model Used:** [model name/version]
 **Next Interval:** <minutes> minutes
+**Tokens:** [injected post-execution by orchestrator]
 
 ### Eligible Matches
 - [Match]: [not_started/live_pre_halftime/live_post_halftime/complete]

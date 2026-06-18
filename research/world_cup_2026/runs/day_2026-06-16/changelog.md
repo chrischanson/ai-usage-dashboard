@@ -1,5 +1,36 @@
 # 📝 World Cup 2026 Prediction Changelog — 2026-06-16
 
+## Iteration 4 - 2026-06-17T01:57:00Z
+**Model Used:** opencode: deepseek-v4-flash-free
+**Next Interval:** 65 minutes
+
+### Eligible Matches
+- France vs. Senegal: complete (verified previous iterations)
+- Iraq vs. Norway: complete (verified previous iterations)
+- Argentina vs. Algeria: live_post_halftime (frozen under Weighted Halftime Rule)
+- Austria vs. Jordan: not_started
+
+### Changes
+- Argentina vs. Algeria: No change — prediction frozen under Weighted Halftime Rule. Halftime score Argentina 1-0 Algeria (Messi 17') CONFIRMS the pre-halftime ARGENTINA WIN (High) prediction. Prediction frozen until estimated full time. Mahrez and Amoura still on bench at HT.
+- Austria vs. Jordan: No change — AUSTRIA WIN (Medium). No new material evidence since iteration 3. Awaiting official lineups at ~03:00 UTC.
+
+### Search Queries Executed
+- Argentina vs. Algeria: `Argentina vs Algeria World Cup 2026 live score June 17`, `Argentina Algeria World Cup 2026 match report goals halftime score`
+- Austria vs. Jordan: `Austria vs Jordan World Cup 2026 injury update Alaba fitness June 17`, `Austria vs Jordan betting odds World Cup 2026 June 17`
+
+### New Evidence
+- Argentina vs. Algeria: [official] FotMob — Halftime score 1-0, Messi 17' (De Paul assist). Possession 56%-44%, xG 0.19-0.10. Chaïbi goal disallowed (offside, 8'). Mahrez/Amoura on bench at HT.
+
+### Open Questions Resolved
+- Argentina vs. Algeria: "What is the halftime score?" — 1-0 Argentina. Confirms prediction (Weighted Halftime Rule applied). "Did Mahrez/Amoura enter?" — Not in first half.
+
+### New Questions Raised
+- Argentina vs. Algeria: Final score verification needed next iteration. Will Mahrez/Amoura enter in second half? Messi workload minutes — subbed or completed match?
+- Austria vs. Jordan: Official lineups expected at ~03:00 UTC — will be reviewed in iteration 5.
+
+### Next Interval Reason
+- Wrote `65` minutes to `/home/dev/workspace/main/research/world_cup_2026/prediction_interval.txt` because the next run at ~03:00 UTC will capture both the Argentina final result (estimated FT ~02:55) and the Austria lineup window (official lineups expected ~03:00, 60 min before 04:00 kickoff). Argentina is frozen under Weighted Halftime Rule, so no urgent live monitoring is needed, but Austria's lineup release is the next material information event. Interval set slightly above the 60-min minimum to account for the frozen status while still catching the lineup release.
+
 ## Iteration 3 - 2026-06-17T00:03:53Z
 **Model Used:** opencode: deepseek-v4-flash-free
 **Next Interval:** 110 minutes
