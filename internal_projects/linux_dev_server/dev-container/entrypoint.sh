@@ -45,12 +45,26 @@ chown -R dev:dev /home/dev/.ssh
 mkdir -p /home/dev/.config/gh
 chown -R dev:dev /home/dev/.config/gh
 
+# ── Ensure persistent directories exist and have correct ownership ──
+mkdir -p /home/dev/.npm-global
+mkdir -p /home/dev/.local/bin
+mkdir -p /home/dev/.opencode/bin
+chown -R dev:dev /home/dev/.npm-global /home/dev/.local /home/dev/.opencode 2>/dev/null || true
+
+# Ensure .npmrc has npm global prefix configured
+NPMRC="/home/dev/.npmrc"
+if [ ! -f "$NPMRC" ] || ! grep -q "prefix=" "$NPMRC"; then
+    echo "prefix=/home/dev/.npm-global" >> "$NPMRC"
+    chown dev:dev "$NPMRC"
+fi
+
 # ── Export environment variables for SSH sessions ─────────────
 # SSH strips Docker env vars upon login. We must explicitly write
 # the AI keys into a profile script so the dev user has access.
 # Model values are sourced from the mounted config file so they can
 # be changed at runtime without restarting the container.
 cat <<EOF > /etc/profile.d/ai-keys.sh
+export PATH="/home/dev/.npm-global/bin:/home/dev/.local/bin:/home/dev/.opencode/bin:\$PATH"
 export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
 export ANTHROPIC_BASE_URL="${ANTHROPIC_BASE_URL}"
 export ANTHROPIC_AUTH_TOKEN="${ANTHROPIC_AUTH_TOKEN}"
@@ -88,6 +102,7 @@ fi
 
 cat <<EOF >> "$BASHRC"
 $START_MARKER
+export PATH="/home/dev/.npm-global/bin:/home/dev/.local/bin:/home/dev/.opencode/bin:\$PATH"
 export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
 export ANTHROPIC_BASE_URL="${ANTHROPIC_BASE_URL}"
 export ANTHROPIC_AUTH_TOKEN="${ANTHROPIC_AUTH_TOKEN}"
@@ -120,19 +135,45 @@ chown dev:dev "$BASHRC"
 # Create a wrapper that sources the runtime model config before
 # every claude invocation. This covers docker exec, cron, and
 # any non-shell context where .bashrc is not sourced.
-# The guard checks for claude.real (created once) to stay idempotent.
-if [ -f /usr/local/bin/claude ] && [ ! -f /usr/local/bin/claude.real ]; then
-    mv /usr/local/bin/claude /usr/local/bin/claude.real
-    cat > /usr/local/bin/claude <<'WRAPPER'
+cat > /usr/local/bin/claude <<'WRAPPER'
 #!/usr/bin/env bash
 if [ -f /etc/claude-model.conf ]; then
   set -a
   . /etc/claude-model.conf
   set +a
 fi
-exec /usr/local/bin/claude.real "$@"
+if [ -f /home/dev/.npm-global/bin/claude ]; then
+  exec /home/dev/.npm-global/bin/claude "$@"
+else
+  echo "Error: Claude Code is not installed in /home/dev/.npm-global/bin/claude" >&2
+  exit 1
+fi
 WRAPPER
-    chmod +x /usr/local/bin/claude
+chmod +x /usr/local/bin/claude
+
+# ── Self-healing bootstrapping for missing tools ──────────────
+# If the container starts with a populated dev-home volume that is missing
+# these tools (e.g. from an older version of the container configuration),
+# bootstrap/install them automatically.
+if [ ! -f /home/dev/.npm-global/bin/claude ] || \
+   [ ! -f /home/dev/.npm-global/bin/codex ] || \
+   [ ! -f /home/dev/.npm-global/bin/gemini ]; then
+    echo "[entrypoint] Bootstrapping missing npm global AI tools..."
+    sudo -u dev PATH="/home/dev/.npm-global/bin:/home/dev/.local/bin:/home/dev/.opencode/bin:$PATH" \
+        npm install -g @anthropic-ai/claude-code @openai/codex @google/gemini-cli || true
+fi
+
+if [ ! -f /home/dev/.opencode/bin/opencode ]; then
+    echo "[entrypoint] Bootstrapping missing OpenCode..."
+    LATEST_VERSION=$(curl -sI https://github.com/anomalyco/opencode/releases/latest | grep -i "location:" | sed -n 's/.*\/tag\/v\([0-9.]*\).*/\1/p' | tr -d '\r')
+    sudo -u dev PATH="/home/dev/.npm-global/bin:/home/dev/.local/bin:/home/dev/.opencode/bin:$PATH" \
+        bash -c "curl -fsSL https://opencode.ai/install | bash -s -- '$LATEST_VERSION'" || true
+fi
+
+if [ ! -f /home/dev/.local/bin/agy ]; then
+    echo "[entrypoint] Bootstrapping missing Antigravity CLI..."
+    sudo -u dev PATH="/home/dev/.npm-global/bin:/home/dev/.local/bin:/home/dev/.opencode/bin:$PATH" \
+        bash -c "curl -fsSL https://antigravity.google/cli/install.sh | bash" || true
 fi
 
 # ── Tailscale (mesh networking) ───────────────────────────────

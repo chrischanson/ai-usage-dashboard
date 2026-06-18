@@ -40,35 +40,11 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# ── Claude Code CLI ────────────────────────────────────────────
+# ── Claude Code CLI dependencies ────────────────────────────────
 # NodeSource .deb ships a broken npm (missing promise-retry); use corepack
 # to upgrade npm instead of the broken npm trying to upgrade itself.
 RUN corepack enable \
-    && corepack prepare npm@latest --activate \
-    && npm install -g @anthropic-ai/claude-code
-
-# ── OpenCode (OpenRouter TUI agent) ────────────────────────────
-# Install globally so all users can access it
-RUN curl -fsSL https://opencode.ai/install | bash \
-    && mv /root/.opencode/bin/opencode /usr/local/bin/ || \
-    echo "WARNING: OpenCode install failed — skipping (can install later)"
-
-# ── OpenAI Codex CLI ───────────────────────────────────────────
-# Terminal-native AI coding agent by OpenAI.
-# Uses OPENAI_API_KEY (can be pointed at OpenRouter via OPENAI_BASE_URL)
-RUN npm install -g @openai/codex
-
-# ── Gemini CLI ─────────────────────────────────────────────────
-# Google's open-source AI coding agent.
-# Authenticates via Google OAuth or GEMINI_API_KEY env var.
-RUN npm install -g @google/gemini-cli
-
-# ── Antigravity CLI (Google) ───────────────────────────────────
-# Terminal AI coding agent with multi-step reasoning and tool
-# calling. Authenticates via Google OAuth or ANTIGRAVITY_API_KEY.
-RUN curl -fsSL https://antigravity.google/cli/install.sh | bash \
-    && mv /root/.local/bin/agy /usr/local/bin/ || \
-    echo "WARNING: Antigravity CLI install failed — skipping"
+    && corepack prepare npm@latest --activate
 
 # ── Bazelisk (manages Bazel versions automatically) ────────────
 # Bazelisk downloads the correct Bazel version based on .bazelversion
@@ -118,6 +94,20 @@ RUN cd /home/$USERNAME/workspace/main \
     && git config --global push.autoSetupRemote true \
     && git config --global credential.helper 'store --file /home/dev/workspace/.git-credentials' \
     && git init
+
+# ── AI Coding Tools (Installed inside persistent home volume) ──
+ENV PATH="/home/dev/.npm-global/bin:/home/dev/.local/bin:/home/dev/.opencode/bin:${PATH}"
+
+RUN mkdir -p /home/dev/.npm-global \
+    && npm config set prefix "/home/dev/.npm-global" \
+    && npm install -g @anthropic-ai/claude-code @openai/codex @google/gemini-cli
+
+RUN LATEST_VERSION=$(curl -sI https://github.com/anomalyco/opencode/releases/latest | grep -i "location:" | sed -n 's/.*\/tag\/v\([0-9.]*\).*/\1/p' | tr -d '\r') \
+    && curl -fsSL https://opencode.ai/install | bash -s -- "$LATEST_VERSION" || \
+    echo "WARNING: OpenCode install failed — skipping (can install later)"
+
+RUN curl -fsSL https://antigravity.google/cli/install.sh | bash || \
+    echo "WARNING: Antigravity CLI install failed — skipping"
 
 # ── Entrypoint (must run as root for sshd) ─────────────────────
 USER root
