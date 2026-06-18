@@ -75,6 +75,7 @@ class RaceResult:
     extracted_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat(timespec="seconds"))
     extraction_method: str = "seed"
     confidence: str = "unknown"
+    status: str = "active"
     notes: str = ""
     raw_evidence: list[str] = field(default_factory=list)
 
@@ -98,6 +99,30 @@ class RaceResult:
             notes=race.notes,
         )
 
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any]) -> "RaceResult":
+        return cls(
+            id=str(raw["id"]),
+            name=str(raw["name"]),
+            city=str(raw["city"]),
+            country=str(raw["country"]),
+            region=str(raw["region"]),
+            official_url=str(raw.get("official_url", "")),
+            registration_url=str(raw["registration_url"]) if raw.get("registration_url") else None,
+            event_date=str(raw["event_date"]) if raw.get("event_date") else None,
+            registration_open_date=str(raw["registration_open_date"]) if raw.get("registration_open_date") else None,
+            registration_deadline=str(raw["registration_deadline"]) if raw.get("registration_deadline") else None,
+            lottery_deadline=str(raw["lottery_deadline"]) if raw.get("lottery_deadline") else None,
+            qualification_deadline=str(raw["qualification_deadline"]) if raw.get("qualification_deadline") else None,
+            source_url=str(raw["source_url"]) if raw.get("source_url") else None,
+            extracted_at=str(raw.get("extracted_at", "")),
+            extraction_method=str(raw.get("extraction_method", "seed")),
+            confidence=str(raw.get("confidence", "unknown")),
+            status=str(raw.get("status", "active")),
+            notes=str(raw.get("notes", "")),
+            raw_evidence=list(raw.get("raw_evidence", [])),
+        )
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
@@ -116,6 +141,7 @@ class RaceResult:
             "extracted_at": self.extracted_at,
             "extraction_method": self.extraction_method,
             "confidence": self.confidence,
+            "status": self.status,
             "notes": self.notes,
             "raw_evidence": self.raw_evidence,
         }

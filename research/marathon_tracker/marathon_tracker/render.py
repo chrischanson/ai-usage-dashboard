@@ -89,6 +89,7 @@ def render_html(payload: dict[str, object]) -> str:
             <th>Registration Deadline</th>
             <th>Lottery Deadline</th>
             <th>Qualification Deadline</th>
+            <th>Status</th>
             <th>Confidence</th>
             <th>Source</th>
           </tr>
@@ -106,6 +107,7 @@ def render_html(payload: dict[str, object]) -> str:
 
 def render_row(race: dict[str, object]) -> str:
     confidence = esc(race.get("confidence"))
+    status = esc(race.get("status", "active"))
     source = race.get("source_url") or race.get("official_url")
     source_html = f'<a href="{esc(source)}">official page</a>' if source else ""
     return f"""          <tr>
@@ -117,6 +119,7 @@ def render_row(race: dict[str, object]) -> str:
             <td>{date_or_dash(race.get("registration_deadline"))}</td>
             <td>{date_or_dash(race.get("lottery_deadline"))}</td>
             <td>{date_or_dash(race.get("qualification_deadline"))}</td>
+            <td class="confidence {status}">{status}</td>
             <td class="confidence {confidence}">{confidence}</td>
             <td>{source_html}</td>
           </tr>"""

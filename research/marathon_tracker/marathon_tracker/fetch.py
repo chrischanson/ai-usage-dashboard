@@ -42,6 +42,18 @@ def html_to_text(html: str) -> str:
     return parser.text()
 
 
+def check_url(url: str, timeout: int = 15) -> tuple[bool, str | None]:
+    try:
+        req = urllib.request.Request(url, method="HEAD")
+        req.add_header("User-Agent", "marathon-tracker/0.1 (+https://github.com/)")
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return True, None
+    except urllib.error.HTTPError as exc:
+        return False, f"HTTP {exc.code}"
+    except (urllib.error.URLError, TimeoutError, ValueError) as exc:
+        return False, str(exc)
+
+
 def fetch_text(url: str, timeout: int = 30, retries: int = 2) -> str:
     headers = {
         "User-Agent": "marathon-tracker/0.1 (+https://github.com/)",

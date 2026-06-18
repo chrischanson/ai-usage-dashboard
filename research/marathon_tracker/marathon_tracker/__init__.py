@@ -1,4 +1,4 @@
 """Tools for researching marathon dates and registration deadlines."""
 
-__all__ = ["update"]
+__all__ = ["update", "discover"]
 
