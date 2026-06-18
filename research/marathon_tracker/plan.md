@@ -1,6 +1,6 @@
 # Marathon Tracker Plan
 
-> Research project for tracking marathon race dates and registration deadlines worldwide, updating those results periodically, and publishing the latest output to GitHub Pages.
+> Research project for tracking marathon race dates and registration deadlines worldwide, updating those results periodically, and publishing the latest output as a markdown file.
 
 ## Goal
 
@@ -9,7 +9,7 @@ Build a repeatable research pipeline that:
 1. Discovers official marathon race pages around the world from authoritative directories.
 2. Extracts key dates such as registration open dates, deadlines, lottery dates, qualification dates, and event dates.
 3. Re-runs on a schedule so the dataset stays current.
-4. Publishes the latest results as a static GitHub Pages site.
+4. Publishes the latest results as a markdown summary committed to the repository.
 
 ## Scope
 
@@ -17,7 +17,7 @@ This project is intentionally focused on official sources and durable output.
 
 - Primary source of truth: official race websites, entry pages, and race announcements.
 - Secondary assistance: an LLM that interprets page text and normalizes dates.
-- Output format: static JSON plus a readable HTML page.
+- Output format: a markdown summary (committed to repo) plus a JSON baseline (internal carry-over, not published).
 - Refresh mode: manual runs and scheduled runs.
 
 ## Working Model
@@ -51,8 +51,7 @@ Each run follows three phases:
 8. Ask the LLM to extract date fields when credentials are available.
 9. Fall back to deterministic regex extraction when the LLM is unavailable.
 10. Merge the extracted data into a stable result record.
-11. Render `docs/marathons.json` and `docs/index.html`.
-12. Publish `docs/` through GitHub Pages.
+11. Render `docs/marathons.json` (internal baseline, not committed) and `docs/marathons.md` (human-readable summary, committed).
 
 ## Data Fields
 
@@ -92,12 +91,11 @@ The updater should prefer stable behavior over aggressive guessing.
 
 ## Publishing Strategy
 
-GitHub Pages is the distribution target.
+The output is committed directly to the repository — no separate deployment step.
 
-- `docs/` is the publish directory.
-- `docs/index.html` is the human-facing landing page.
-- `docs/marathons.json` is the machine-readable dataset.
-- The GitHub Actions workflow runs daily and can also be triggered manually.
+- `docs/marathons.md` is the human-readable summary (committed, visible on GitHub).
+- `docs/marathons.json` is the machine-readable dataset and carry-over baseline (gitignored, not committed).
+- The GitHub Actions workflow runs daily and can also be triggered manually, then commits the updated `.md` file.
 - If the repo has an `LLM_API_KEY` secret, the workflow can extract richer data in CI.
 
 ## Job Design
@@ -116,14 +114,15 @@ daily run:
         - reachable:   fetch page → extract dates (LLM or regex) → status=active
         - unreachable: keep last known data, status=stale, confidence=low
      c. if no: carry over from previous output unchanged, status=carried-over
-  6. render docs/marathons.json and docs/index.html
-  7. commit docs/ and deploy to GitHub Pages
+   6. render docs/marathons.json (internal baseline) and docs/marathons.md (summary)
+   7. commit docs/marathons.md to the repository
 
 Key invariants:
 - A race is never removed from the output once added — only marked stale or carried-over.
 - The curated list always overrides auto-discovered/same-id races.
 - `config/races.json` only gets new races appended — never pruned or overwritten.
-- `docs/marathons.json` is both the output artifact and the input baseline for the next run.
+- `docs/marathons.json` is the internal carry-over baseline for the next run (gitignored).
+- `docs/marathons.md` is the published summary (committed to git).
 
 ## Milestones
 
@@ -152,23 +151,23 @@ Acceptance criteria:
 
 ### 3. Render static outputs
 
-Generate a readable HTML summary and a structured JSON dataset.
+Generate a markdown summary and a structured JSON dataset.
 
 Acceptance criteria:
 
-- `docs/index.html` loads in a browser.
+- `docs/marathons.md` renders as a readable table on GitHub.
 - `docs/marathons.json` validates as JSON.
-- The HTML page shows the current records in a sortable or scannable table.
+- The markdown file shows the current records with their dates, confidence, and status.
 
-### 4. Publish through GitHub Pages
+### 4. Commit results via CI
 
-Add a workflow that updates the static site in CI.
+Add a workflow that updates the output in CI.
 
 Acceptance criteria:
 
 - The workflow runs on schedule.
 - The workflow can be run manually.
-- The generated `docs/` contents are deployed to GitHub Pages.
+- The generated `docs/marathons.md` is committed to the repository.
 
 ### 5. Automatically discover new races
 
@@ -359,8 +358,8 @@ The repo already contains:
 
 - a curated race list in `config/races.json`
 - the update pipeline in `marathon_tracker/`
-- rendered static output in `docs/`
-- a GitHub Pages workflow in `.github/workflows/marathon-tracker.yml`
+- rendered static output in `docs/marathons.md` and internal baseline `docs/marathons.json`
+- a CI workflow in `.github/workflows/marathon-tracker.yml`
 
 The next useful work is to expand the update pipeline with:
 - auto-discovery of new races (Phase A)

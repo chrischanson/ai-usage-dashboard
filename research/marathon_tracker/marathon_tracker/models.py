@@ -34,7 +34,7 @@ class Race:
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "Race":
-        required = ["id", "name", "city", "country", "region", "official_url"]
+        required = ["id", "name", "city", "country", "region"]
         missing = [key for key in required if not raw.get(key)]
         if missing:
             raise ValueError(f"race entry missing required fields: {', '.join(missing)}")

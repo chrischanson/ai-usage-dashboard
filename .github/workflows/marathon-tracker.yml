@@ -7,11 +7,9 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 concurrency:
-  group: marathon-tracker-pages
+  group: marathon-tracker
   cancel-in-progress: false
 
 jobs:
@@ -37,17 +35,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add research/marathon_tracker/docs
+          git add research/marathon_tracker/docs/marathons.md
           git diff --cached --quiet || git commit -m "Update marathon tracker data"
           git push
-
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: research/marathon_tracker/docs
-
-      - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v4

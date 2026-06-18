@@ -22,4 +22,7 @@ __pycache__/
 # Temporary agentic skill links
 /skills/wc_*
 
+# Marathon tracker internal baseline (not committed)
+research/marathon_tracker/docs/marathons.json
+
 
