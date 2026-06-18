@@ -328,7 +328,7 @@ if [ -f "${SKILLS_RUNNER}" ]; then
 
     SCHEDULE_SESSION_ARGS=""
     if [ "${AGENT}" = "opencode" ] && is_first_session "${AGENT}"; then
-        SCHEDULE_SESSION_ARGS='--title "world cup prediction"'
+        SCHEDULE_SESSION_ARGS="--title world-cup-prediction"
     else
         SCHEDULE_SESSION_ARGS="$(session_args "${AGENT}")"
     fi
@@ -361,7 +361,7 @@ else
     if [ "${AGENT}" = "opencode" ]; then
         SESSION_ARGS=""
         if is_first_session "${AGENT}"; then
-            SESSION_ARGS='--title "world cup prediction"'
+            SESSION_ARGS="--title world-cup-prediction"
         else
             SID=$(get_session_id "${AGENT}")
             if [ -n "${SID}" ]; then
@@ -379,7 +379,7 @@ else
 import json, sys
 sessions = json.load(sys.stdin)
 for s in sessions:
-    if s.get('title') == 'world cup prediction':
+    if s.get('title') == 'world-cup-prediction':
         print(s['id'])
         break
 " 2>/dev/null)
@@ -392,7 +392,7 @@ for s in sessions:
             echo "Warning: agy failed. Trying opencode fallback..." >&2
             SESSION_ARGS=""
             if is_first_session "opencode"; then
-                SESSION_ARGS='--title "world cup prediction"'
+                SESSION_ARGS="--title world-cup-prediction"
             else
                 SID=$(get_session_id "opencode")
                 if [ -n "${SID}" ]; then
@@ -406,7 +406,7 @@ for s in sessions:
 import json, sys
 sessions = json.load(sys.stdin)
 for s in sessions:
-    if s.get('title') == 'world cup prediction':
+    if s.get('title') == 'world-cup-prediction':
         print(s['id'])
         break
 " 2>/dev/null)
