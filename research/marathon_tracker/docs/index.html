@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Marathon Tracker</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17202a;
+      --muted: #5f6b7a;
+      --line: #d7dee8;
+      --surface: #f7f9fb;
+      --accent: #0b6bcb;
+      --warn: #8a5a00;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      font: 15px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #ffffff;
+    }
+    header {
+      padding: 28px clamp(16px, 4vw, 48px) 18px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface);
+    }
+    h1 { margin: 0 0 8px; font-size: clamp(28px, 4vw, 42px); letter-spacing: 0; }
+    .meta { margin: 0; color: var(--muted); max-width: 760px; }
+    main { padding: 20px clamp(12px, 3vw, 40px) 40px; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); }
+    table { width: 100%; border-collapse: collapse; min-width: 980px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { font-size: 12px; text-transform: uppercase; color: var(--muted); background: #f0f4f8; }
+    tr:last-child td { border-bottom: 0; }
+    a { color: var(--accent); }
+    .muted { color: var(--muted); }
+    .confidence { font-weight: 650; }
+    .low, .unknown { color: var(--warn); }
+    @media (max-width: 720px) {
+      header { padding-top: 20px; }
+      th, td { padding: 9px 10px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Marathon Tracker</h1>
+    <p class="meta">10 races tracked. Generated 2026-06-18T15:30:26+00:00 UTC from official race pages where available.</p>
+  </header>
+  <main>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Race</th>
+            <th>Location</th>
+            <th>Region</th>
+            <th>Event Date</th>
+            <th>Registration Opens</th>
+            <th>Registration Deadline</th>
+            <th>Lottery Deadline</th>
+            <th>Qualification Deadline</th>
+            <th>Confidence</th>
+            <th>Source</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Sanlam Cape Town Marathon</strong><br><span class="muted">Curated from Sanlam Cape Town Marathon official 2027 entries page on 2026-06-18.</span></td>
+            <td>Cape Town, South Africa</td>
+            <td>Africa</td>
+            <td><span class="muted">-</span></td>
+            <td>2026-06-10</td>
+            <td>2026-06-24</td>
+            <td>2026-06-24</td>
+            <td><span class="muted">-</span></td>
+            <td class="confidence high">high</td>
+            <td><a href="https://capetownmarathon.com/marathon/">official page</a></td>
+          </tr>
+          <tr>
+            <td><strong>Tokyo Marathon</strong><br><span class="muted">Curated from Tokyo Marathon official 2027 entry schedule and announcement pages on 2026-06-18.</span></td>
+            <td>Tokyo, Japan</td>
+            <td>Asia</td>
+            <td>2027-03-07</td>
+            <td>2026-08-14</td>
+            <td>2026-08-28</td>
+            <td>2026-08-28</td>
+            <td>2026-09-30</td>
+            <td class="confidence high">high</td>
+            <td><a href="https://www.marathon.tokyo/en/20th/">official page</a></td>
+          </tr>
+          <tr>
+            <td><strong>BMW Berlin Marathon</strong><br><span class="muted">Curated from BMW Berlin Marathon official registration information on 2026-06-18.</span></td>
+            <td>Berlin, Germany</td>
+            <td>Europe</td>
+            <td>2026-09-27</td>
+            <td>2025-09-25</td>
+            <td>2025-11-06</td>
+            <td>2025-11-06</td>
+            <td><span class="muted">-</span></td>
+            <td class="confidence high">high</td>
+            <td><a href="https://www.bmw-berlin-marathon.com/en/registration/registration-information">official page</a></td>
+          </tr>
+          <tr>
+            <td><strong>Schneider Electric Marathon de Paris</strong><br><span class="muted">Curated from Schneider Electric Marathon de Paris official registration and news pages on 2026-06-18.</span></td>
+            <td>Paris, France</td>
+            <td>Europe</td>
+            <td>2026-04-12</td>
+            <td>2025-04-24</td>
+            <td><span class="muted">-</span></td>
+            <td><span class="muted">-</span></td>
+            <td><span class="muted">-</span></td>
+            <td class="confidence medium">medium</td>
+            <td><a href="https://www.schneiderelectricparismarathon.com/en/registration/register">official page</a></td>
+          </tr>
+          <tr>
+            <td><strong>TCS London Marathon</strong><br><span class="muted">Curated from London Marathon official ballot page on 2026-06-18.</span></td>
+            <td>London, United Kingdom</td>
+            <td>Europe</td>
+            <td>2027-04-25</td>
+            <td>2026-04-24</td>
+            <td>2026-05-01</td>
+            <td>2026-05-01</td>
+            <td><span class="muted">-</span></td>
+            <td class="confidence high">high</td>
+            <td><a href="https://www.tcslondonmarathon.com/enter/how-to-enter/ballot-entry">official page</a></td>
+          </tr>
+          <tr>
+            <td><strong>Bank of America Chicago Marathon</strong><br><span class="muted">Curated from Chicago Marathon official FAQ and press pages on 2026-06-18.</span></td>
+            <td>Chicago, United States</td>
+            <td>North America</td>
+            <td>2026-10-11</td>
+            <td>2025-10-21</td>
+            <td>2025-11-18</td>
+            <td>2025-11-18</td>
+            <td><span class="muted">-</span></td>
+            <td class="confidence medium">medium</td>
+            <td><a href="https://www.chicagomarathon.com/runners/frequently-asked-application-questions/">official page</a></td>
+          </tr>
+          <tr>
+            <td><strong>Boston Marathon</strong><br><span class="muted">Curated from B.A.A. official pages on 2026-06-18; exact 2027 registration week dates were not yet represented as a full date.</span></td>
+            <td>Boston, United States</td>
+            <td>North America</td>
+            <td>2027-04-19</td>
+            <td><span class="muted">-</span></td>
+            <td><span class="muted">-</span></td>
+            <td><span class="muted">-</span></td>
+            <td><span class="muted">-</span></td>
+            <td class="confidence medium">medium</td>
+            <td><a href="https://www.baa.org/races/boston-marathon/">official page</a></td>
+          </tr>
+          <tr>
+            <td><strong>TCS New York City Marathon</strong><br><span class="muted">Curated from NYRR official 2026 entry and qualifier pages on 2026-06-18.</span></td>
+            <td>New York, United States</td>
+            <td>North America</td>
+            <td>2026-11-01</td>
+            <td>2026-02-04</td>
+            <td>2026-02-25</td>
+            <td>2026-02-25</td>
+            <td>2026-12-31</td>
+            <td class="confidence high">high</td>
+            <td><a href="https://www.nyrr.org/tcsnycmarathon/runners/entry/2026">official page</a></td>
+          </tr>
+          <tr>
+            <td><strong>TCS Sydney Marathon</strong><br><span class="muted">Curated from Sydney Marathon official homepage ballot information on 2026-06-18.</span></td>
+            <td>Sydney, Australia</td>
+            <td>Oceania</td>
+            <td>2026-08-30</td>
+            <td>2025-09-24</td>
+            <td>2025-10-17</td>
+            <td>2025-10-17</td>
+            <td><span class="muted">-</span></td>
+            <td class="confidence high">high</td>
+            <td><a href="https://sydneymarathon.com/">official page</a></td>
+          </tr>
+          <tr>
+            <td><strong>Maratona do Rio</strong><br><span class="muted">Curated from Maratona do Rio official sales channel and rules pages on 2026-06-18.</span></td>
+            <td>Rio de Janeiro, Brazil</td>
+            <td>South America</td>
+            <td>2026-06-07</td>
+            <td>2025-11-12</td>
+            <td>2025-11-26</td>
+            <td>2025-11-26</td>
+            <td><span class="muted">-</span></td>
+            <td class="confidence high">high</td>
+            <td><a href="https://www.maratonadorio.com.br/canais-de-venda">official page</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</body>
+</html>
