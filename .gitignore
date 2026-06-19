@@ -25,4 +25,8 @@ __pycache__/
 # Marathon tracker internal baseline (not committed)
 research/marathon_tracker/docs/marathons.json
 
+# Agent session tracking files (per-execution, not for version control)
+.agy_conversation_id
+.opencode_session_id
+
 
