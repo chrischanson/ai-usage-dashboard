@@ -250,8 +250,8 @@ is_first_session() {
 }
 
 # --- Parse arguments ---
-AGENT="agy"
-FALLBACK_AGENT="opencode"
+AGENT="opencode"
+FALLBACK_AGENT="agy"
 DATE=""
 POSTMORTEM_ONLY=0
 
@@ -701,6 +701,18 @@ else
         }
     fi
 fi
+
+echo ""
+echo "--- Committing changes to git ---"
+cd "${SCRIPT_DIR}" || true
+git add -A "${SCRIPT_DIR}/"
+if git diff --cached --quiet; then
+    echo "Nothing new to commit."
+else
+    git commit -m "world cup 2026: day ${DATE} predictions"
+    echo "Committed."
+fi
+cd "${OLDPWD}" || true
 
 echo ""
 echo "=========================================="
