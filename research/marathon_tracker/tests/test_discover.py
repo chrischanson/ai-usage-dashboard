@@ -218,27 +218,47 @@ class LoadPreviousOutputTest(unittest.TestCase):
 
     def test_reads_valid_previous_output(self):
         from marathon_tracker.config import load_previous_output
-        data = {
-            "generated_at": "2026-01-01T00:00:00+00:00",
-            "count": 1,
-            "races": [
-                {"id": "test", "name": "Test", "city": "City", "country": "Country",
-                 "region": "Region", "official_url": "https://example.com",
-                 "registration_url": None, "source_url": "https://example.com",
-                 "event_date": "2026-06-01", "extracted_at": "2026-01-01T00:00:00+00:00",
-                 "extraction_method": "seed", "confidence": "high", "status": "active",
-                 "notes": "", "raw_evidence": []}
-            ],
-        }
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            json.dump(data, f)
+        from marathon_tracker.db import init_db
+        import sqlite3
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
             tmp = Path(f.name)
         try:
+            conn = sqlite3.connect(tmp)
+            conn.row_factory = sqlite3.Row
+            init_db(conn)
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO locations (city, country, region) VALUES ('City', 'Country', 'Region')")
+            location_id = cursor.execute("SELECT id FROM locations").fetchone()["id"]
+            cursor.execute("INSERT INTO races (id, name, location_id, official_url) VALUES ('test', 'Test', ?, 'https://example.com')", (location_id,))
+            cursor.execute("INSERT INTO race_events (race_id, year, event_date, status) VALUES ('test', 2026, '2026-06-01', 'active')")
+            event_id = cursor.execute("SELECT id FROM race_events").fetchone()["id"]
+            cursor.execute("INSERT INTO extraction_metadata (event_id, source_url, extracted_at, extraction_method, confidence, notes, raw_evidence) VALUES (?, 'https://example.com', '2026-01-01T00:00:00+00:00', 'seed', 'high', '', '[]')", (event_id,))
+            
+            # Insert official url and link to registration window
+            cursor.execute("INSERT INTO official_urls (url) VALUES ('https://official-window.com')")
+            url_id = cursor.execute("SELECT id FROM official_urls").fetchone()["id"]
+            cursor.execute("""
+                INSERT INTO registration_windows (event_id, window_type, description, open_date, close_date, official_url_id)
+                VALUES (?, 'standard', 'Standard Entry', '2026-01-01', '2026-02-01', ?)
+            """, (event_id, url_id))
+            
+            conn.commit()
+            conn.close()
+            
             result = load_previous_output(tmp)
             self.assertIsNotNone(result)
-            self.assertIn("test", result)
-            self.assertEqual(result["test"].name, "Test")
-            self.assertEqual(result["test"].status, "active")
+            self.assertIn(("test", 2026), result)
+            self.assertEqual(result[("test", 2026)].name, "Test")
+            self.assertEqual(result[("test", 2026)].status, "active")
+            
+            # Verify window loading and official URL mapping
+            windows = result[("test", 2026)].registration_windows
+            self.assertEqual(len(windows), 1)
+            self.assertEqual(windows[0].window_type, "standard")
+            self.assertEqual(windows[0].description, "Standard Entry")
+            self.assertEqual(windows[0].open_date, "2026-01-01")
+            self.assertEqual(windows[0].close_date, "2026-02-01")
+            self.assertEqual(windows[0].official_url, "https://official-window.com")
         finally:
             tmp.unlink()
 
@@ -302,33 +322,46 @@ class NeedsRefreshTest(unittest.TestCase):
         self.assertTrue(self._needs_refresh(r))
 
     def test_far_future_no_refresh(self):
-        r = self._make_result(event_date="2028-12-25",
-                               registration_open_date="2028-06-01",
-                               registration_deadline="2028-09-01",
-                               lottery_deadline="2028-08-01",
-                               qualification_deadline="2028-07-01")
+        from marathon_tracker.models import RegistrationWindow
+        r = self._make_result(
+            event_date="2028-12-25",
+            registration_windows=[
+                RegistrationWindow("standard", "2028-06-01", "2028-09-01"),
+                RegistrationWindow("lottery", None, "2028-08-01"),
+                RegistrationWindow("qualification", None, "2028-07-01")
+            ]
+        )
         self.assertFalse(self._needs_refresh(r))
 
     def test_missing_milestones_triggers_refresh(self):
-        r = self._make_result(event_date="2027-06-01",
-                               registration_open_date=None,
-                               registration_deadline=None)
+        r = self._make_result(
+            event_date="2027-06-01",
+            registration_windows=[]
+        )
         self.assertTrue(self._needs_refresh(r))
 
     def test_far_future_with_all_dates_no_refresh(self):
-        r = self._make_result(event_date="2027-12-25",
-                               registration_open_date="2027-01-01",
-                               registration_deadline="2027-11-01",
-                               lottery_deadline="2027-10-01",
-                               qualification_deadline="2027-09-01")
+        from marathon_tracker.models import RegistrationWindow
+        r = self._make_result(
+            event_date="2027-12-25",
+            registration_windows=[
+                RegistrationWindow("standard", "2027-01-01", "2027-11-01"),
+                RegistrationWindow("lottery", None, "2027-10-01"),
+                RegistrationWindow("qualification", None, "2027-09-01")
+            ]
+        )
         self.assertFalse(self._needs_refresh(r))
 
     def test_stale_data_triggers_refresh(self):
+        from marathon_tracker.models import RegistrationWindow
         old = "2020-01-01T00:00:00+00:00"
-        r = self._make_result(event_date="2027-12-25",
-                               registration_open_date="2027-01-01",
-                               registration_deadline="2027-11-01",
-                               extracted_at=old)
+        r = self._make_result(
+            event_date="2027-12-25",
+            registration_windows=[
+                RegistrationWindow("standard", "2027-01-01", "2027-11-01")
+            ],
+            extracted_at=old
+        )
         self.assertTrue(self._needs_refresh(r))
 
 

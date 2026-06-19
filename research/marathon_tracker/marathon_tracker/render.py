@@ -21,7 +21,6 @@ def write_outputs(results: list[RaceResult], docs_dir: Path) -> None:
         "count": len(results),
         "races": [result.to_dict() for result in sorted(results, key=lambda item: (item.region, item.name))],
     }
-    (docs_dir / "marathons.json").write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     (docs_dir / "marathons.md").write_text(render_markdown(payload), encoding="utf-8")
 
 
@@ -55,46 +54,81 @@ def render_markdown(payload: dict[str, object]) -> str:
         lines.append(f"## {CATEGORY_LABELS[cat_key]} ({len(group)})")
         lines.append("")
         lines.append(
-            "| Race | Location | Region | Event Date | Registration Opens | Registration Deadline | Lottery Deadline | Qualification Deadline | Confidence | Source |"
+            "| Race | Location | Region | Event Date | Registration Windows | Confidence | Source |"
         )
         lines.append(
-            "|------|----------|--------|------------|-------------------|-----------------------|------------------|------------------------|------------|--------|"
+            "|------|----------|--------|------------|----------------------|------------|--------|"
         )
         for race in group:
             name = _esc(race.get("name", ""))
+            if race.get("year"):
+                name = f"{name} ({race['year']})"
             city = _esc(race.get("city", ""))
             country = _esc(race.get("country", ""))
             region = _esc(race.get("region", ""))
             event_date = _date_or_dash(race.get("event_date"))
-            reg_opens = _date_or_dash(race.get("registration_open_date"))
-            reg_deadline = _date_or_dash(race.get("registration_deadline"))
-            lottery = _date_or_dash(race.get("lottery_deadline"))
-            qual = _date_or_dash(race.get("qualification_deadline"))
+            
+            # Format windows cell
+            windows_list = race.get("registration_windows") or []
+            windows_cell = _format_windows(windows_list)
+            
             confidence = _esc(race.get("confidence", ""))
             source = race.get("source_url") or race.get("official_url")
             source_cell = f"[link]({source})" if source else ""
 
             lines.append(
-                f"| **{name}** | {city}, {country} | {region} | {event_date} | {reg_opens} | {reg_deadline} | {lottery} | {qual} | {confidence} | {source_cell} |"
+                f"| **{name}** | {city}, {country} | {region} | {event_date} | {windows_cell} | {confidence} | {source_cell} |"
             )
         lines.append("")
 
     return "\n".join(lines)
 
 
+def _format_windows(windows: list[dict]) -> str:
+    if not windows:
+        return "-"
+        
+    def sort_key(w):
+        c = w.get("close_date") or ""
+        o = w.get("open_date") or ""
+        t = w.get("window_type", "")
+        return (c, o, t)
+        
+    sorted_windows = sorted(windows, key=sort_key)
+    formatted = []
+    for w in sorted_windows:
+        w_type = w.get("window_type", "")
+        desc = w.get("description") or w_type.replace("-", " ").title()
+        op = w.get("open_date")
+        cl = w.get("close_date")
+        
+        desc_esc = _esc(desc)
+        if op and cl:
+            formatted.append(f"**{desc_esc}**:<br>{op} to {cl}")
+        elif cl:
+            formatted.append(f"**{desc_esc}**:<br>deadline {cl}")
+        elif op:
+            formatted.append(f"**{desc_esc}**:<br>opens {op}")
+        else:
+            formatted.append(f"**{desc_esc}**")
+            
+    return "<br>".join(formatted)
+
+
 def _race_category(race: dict) -> str:
     today = datetime.now(timezone.utc).date()
 
     event = _parse_date(race.get("event_date"))
-    reg_open = _parse_date(race.get("registration_open_date"))
-    reg_deadline = _parse_date(race.get("registration_deadline"))
-    lottery = _parse_date(race.get("lottery_deadline"))
-    qual = _parse_date(race.get("qualification_deadline"))
-
     if event and event < today:
         return "match-completed"
 
-    deadlines = [d for d in (reg_deadline, lottery, qual) if d is not None]
+    windows = race.get("registration_windows") or []
+    deadlines = []
+    for w in windows:
+        cl = _parse_date(w.get("close_date"))
+        if cl:
+            deadlines.append(cl)
+
     if deadlines and max(deadlines) < today:
         return "closed-to-registration"
 

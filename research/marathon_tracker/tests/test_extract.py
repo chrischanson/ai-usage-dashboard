@@ -26,7 +26,14 @@ class ExtractTest(unittest.TestCase):
         """
         result = extract_dates(race, text)
         self.assertEqual(result.event_date, "2026-04-20")
-        self.assertEqual(result.registration_deadline, "2026-03-01")
+        
+        # Verify registration windows instead of deleted registration_deadline
+        self.assertEqual(len(result.registration_windows), 2)
+        standard_window = next(w for w in result.registration_windows if w.window_type == "standard")
+        self.assertEqual(standard_window.close_date, "2026-03-01")
+        qual_window = next(w for w in result.registration_windows if w.window_type == "qualification")
+        self.assertEqual(qual_window.close_date, "2026-01-15")
+        
         self.assertEqual(result.extraction_method, "regex")
         self.assertEqual(result.confidence, "medium")
 

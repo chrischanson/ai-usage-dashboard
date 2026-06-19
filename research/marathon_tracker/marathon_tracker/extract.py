@@ -4,7 +4,7 @@ import re
 from datetime import datetime
 
 from .llm import extract_with_llm
-from .models import DATE_FIELDS, Race, RaceResult
+from .models import Race, RaceResult, RegistrationWindow
 
 
 MONTHS = (
@@ -35,34 +35,68 @@ KEYWORD_MAP = {
 }
 
 
-def extract_dates(race: Race, page_text: str | None) -> RaceResult:
+def extract_dates(race: Race, page_text: str | None, source_url: str | None = None) -> RaceResult:
     result = RaceResult.from_race(race)
     if not page_text:
         result.extraction_method = "seed"
         if not result.notes:
             result.notes = "No page text was fetched; only configured race metadata is available."
+        url = source_url or result.source_url or result.official_url
+        if url:
+            for w in result.registration_windows:
+                if not w.official_url:
+                    w.official_url = url
         return result
 
+    url = source_url or result.source_url or result.official_url
     llm_result = extract_with_llm(race.name, page_text)
     if llm_result:
-        apply_extraction(result, llm_result, replace_existing=True)
+        apply_extraction(result, llm_result, replace_existing=True, source_url=url)
         result.extraction_method = "llm"
         if result.notes:
             result.notes = result.notes[:500]
         return result
 
     fallback = regex_extract(page_text)
-    apply_extraction(result, fallback, replace_existing=False)
+    apply_extraction(result, fallback, replace_existing=False, source_url=url)
     result.extraction_method = "regex"
     return result
 
 
-def apply_extraction(result: RaceResult, extraction: dict[str, object], replace_existing: bool) -> None:
-    for field in DATE_FIELDS:
-        value = extraction.get(field)
-        normalized = normalize_date(value) if isinstance(value, str) else None
-        if normalized and (replace_existing or not getattr(result, field)):
-            setattr(result, field, normalized)
+def apply_extraction(
+    result: RaceResult,
+    extraction: dict[str, object],
+    replace_existing: bool,
+    source_url: str | None = None
+) -> None:
+    # 1. Extract event_date
+    value = extraction.get("event_date")
+    normalized_event = normalize_date(value) if isinstance(value, str) else None
+    if normalized_event and (replace_existing or not result.event_date):
+        result.event_date = normalized_event
+
+    # 2. Extract registration_windows
+    extracted_windows = extraction.get("registration_windows")
+    if isinstance(extracted_windows, list):
+        windows = []
+        for w in extracted_windows:
+            if isinstance(w, dict):
+                w_type = w.get("window_type", "standard")
+                desc = w.get("description")
+                op = normalize_date(w.get("open_date"))
+                cl = normalize_date(w.get("close_date"))
+                if op or cl:
+                    windows.append(RegistrationWindow(
+                        window_type=str(w_type),
+                        open_date=op,
+                        close_date=cl,
+                        description=str(desc) if desc else None,
+                        official_url=str(w.get("official_url")) if w.get("official_url") else source_url
+                    ))
+        if windows and (replace_existing or not result.registration_windows):
+            result.registration_windows = windows
+
+    # 3. Metadata
     confidence = extraction.get("confidence")
     if replace_existing or result.confidence == "unknown":
         result.confidence = str(confidence) if confidence in {"high", "medium", "low", "unknown"} else "unknown"
@@ -82,13 +116,54 @@ def regex_extract(page_text: str) -> dict[str, object]:
         "raw_evidence": [],
     }
     evidence: list[str] = []
-    for field, keywords in KEYWORD_MAP.items():
-        value, line = find_date_near_keywords(lines, keywords)
-        if value:
-            extraction[field] = value
-            evidence.append(line)
+    
+    # Extract event_date
+    val, line = find_date_near_keywords(lines, KEYWORD_MAP["event_date"])
+    if val:
+        extraction["event_date"] = val
+        evidence.append(line)
+        
+    # Extract windows
+    windows = []
+    
+    # Standard Registration
+    open_val, open_line = find_date_near_keywords(lines, KEYWORD_MAP["registration_open_date"])
+    close_val, close_line = find_date_near_keywords(lines, KEYWORD_MAP["registration_deadline"])
+    if open_val or close_val:
+        windows.append({
+            "window_type": "standard",
+            "description": "Standard Registration",
+            "open_date": open_val,
+            "close_date": close_val
+        })
+        if open_line: evidence.append(open_line)
+        if close_line: evidence.append(close_line)
+        
+    # Lottery
+    lottery_val, lottery_line = find_date_near_keywords(lines, KEYWORD_MAP["lottery_deadline"])
+    if lottery_val:
+        windows.append({
+            "window_type": "lottery",
+            "description": "Lottery Application",
+            "open_date": None,
+            "close_date": lottery_val
+        })
+        if lottery_line: evidence.append(lottery_line)
+        
+    # Qualification
+    qual_val, qual_line = find_date_near_keywords(lines, KEYWORD_MAP["qualification_deadline"])
+    if qual_val:
+        windows.append({
+            "window_type": "qualification",
+            "description": "Qualification Window",
+            "open_date": None,
+            "close_date": qual_val
+        })
+        if qual_line: evidence.append(qual_line)
+        
+    extraction["registration_windows"] = windows
     extraction["raw_evidence"] = evidence[:5]
-    if any(extraction.get(field) for field in DATE_FIELDS):
+    if extraction.get("event_date") or windows:
         extraction["confidence"] = "medium"
     return extraction
 

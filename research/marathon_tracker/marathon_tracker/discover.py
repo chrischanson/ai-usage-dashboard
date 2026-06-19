@@ -81,51 +81,53 @@ def _run_graphql(season: int, group_id: str) -> list[dict[str, Any]]:
 def discover_from_world_athletics() -> list[Race]:
     from datetime import datetime
 
-    season = datetime.now().year
+    current_year = datetime.now().year
+    seasons = [current_year, current_year - 1]  # Query both 2026 and 2025
     country_map = _load_country_map()
 
     candidates: list[Race] = []
     seen_keys: set[str] = set()
 
-    for group_id in ("12",):  # Label Road Races
-        try:
-            competitions = _run_graphql(season, group_id)
-        except RuntimeError:
-            continue
-
-        for comp in competitions:
-            if not isinstance(comp, dict):
+    for season in seasons:
+        for group_id in ("12",):  # Label Road Races
+            try:
+                competitions = _run_graphql(season, group_id)
+            except RuntimeError:
                 continue
-            name = (comp.get("name") or "").strip()
-            if not name:
-                continue
-            venue = comp.get("venue") or {}
-            city = (venue.get("city") or "").strip()
-            country_code = (venue.get("countryCode") or "").strip().upper()
-            country = country_map.get(country_code, country_code)
-            subgroup = comp.get("competitionSubgroup") or ""
-            event_date = (comp.get("startDate") or "").strip()[:10]
 
-            race_id = _slugify(name)
-            if race_id in seen_keys:
-                continue
-            seen_keys.add(race_id)
+            for comp in competitions:
+                if not isinstance(comp, dict):
+                    continue
+                name = (comp.get("name") or "").strip()
+                if not name:
+                    continue
+                venue = comp.get("venue") or {}
+                city = (venue.get("city") or "").strip()
+                country_code = (venue.get("countryCode") or "").strip().upper()
+                country = country_map.get(country_code, country_code)
+                subgroup = comp.get("competitionSubgroup") or ""
+                event_date = (comp.get("startDate") or "").strip()[:10]
 
-            candidates.append(
-                Race(
-                    id=race_id,
-                    name=name,
-                    city=city,
-                    country=country,
-                    region=_guess_region(country),
-                    official_url="",
-                    registration_url=None,
-                    source_url=None,
-                    event_date=event_date or None,
-                    confidence="low",
-                    notes=f"Auto-discovered from World Athletics ({subgroup})",
+                race_id = _slugify(name)
+                if race_id in seen_keys:
+                    continue
+                seen_keys.add(race_id)
+
+                candidates.append(
+                    Race(
+                        id=race_id,
+                        name=name,
+                        city=city,
+                        country=country,
+                        region=_guess_region(country),
+                        official_url="",
+                        registration_url=None,
+                        source_url=None,
+                        event_date=event_date or None,
+                        confidence="low",
+                        notes=f"Auto-discovered from World Athletics ({subgroup} - {season})",
+                    )
                 )
-            )
     return candidates
 
 

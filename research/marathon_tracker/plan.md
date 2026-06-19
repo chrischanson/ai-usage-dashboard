@@ -6,7 +6,7 @@
 
 Build a repeatable research pipeline that:
 
-1. Discovers official marathon race pages around the world from authoritative directories.
+1. Discovers official marathon and half-marathon race pages around the world from authoritative directories.
 2. Extracts key dates such as registration open dates, deadlines, lottery dates, qualification dates, and event dates.
 3. Re-runs on a schedule so the dataset stays current.
 4. Publishes the latest results as a markdown summary committed to the repository.
@@ -32,9 +32,11 @@ Each run follows three phases:
 3. Discover new races from external directories (World Athletics calendar, Wikipedia), merge
    them into the current set. New discoveries that don't already exist in either the baseline
    or the curated list are added with `confidence="low"`.
+   *(Note: if a specific `--race-id` is provided, discovery is skipped and only that race is processed).*
 
 ### Phase B — Prioritize
 4. For every race in the merged set, determine if it needs a fresh fetch:
+   - **Targeted Race**: the race ID matches a provided `--race-id` flag (forces a refresh).
    - **Milestone window**: any date field (`event_date`, `registration_open_date`, `registration_deadline`,
      `lottery_deadline`, `qualification_deadline`) falls within the next 90 days.
    - **Missing milestones**: the event date is in the future and any of those five date fields is empty.
@@ -44,10 +46,11 @@ Each run follows three phases:
    left unchanged.
 
 ### Phase C — Refresh
-6. For each prioritized race, verify the source URL is still reachable (HTTP HEAD).
-   - If the URL returns 4xx/5xx, mark the race with `confidence="low"` and `notes`
-     `"Source URL may be stale; page returned {status}"`. The last known data is preserved.
-7. Fetch the official source page for each prioritised race whose URL is reachable.
+6. For each prioritized race, check if a custom module exists in `marathon_tracker/scrapers/`.
+   - If a custom scraper exists (e.g., `london_marathon.py` for `london-marathon`), dynamically execute its `extract()` function to bypass generic extraction.
+   - If no custom scraper exists, verify the source URL is still reachable (HTTP HEAD).
+     - If the URL returns 4xx/5xx, mark the race with `confidence="low"` and `notes` `"Source URL may be stale; page returned {status}"`. The last known data is preserved.
+7. Fetch the official source page for each prioritised race whose URL is reachable (and lacking a custom scraper).
 8. Ask the LLM to extract date fields when credentials are available.
 9. Fall back to deterministic regex extraction when the LLM is unavailable.
 10. Merge the extracted data into a stable result record.
@@ -274,6 +277,7 @@ New CLI flags:
 | `--discover` | `true` | Enable auto-discovery of new races |
 | `--no-discover` | `false` | Disable auto-discovery (use curated list only) |
 | `--discover-source` | `"world-athletics"` | Source to use: `world-athletics`, `wikipedia`, or `all` |
+| `--race-id` | `None` | Update only a specific race ID, bypassing discovery |
 
 The workflow in `.github/workflows/marathon-tracker.yml` runs with defaults (auto-discovery
 on, WA source). Users running locally with `--no-network` also get `--no-discover` implied.
@@ -354,17 +358,26 @@ broken pages for manual review.
 
 ## Current State
 
-The repo already contains:
+The core update pipeline is fully migrated to a relational SQLite backend and supports modular scrapers. The repo contains:
 
-- a curated race list in `config/races.json`
-- the update pipeline in `marathon_tracker/`
-- rendered static output in `docs/marathons.md` and internal baseline `docs/marathons.json`
-- a CI workflow in `.github/workflows/marathon-tracker.yml`
+- A relational SQLite database at `docs/marathons.db` containing `races`, `race_events`, and `extraction_metadata` tables.
+- The update pipeline in `marathon_tracker/` using SQLite (`config.py`, `db.py`, `update.py`).
+- A modular scraper architecture in `marathon_tracker/scrapers/` to allow per-marathon extraction scripts.
+- Rendered static output in `docs/marathons.md` (generated directly from the SQLite database).
+- A devserver execution wrapper script `run_update.sh` for manual or cron execution (with `.github/workflows/` removed).
 
-The next useful work is to expand the update pipeline with:
-- auto-discovery of new races (Phase A)
-- refresh prioritisation (Phase B)
-- source URL verification (Phase C)
-- change the workflow schedule from weekly to daily
-then continue expanding source coverage and refining extraction rules as real race pages change.
+## Next Phase (v2 Roadmap)
+
+Now that the core tracker is stable, the next useful work is to expand its scope and coverage:
+
+1. **Expand Tracking Scope**: Adjust the data schema and discovery queries to officially track **Half-Marathons** alongside full marathons.
+2. **Expand Auto-Discovery Sources**: Integrate new external directories to massively expand coverage beyond World Athletics. Prioritized sources include:
+   - AIMS (Association of International Marathons and Distance Races) calendar
+   - MarathonGuide.com
+   - Registration platforms like RunSignup and Active.com
+3. **Extraction Robustness**: Continue relying on lightweight HTTP requests and LLM extraction, maintaining current strategies until significant bot-protection roadblocks necessitate headless browsers or third-party scraping APIs.
+4. **Database Change Log (Audit Table)**: Implement a structured audit trail in `marathons.db` to log whenever data changes.
+   - **Schema**: A `change_log` table tracking: timestamp, table name, action (INSERT, UPDATE, DELETE), record ID, old values, and new values.
+   - **Implementation**: Written natively via SQLite `BEFORE/AFTER` triggers inside `db.py` to ensure any modification to the `races`, `race_events`, or `extraction_metadata` tables is captured automatically (whether triggered by the Python pipeline or manual client updates).
+
 
