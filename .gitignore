@@ -22,8 +22,9 @@ __pycache__/
 # Temporary agentic skill links
 /skills/wc_*
 
-# Marathon tracker internal baseline (not committed)
+# Old JSON files (no longer committed/used)
 research/marathon_tracker/docs/marathons.json
+research/marathon_tracker/config/races.json
 
 # Agent session tracking files (per-execution, not for version control)
 .agy_conversation_id
