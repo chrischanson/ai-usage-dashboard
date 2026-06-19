@@ -1,24 +1,24 @@
 ---
 date: "2026-06-18"
-iteration: 1
-last_updated: "2026-06-18T20:20:31Z"
-matches_covered: 3
-overall_confidence: "Mixed — Switzerland-Bosnia frozen post-halftime; Canada favored at home; Mexico-South Korea near coin-flip"
+iteration: 3
+last_updated: "2026-06-18T22:25:30Z"
+matches_covered: 4
+overall_confidence: "Consistent — CAN-QAT on track (1-0, dominant); MEX-KOR still marginal favorite but new CB/midfield concerns"
 model: "opencode: deepseek-v4-flash-free"
-next_interval_minutes: 60
+next_interval_minutes: 90
 next_difficulty: "medium"
 ---
 
-# World Cup 2026 Predictions for 2026-06-18 - Iteration 1
+# World Cup 2026 Predictions for 2026-06-18 - Iteration 3
 
 ## 📊 Executive Summary Table
 
 | Match | Status | Prediction | Confidence | Last Updated |
 |:------|:-------|:-----------|:-----------|:-------------|
 | Czechia vs. South Africa | complete | COMPLETE (1-1) | — | 2026-06-18T20:20:31Z |
-| Switzerland vs. Bosnia and Herzegovina | live_post_halftime | SWITZERLAND WIN (frozen) | Medium | 2026-06-18T20:20:31Z |
-| Canada vs. Qatar | not_started | CANADA WIN | Medium | 2026-06-18T20:20:31Z |
-| Mexico vs. South Korea | not_started | MEXICO WIN | Low | 2026-06-18T20:20:31Z |
+| Switzerland vs. Bosnia and Herzegovina | complete | COMPLETE — SWITZERLAND WIN 4-1 | Medium (correct) | 2026-06-18T21:23:30Z |
+| Canada vs. Qatar | live_pre_halftime (24') | CANADA WIN | Medium | 2026-06-18T21:23:30Z |
+| Mexico vs. South Korea | not_started | MEXICO WIN | Low | 2026-06-18T21:23:30Z |
 
 ---
 
@@ -57,45 +57,46 @@ N/A — match is complete.
 
 ### Match: Switzerland vs. Bosnia and Herzegovina
 
-**Status:** live_post_halftime
-**Kickoff:** 19:00 UTC | **Venue:** Los Angeles Stadium, Los Angeles, CA | **Group/Round:** Group B
+**Status:** complete
+**Kickoff:** 19:00 UTC | **Venue:** SoFi Stadium, Inglewood, CA | **Group/Round:** Group B
 
-### Prediction: SWITZERLAND WIN (frozen under Weighted Halftime Rule)
-**Confidence:** Medium (frozen — gather live evidence for audit only)
+### Prediction: COMPLETE — SWITZERLAND WIN 4-1 (frozen under Weighted Halftime Rule until FT)
+**Confidence:** Medium — correctly predicted
 
 ### Reasoning
-Switzerland entered as clear favorites (FIFA #19 vs #64, superior World Cup pedigree) and dominated possession (64%) but have failed to convert. Current score 0-0 at ~62'. Live score CONTRADICTS pre-halftime analytical prediction. However, no structural reason to override — no red cards, no key injuries, Bosnia's compact defensive block was the anticipated approach. The low xG (0.19 for 7 shots) is concerning but reflects Bosnia's disciplined defending rather than a tactical surprise. Prediction frozen per Weighted Halftime Rule; continue gathering evidence for audit until estimated full time (20:50 UTC).
+Switzerland won 4-1, validating the pre-halftime analytical prediction despite a tense 0-0 at 62'. The Weighted Halftime Rule correctly prevented a panic downgrade when the live score contradicted the forecast at halftime. Switzerland's patience paid off via second-half substitutes: Manzambi (74' volley, 90'), Vargas (84'), and Xhaka (90'+7 penalty) after Bosnia's Muharemovic saw a second yellow (80'). Bosnia's consolation came from substitute Mahmic (90'+3 volley). The final xG was SUI 2.01 vs BIH 0.24, confirming Switzerland's dominance was always going to break through. Key lesson: low first-half xG (0.19) was a mirage caused by Bosnia's disciplined defending in a compact block — once fatigue and substitutions broke the dam, the quality gap showed.
 
 ### Key Factors
-- [official] Confirmed lineups — Switzerland 4-3-1-2, Bosnia 4-4-2
-- [official] Edin Dzeko STARTED for Bosnia (resolved prior doubt)
-- [strong] Current score 0-0, 62nd minute (FotMob live data)
-- [strong] Possession: 64% Switzerland, 36% Bosnia
-- [strong] Shots: 7 Switzerland, 1 Bosnia; xG: 0.19 vs 0.18 — near-identical expected goals
-- [strong] Bosnia yellow cards: Dzeko (61'), Dedic (59') — both disciplinary not structural
-- [medium] Pre-match: Switzerland had 26 shots vs Qatar but only scored a penalty (wasteful finishing pattern continues?)
+- [official] Final score: Switzerland 4-1 Bosnia-Herzegovina (ESPN, AP News)
+- [official] Goal scorers: Manzambi 74', 90'; Vargas 84'; Xhaka 90'+7 pen — BIH: Mahmic 90'+3
+- [official] Red card: Tarik Muharemovic (BIH) — second yellow card 80'
+- [official] Final xG: SUI 2.01, BIH 0.24 (ESPN)
+- [official] Possession: 62% SUI, 38% BIH
+- [official] Shots on goal: SUI 7 (54%), BIH 3 (60%)
+- [official] Group B standing: Switzerland 4 pts (1W 1D), Bosnia 1 pt (0W 1D 1L)
 
 ### Evidence Gathered This Iteration
-- [official] Lineups confirmed via FotMob: Switzerland (Kobel; Widmer, Elvedi, Akanji, Rodriguez; Aebischer, Xhaka, Freuler; Rieder; Embolo, Ndoye); Bosnia (Vasilj; Dedic, Katic, Muharemovic, Kolasinac; Memic, Tahirovic, Sunjic, Alajbegovic; Demirovic, Dzeko)
-- [strong] FotMob live match data confirms 0-0 at 62', 64% possession, 0.19 vs 0.18 xG
+- [official] ESPN match centre confirms 4-1 final — full stats, goal times, cards
+- [official] AP News: Manzambi first World Cup goal on volley in 74th sparked the late eruption
+- [official] Xhaka penalty (90'+7), Mahmic consolation volley (90'+3)
+- [official] Subs decisive: Vargas and Manzambi both came off bench to score
 
 ### Search History
 - **Iteration 1**: `Switzerland vs Bosnia Herzegovina World Cup 2026 live score 18 June 2026`
+- **Iteration 2**: ESPN match centre web fetch
 
 ### Questions for Next Iteration
-1. Does the match finish 0-0 or does a goal arrive late? This determines whether the low xG pattern was predictive of a draw (structural).
-2. Were any second-half cards/ injuries that changed the match state after the current observation?
-3. Final score verification — needed for postmortem audit.
+N/A — match is complete. Postmortem data collected: xG narrative, substitution impact, red card timing.
 
 ### Prediction Changes
-- **Previous prediction:** None (first iteration this matchday)
-- **Change:** Initial prediction set to SWITZERLAND WIN (Medium), then frozen at live_post_halftime under Weighted Halftime Rule. Live score 0-0 contradicts prediction but no structural override warranted.
+- **Previous prediction:** SWITZERLAND WIN (Medium, frozen at live_post_halftime)
+- **Change:** Marked complete. Weighted Halftime Rule validated — no change to prediction needed despite 0-0 contradiction at HT.
 
 ---
 
 ### Match: Canada vs. Qatar
 
-**Status:** not_started
+**Status:** live_pre_halftime (24')
 **Kickoff:** 22:00 UTC | **Venue:** BC Place, Vancouver, BC, Canada | **Group/Round:** Group B
 
 ### Prediction: CANADA WIN
@@ -105,33 +106,40 @@ Switzerland entered as clear favorites (FIFA #19 vs #64, superior World Cup pedi
 Canada are heavy home favorites (-325 to -350 moneyline, ~71-77% implied probability) against a Qatar side that earned a 1-1 draw vs Switzerland but was largely outplayed (26 shots faced). Canada's physical, direct style is well-suited to BC Place's temporary grass surface, and the home crowd in Vancouver provides a significant advantage. Key risks: Alphonso Davies (hamstring) is doubtful — expected to be on the bench at best; Moise Bombito (leg) is a game-time decision. However, Cyle Larin's impact goal off the bench vs Bosnia earned him a starting role, and Canada's attacking depth (David, Larin, Buchanan, Kone) should be enough. Qatar are organized under Lopetegui and have a match-winner in Akram Afif, but their 1.55% win probability per some models reflects the quality gap. Confidence downgraded to Medium due to Davies uncertainty and BC Place's unpredictable temporary grass surface.
 
 ### Key Factors
-- [strong] Canada moneyline -325 to -350 (DraftKings, Sports Interaction) — heavy favorites
-- [strong] Canada 71% win probability per FootballExplorer model; 77% per Polymarket prediction market
-- [strong] Alphonso Davies (hamstring) doubtful — pushing to return but likely bench role (RotoWire, Sports Mole, 101GreatGoals)
-- [medium] Cyle Larin expected to start after scoring equalizer off bench vs Bosnia (LeagueLane, 101GreatGoals)
-- [medium] Moise Bombito (leg) game-time decision — De Fougerolles expected to start at CB
-- [medium] Qatar have no injury worries (multiple sources)
-- [medium] BC Place — temporary grass surface; Canada's direct style suits this, reducing heuristic impact
-- [weak] Predicted lineups: Canada 4-4-2 (Crepeau; Johnston, De Fougerolles, Cornelius, Laryea; Buchanan, Eustaquio, Kone, Millar; David, Larin); Qatar 4-2-3-1 (Abunada; Al-Oui, Miguel, Khoukhi, Ahmed; Gaber, Laye; Junior, Madibo, Afif; Ali)
+- [official] Confirmed Canada XI (4-4-2): Crepeau; Johnston, De Fougerolles, Cornelius, Laryea; Buchanan, Eustaquio (c), Kone, Ahmed; David, Larin (PrizePicks via CANMNT tweet)
+- [official] Davies on bench — hamstring recovery, not yet fit to start (PrizePicks)
+- [official] Confirmed Qatar XI (4-3-3): Abunada; Al Oui, Miguel, Khoukhi (c), Elamin; Gaber, Madibo, Laye; Edmilson Junior, Abdurisag, Afif — same XI as vs Switzerland
+- [official] Live score: CANADA 1-0 Qatar at 24' — Larin 16' (ESPN, FotMob)
+- [official] xG: Canada 0.52, Qatar 0.18 (ESPN, FotMob)
+- [official] Possession: 69% Canada, 31% Qatar (ESPN)
+- [official] Shots on target: Canada 3 (60%), Qatar 0 (0%) (ESPN)
+- [official] Yellow card: Cornelius (CAN) 9' (ESPN)
+- [strong] Larin scored 16' — second career World Cup goal, first Canadian with multiple WC goals (ESPN)
+- [strong] Goal originated from Johnston cross, David shot saved by Abunada, Larin prodded home rebound
+- [strong] Canada currently dominating — 3 SOT, 0.52 xG, 69% possession
+- [medium] Davies still on bench at 24' — no substitute appearance yet
+- [medium] Qatar yet to register a shot on target (0 SOT from 2 total shots)
 
 ### Evidence Gathered This Iteration
-- [strong] Multiple betting sources confirm Canada as heavy favorite (-325 to -350 range)
-- [strong] Davies injury update consistent across sources — doubtful, pushing to return
-- [medium] Predicted lineups indicate Larin starts over Oluwaseyi after goal vs Bosnia
-- [medium] Temporary grass at BC Place noted — Canada's direct/athletic style mitigates the usual discount for possession teams
+- [official] FotMob live data: CAN 1-0 QAT, 24', Larin 16', xG 0.51-0.18, possession 69-31
+- [official] ESPN match centre confirms same scoreline and stats
+- [strong] Larin goal confirmed — first Canadian with multiple World Cup goals
+- [medium] No structural events (red cards, injuries) — match progressing as predicted
 
 ### Search History
 - **Iteration 1**: `Canada vs Qatar World Cup 2026 preview lineup news June 18 2026`, `Canada vs Qatar betting odds movement June 18 2026`
+- **Iteration 2**: PrizePicks lineup confirmation article; FotMob match page
+- **Iteration 3**: FotMob live match page; ESPN match centre
 
 ### Questions for Next Iteration
-1. Official lineups (expected ~21:00 UTC): Does Davies start or is he on the bench? Does Bombito start? This directly impacts Canada's left-side attacking threat and defensive solidity.
-2. Official lineup: Does Larin start? Confirms the tactical shift to a 4-4-2 with two strikers.
-3. Any late Qatar injury news or tactical changes from Lopetegui?
-4. Pre-match warm-up: Any visible issues with the BC Place temporary grass surface?
+1. Does Davies enter as a substitute in the second half? If so, at what minute and does he create chances?
+2. Can Qatar generate any shots on target in the second half? Their 0 SOT at 24' suggests complete offensive nullification.
+3. Any second-half injuries, red cards, or structural changes that change the match state?
+4. Final score verification — needed if match is complete by next interval.
 
 ### Prediction Changes
-- **Previous prediction:** None (first iteration this matchday)
-- **Change:** Initial prediction set to CANADA WIN (Medium). May upgrade to High if Davies starts and official lineup confirms full-strength attack.
+- **Previous prediction:** CANADA WIN (Medium)
+- **Change:** Prediction tracking correctly. No change needed — Canada leading 1-0, dominating possession (69%) and xG (0.52). Larin goal validates the start decision. Live evidence confirms pre-match analysis. Confidence remains Medium.
 
 ---
 
@@ -162,16 +170,24 @@ Both teams won their openers (Mexico 2-0 vs South Africa, South Korea 2-1 vs Cze
 - [strong] Mexico -182 favorite on FOX Sports odds board
 - [medium] Both teams in good form after opening wins
 - [medium] Guadalajara natural grass — no temporary pitch concerns
+- [medium] New tactical preview (101GreatGoals, 18 June): predicted Mexico XI includes Alvarez at CB alongside Vasquez (makeshift pairing), Lira at CDM
+- [medium] 101GreatGoals predicts Mexico 2-2 Draw — cites even contest despite Mexico's excellent H2H record (9W 3D 2L, 5-0 vs Asian opposition at World Cups)
+- [medium] Bae Jun-Ho and Kim Tae-Hyeon (both ankle) are injury concerns for South Korea per 101GreatGoals
+- [medium] Raul Jimenez has scored in his last 2 games vs South Korea
+- [weak] Predicted Mexico XI: Rangel; Reyes, Alvarez, Vasquez, Gallardo; Lira; Alvarado, Gutierrez, Fidalgo, Quinones; Jimenez
 
 ### Search History
 - **Iteration 1**: `Mexico vs South Korea World Cup 2026 team news injuries betting odds June 18`
+- **Iteration 2**: No new searches — pre-lineup gate active (>75 min to KO)
+- **Iteration 3**: 101GreatGoals tactical preview (18 June); AccuraStat injury report
 
 ### Questions for Next Iteration
-1. Official lineups (~00:00 UTC): Who partners Reyes at CB in Montes' absence? A makeshift pairing significantly affects Mexico's defensive confidence.
-2. Official lineups: Does Son Heung-min start? (Expected to, but confirmation matters for South Korea's attacking threat assessment.)
-3. Any late fitness news for either side — particularly Mexico's defensive replacements or South Korea's midfield shape?
-4. Warm-up reports: any issues with pitch, weather, or crowd conditions at Estadio Guadalajara?
+1. Official lineups (~00:00 UTC): Does Alvarez start at CB or midfield? Alvarez-Vasquez at CB would be very makeshift — both are primarily midfielders. This significantly affects Mexico's defensive confidence and midfield solidity.
+2. Official lineups: Does Son Heung-min start? (Expected to, but confirmation matters.)
+3. Official lineups: Are Bae Jun-Ho and Kim Tae-Hyeon available? Both listed as ankle injury concerns.
+4. Official lineups: Does Raul Jimenez start? His scoring record vs South Korea (2 in last 2) is a factor.
+5. Pre-match warm-up reports: weather and altitude conditions at Estadio Guadalajara?
 
 ### Prediction Changes
-- **Previous prediction:** None (first iteration this matchday)
-- **Change:** Initial prediction set to MEXICO WIN (Low). May adjust based on official lineup confirmation — if Mexico's center-back pairing is particularly weak, a DRAW prediction would become more plausible.
+- **Previous prediction:** MEXICO WIN (Low)
+- **Change:** No change — prediction carried forward. New risk identified: Alvarez at CB would be a makeshift pairing, further weakening Mexico's defense in Montes' absence. If official lineups confirm Alvarez-CB and Lira-CDM, may downgrade to DRAW. Bae and Kim injury concerns for South Korea partially offset. Lineup gate opens at 23:45 UTC.
