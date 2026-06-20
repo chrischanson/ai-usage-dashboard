@@ -10,62 +10,74 @@
 - **Dates:** June 11 – July 19, 2026
 - **Current Phase:** Group Stage
 - **Tracking Started:** 2026-06-13
-- **Total Matches Predicted:** 20
-- **Total Correct:** 10
-- **Overall Accuracy:** 50.0% (10/20)
+- **Total Matches Tracked:** 20
+- **Pre-Game Accuracy (Final Pre-Kickoff):** 55.0% (11/20)
+- **Half-Time Accuracy (Frozen/Live):** 50.0% (10/20)
 
 ---
 
 ## Accuracy by Confidence Level
 
+### Pre-Game (Pre-Kickoff)
+| Confidence | Correct | Total | Accuracy |
+|:-----------|:--------|:------|:---------|
+| High       | 3       | 3     | 100%     |
+| Medium     | 6       | 11    | 54.5%    |
+| Low        | 2       | 6     | 33.3%    |
+
+*(Note: Germany vs. Curaçao was predicted as GERMANY WIN with High confidence pre-game, and USA vs. Australia was predicted as DRAW with Low confidence pre-game. This table shows pre-kickoff lineup-verified prediction performance.)*
+
+### Half-Time (Frozen / Live-Monitoring)
 | Confidence | Correct | Total | Accuracy |
 |:-----------|:--------|:------|:---------|
 | High       | 2       | 2     | 100%     |
 | Medium     | 6       | 10    | 60.0%    |
 | Low        | 2       | 8     | 25.0%    |
 
+*(Note: Under the Weighted Halftime Rule, in-play monitoring downgraded Germany vs. Curaçao to Low-confidence DRAW, and downgraded Saudi Arabia vs. Uruguay to Low-confidence URUGUAY WIN.)*
+
 ---
 
 ## Accuracy by Tournament Phase
 
-| Phase | Correct | Total | Accuracy |
-|:------|:--------|:------|:---------|
-| Group Stage | 10 | 20 | 50.0% |
-| Round of 32 | 0 | 0 | N/A |
-| Round of 16 | 0 | 0 | N/A |
-| Quarter-finals | 0 | 0 | N/A |
-| Semi-finals | 0 | 0 | N/A |
-| Third Place | 0 | 0 | N/A |
-| Final | 0 | 0 | N/A |
+| Phase | Pre-Game Correct | Half-Time Correct | Total | Pre-Game Acc | Half-Time Acc |
+|:------|:-----------------|:------------------|:------|:-------------|:--------------|
+| Group Stage | 11 | 10 | 20 | 55.0% | 50.0% |
+| Round of 32 | 0 | 0 | 0 | N/A | N/A |
+| Round of 16 | 0 | 0 | 0 | N/A | N/A |
+| Quarter-finals | 0 | 0 | 0 | N/A | N/A |
+| Semi-finals | 0 | 0 | 0 | N/A | N/A |
+| Third Place | 0 | 0 | 0 | N/A | N/A |
+| Final | 0 | 0 | 0 | N/A | N/A |
 
 ---
 
 ## Match Results Log
 
-| Date | Match | Prediction | Actual | Correct? | Confidence |
-|:-----|:------|:-----------|:-------|:---------|:-----------|
-| 2026-06-14 | Haiti vs. Scotland | SCOTLAND WIN | SCOTLAND WIN | ✅ | Medium |
-| 2026-06-14 | Australia vs. Türkiye | TÜRKİYE WIN | AUSTRALIA WIN | ❌ | Low |
-| 2026-06-14 | Germany vs. Curaçao | DRAW | GERMANY WIN | ❌ | Low |
-| 2026-06-14 | Netherlands vs. Japan | NETHERLANDS WIN | DRAW | ❌ | Medium |
-| 2026-06-14 | Côte d'Ivoire vs. Ecuador | DRAW | CÔTE D'IVOIRE WIN | ❌ | Medium |
-| 2026-06-14 | Sweden vs. Tunisia | SWEDEN WIN | SWEDEN WIN | ✅ | Medium |
-| 2026-06-15 | Spain vs. Cape Verde | SPAIN WIN | DRAW | ❌ | Medium |
-| 2026-06-15 | Belgium vs. Egypt | DRAW | DRAW | ✅ | Low |
-| 2026-06-15 | Saudi Arabia vs. Uruguay | URUGUAY WIN | DRAW | ❌ | Low |
-| 2026-06-15 | Iran vs. New Zealand | IRAN WIN | DRAW | ❌ | Low |
-| 2026-06-16 | Iraq vs. Norway | NORWAY WIN | NORWAY WIN | ✅ | Medium |
-| 2026-06-16 | Argentina vs. Algeria | ARGENTINA WIN | ARGENTINA WIN | ✅ | High |
-| 2026-06-16 | Austria vs. Jordan | AUSTRIA WIN | AUSTRIA WIN | ✅ | Medium |
-| 2026-06-18 | Switzerland vs. Bosnia and Herzegovina | SWITZERLAND WIN | SWITZERLAND WIN | ✅ | Medium |
-| 2026-06-18 | Canada vs. Qatar | CANADA WIN | CANADA WIN | ✅ | Medium |
-| 2026-06-18 | Mexico vs. South Korea | MEXICO WIN | MEXICO WIN | ✅ | Low |
-| 2026-06-19 | USA vs. Australia | DRAW | USA WIN | ❌ | Low |
-| 2026-06-19 | Scotland vs. Morocco | DRAW | MOROCCO WIN | ❌ | Low |
-| 2026-06-19 | Brazil vs. Haiti | BRAZIL WIN | BRAZIL WIN | ✅ | High |
-| 2026-06-19 | Türkiye vs. Paraguay | TÜRKİYE WIN | PARAGUAY WIN | ❌ | Medium |
+| Date | Match | Pre-Game Pred (Conf) | Half-Time Pred (Conf) | Actual | Correct? (Pre / HT) |
+|:-----|:------|:---------------------|:---------------------|:-------|:--------------------|
+| 2026-06-14 | Haiti vs. Scotland | SCOTLAND WIN (Med) | SCOTLAND WIN (Med) | SCOTLAND WIN | ✅ / ✅ |
+| 2026-06-14 | Australia vs. Türkiye | TÜRKİYE WIN (Low) | TÜRKİYE WIN (Low) | AUSTRALIA WIN | ❌ / ❌ |
+| 2026-06-14 | Germany vs. Curaçao | GERMANY WIN (High) | DRAW (Low) | GERMANY WIN | ✅ / ❌ |
+| 2026-06-14 | Netherlands vs. Japan | NETHERLANDS WIN (Med) | NETHERLANDS WIN (Med) | DRAW | ❌ / ❌ |
+| 2026-06-14 | Côte d'Ivoire vs. Ecuador | DRAW (Med) | DRAW (Med) | CÔTE D'IVOIRE WIN | ❌ / ❌ |
+| 2026-06-14 | Sweden vs. Tunisia | SWEDEN WIN (Med) | SWEDEN WIN (Med) | SWEDEN WIN | ✅ / ✅ |
+| 2026-06-15 | Spain vs. Cape Verde | SPAIN WIN (Med) | SPAIN WIN (Med) | DRAW | ❌ / ❌ |
+| 2026-06-15 | Belgium vs. Egypt | DRAW (Low) | DRAW (Low) | DRAW | ✅ / ✅ |
+| 2026-06-15 | Saudi Arabia vs. Uruguay | URUGUAY WIN (Med) | URUGUAY WIN (Low) | DRAW | ❌ / ❌ |
+| 2026-06-15 | Iran vs. New Zealand | IRAN WIN (Low) | IRAN WIN (Low) | DRAW | ❌ / ❌ |
+| 2026-06-16 | Iraq vs. Norway | NORWAY WIN (Med) | NORWAY WIN (Med) | NORWAY WIN | ✅ / ✅ |
+| 2026-06-16 | Argentina vs. Algeria | ARGENTINA WIN (High) | ARGENTINA WIN (High) | ARGENTINA WIN | ✅ / ✅ |
+| 2026-06-16 | Austria vs. Jordan | AUSTRIA WIN (Med) | AUSTRIA WIN (Med) | AUSTRIA WIN | ✅ / ✅ |
+| 2026-06-18 | Switzerland vs. Bosnia and Herzegovina | SWITZERLAND WIN (Med) | SWITZERLAND WIN (Med) | SWITZERLAND WIN | ✅ / ✅ |
+| 2026-06-18 | Canada vs. Qatar | CANADA WIN (Med) | CANADA WIN (Med) | CANADA WIN | ✅ / ✅ |
+| 2026-06-18 | Mexico vs. South Korea | MEXICO WIN (Low) | MEXICO WIN (Low) | MEXICO WIN | ✅ / ✅ |
+| 2026-06-19 | USA vs. Australia | DRAW (Low) | DRAW (Low) | USA WIN | ❌ / ❌ |
+| 2026-06-19 | Scotland vs. Morocco | DRAW (Low) | DRAW (Low) | MOROCCO WIN | ❌ / ❌ |
+| 2026-06-19 | Brazil vs. Haiti | BRAZIL WIN (High) | BRAZIL WIN (High) | BRAZIL WIN | ✅ / ✅ |
+| 2026-06-19 | Türkiye vs. Paraguay | TÜRKİYE WIN (Med) | TÜRKİYE WIN (Med) | PARAGUAY WIN | ❌ / ❌ |
 
-*(Note: Germany vs. Curaçao pre-match prediction was GERMANY WIN with High confidence, which was correct. However, live-monitoring in-play adjusted the prediction to DRAW with Low confidence, which was frozen at halftime and recorded as incorrect.)*
+*(Note: Germany vs. Curaçao pre-match prediction was GERMANY WIN with High confidence, which was correct. However, live-monitoring in-play adjusted the prediction to DRAW with Low confidence, which was frozen at halftime and recorded as incorrect for the Half-Time category.)*
 
 ---
 

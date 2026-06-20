@@ -1,5 +1,5 @@
 {
-  "min_interval_minutes": 30,
+  "min_interval_minutes": 60,
   "max_interval_minutes": 180,
   "default_interval_minutes": 60,
   "high": {
@@ -8,10 +8,10 @@
   },
   "medium": {
     "agent": "opencode",
-    "model": "deepseek-v4-flash-free"
+    "model": ""
   },
   "low": {
     "agent": "opencode",
-    "model": "deepseek-v4-flash-free"
+    "model": ""
   }
 }
