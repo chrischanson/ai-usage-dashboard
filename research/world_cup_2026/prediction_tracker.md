@@ -10,9 +10,9 @@
 - **Dates:** June 11 – July 19, 2026
 - **Current Phase:** Group Stage
 - **Tracking Started:** 2026-06-13
-- **Total Matches Predicted:** 13
-- **Total Correct:** 6
-- **Overall Accuracy:** 46.2% (6/13)
+- **Total Matches Predicted:** 16
+- **Total Correct:** 9
+- **Overall Accuracy:** 56.25% (9/16)
 
 ---
 
@@ -20,8 +20,8 @@
 
 | Confidence | Correct | Total | Accuracy |
 |:-----------|:--------|:------|:---------|
-| High       | 0       | 0     | N/A      |
-| Medium     | 4       | 7     | 57.1%    |
+| High       | 1       | 1     | 100%     |
+| Medium     | 6       | 9     | 66.7%    |
 | Low        | 2       | 6     | 33.3%    |
 
 ---
@@ -30,7 +30,7 @@
 
 | Phase | Correct | Total | Accuracy |
 |:------|:--------|:------|:---------|
-| Group Stage | 6 | 13 | 46.2% |
+| Group Stage | 9 | 16 | 56.25% |
 | Round of 32 | 0 | 0 | N/A |
 | Round of 16 | 0 | 0 | N/A |
 | Quarter-finals | 0 | 0 | N/A |
@@ -54,6 +54,9 @@
 | 2026-06-15 | Belgium vs. Egypt | DRAW | DRAW | ✅ | Low |
 | 2026-06-15 | Saudi Arabia vs. Uruguay | URUGUAY WIN | DRAW | ❌ | Low |
 | 2026-06-15 | Iran vs. New Zealand | IRAN WIN | DRAW | ❌ | Low |
+| 2026-06-16 | Iraq vs. Norway | NORWAY WIN | NORWAY WIN | ✅ | Medium |
+| 2026-06-16 | Argentina vs. Algeria | ARGENTINA WIN | ARGENTINA WIN | ✅ | High |
+| 2026-06-16 | Austria vs. Jordan | AUSTRIA WIN | AUSTRIA WIN | ✅ | Medium |
 | 2026-06-18 | Switzerland vs. Bosnia and Herzegovina | SWITZERLAND WIN | SWITZERLAND WIN | ✅ | Medium |
 | 2026-06-18 | Canada vs. Qatar | CANADA WIN | CANADA WIN | ✅ | Medium |
 | 2026-06-18 | Mexico vs. South Korea | MEXICO WIN | MEXICO WIN | ✅ | Low |
@@ -76,6 +79,9 @@
 - [2026-06-18] Favorites facing deep defensive blocks benefit significantly from tactical substitutes and second-half opponent fatigue. Avoid premature downgrades at halftime if structural metrics remain dominant.
 - [2026-06-18] Host-nation favorites playing on home soil with high motivation (e.g., Canada at BC Place, Mexico at Guadalajara Stadium) exhibit strong home-advantage resilience. High-quality transition-heavy teams can run up the score against weaker defensive opponents.
 - [2026-06-18] When a key defender is suspended (e.g., Cesar Montes for Mexico), the team tends to adopt a more conservative defensive structure rather than collapsing, particularly when playing at home under favorable conditions, resulting in tight, low-scoring clean sheets.
+- [2026-06-16] Final score verification must include a 15-minute buffer after estimated full time to capture stoppage-time goals. The Iraq-Norway match had a 90+6' own goal that was missed because verification ran too early.
+- [2026-06-16] Tournament debutants (e.g., Jordan) consistently overperform expected quality in their opening match due to elevated motivation and the opponent's lack of scouting data against them. Favorites facing debutants should receive a modest confidence discount.
+- [2026-06-16] When star players face potential disciplinary incidents (e.g., Messi's red-card-worthy challenge on Mandi), this represents a genuine structural risk that pre-match analysis should proactively flag, even if no card is ultimately given.
 
 ---
 
@@ -93,6 +99,9 @@
 - **Squad Depth & Substitution Impact Heuristic**: Teams with deep squads and high-quality attacking substitutes are highly effective at breaking down disciplined defensive blocks in the final 30 minutes of matches, especially as underdogs experience fatigue. When predicting matchups where a favorite has deep squad rotation and the opponent has thin bench depth, increase confidence in a late-game breakthrough for the favorite.
 - **Logistical / Team Disruption Heuristic (New)**: Favorites experiencing severe off-field logistical disruptions (such as late travel arrivals, training base camp relocations, visa delays) or team controversy (roster exclusion disputes) are prone to organizational collapse and lack of focus. Apply a 10-20% discount to their implied performance rating, particularly when facing cohesive, direct transition teams.
 - **Live-Monitoring Score Verification Heuristic (New)**: Live monitoring updates must verify match scorelines and events across at least two independent live match centers (e.g., FotMob and ESPN) to prevent data discrepancies from blinding the model to the true state of the game.
+- **Final Score Verification Buffer Heuristic (New)**: After estimated full time, wait at least 15 minutes before recording the final score, and confirm across at least two independent official or strong match centers. Stoppage-time goals (including 90+6' own goals) are routinely missed if verification runs too early.
+- **Debutant Motivation Boost Heuristic (New)**: Tournament debutants receive a 10-15% performance boost in their opening match due to elevated motivation and the opponent's lack of recent competitive footage. Favorites facing debutants should have confidence discounted by one notch.
+- **Disciplinary Risk Flag Heuristic (New)**: For players with a history of emotional or high-intensity play that could result in a red-card incident, flag this as a structural risk in the prediction reasoning, even if the probability is low. A single sending-off can invalidate any pre-match analysis.
 
 ### Initial Assumptions
 - Home advantage matters in World Cup group stages (host nations USA, Canada, Mexico)
@@ -116,3 +125,5 @@
 - Does Belgium's reliance on Romelu Lukaku's physical presence mean they are unable to break down organized blocks when he is benched or on restricted workloads?
 - How severely does player injury (e.g., Ismaël Koné's serious leg injury) affect Canada's midfield dynamics in subsequent matches?
 - Will Qatar's disciplinary collapse (two red cards) lead to a systemic team morale breakdown in their final group match?
+- Do tournament debutants (e.g., Jordan) maintain their elevated performance in subsequent group matches, or is the "debutant boost" limited to the opening match?
+- Can Argentina maintain their defensive solidity (clean sheet vs Algeria) against stronger attacking opponents like Austria?

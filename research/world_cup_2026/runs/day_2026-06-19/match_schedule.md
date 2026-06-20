@@ -2,53 +2,57 @@
 date: "2026-06-19"
 match_count: 4
 tournament_phase: "Group Stage"
-generated_at: "2026-06-19T15:30:16Z"
+generated_at: "2026-06-19T19:22:22Z"
 ---
 
-# World Cup 2026 — Match Schedule for 2026-06-19
+# 📅 World Cup 2026 — Match Schedule for 2026-06-19
 
 ## Today's Matches
 
 | # | Kickoff (UTC) | Match | Venue | Group/Round |
 |:--|:--------------|:------|:------|:------------|
-| 31 | 19:00 | USA vs Australia | Seattle Stadium, Seattle, WA | Group D |
-| 30 | 22:00 | Scotland vs Morocco | Boston Stadium, Boston, MA | Group C |
-| 29 | 00:30 (Jun 20) | Brazil vs Haiti | Philadelphia Stadium, Philadelphia, PA | Group C |
-| 32 | 03:00 (Jun 20) | Türkiye vs Paraguay | San Francisco Bay Area Stadium, Santa Clara, CA | Group D |
+| 29 | 01:00 | Brazil vs. Haiti | Philadelphia Stadium (Lincoln Financial Field) | Group C |
+| 30 | 22:00 | Scotland vs. Morocco | Boston Stadium (Gillette Stadium) | Group C |
+| 31 | 03:00 | Türkiye vs. Paraguay | San Francisco Bay Area Stadium (Levi's Stadium) | Group D |
+| 32 | 19:00 | USA vs. Australia | Seattle Stadium (Lumen Field) | Group D |
 
-*Note: All matches are Matchday 2 of the Group Stage.*
+*Note: Kickoff times for Match 29 (01:00 UTC) and Match 31 (03:00 UTC) occur on the next calendar day (June 20) in UTC.*
 
 ## Historical Context
 
-### Teams in today's matches with prior predictions
+Brief notes on any prior predictions involving today's teams:
+- **Australia**: Previously predicted to lose vs. Türkiye on 2026-06-14 (Predicted: Türkiye Win, Actual: Australia Win). Accuracy: 0/1.
+- **Türkiye**: Previously predicted to win vs. Australia on 2026-06-14 (Predicted: Türkiye Win, Actual: Australia Win). Accuracy: 0/1.
+- **Scotland**: Previously predicted to win vs. Haiti on 2026-06-14 (Predicted: Scotland Win, Actual: Scotland Win). Accuracy: 1/1.
+- **Haiti**: Previously predicted to lose vs. Scotland on 2026-06-14 (Predicted: Scotland Win, Actual: Scotland Win). Accuracy: 1/1.
+- **USA**: No prior predictions in tracker.
+- **Morocco**: No prior predictions in tracker.
+- **Brazil**: No prior predictions in tracker.
+- **Paraguay**: No prior predictions in tracker.
 
-- **Scotland (Group C)**: Predicted WIN vs Haiti on 2026-06-14 — was correct ✅ (Medium confidence).
-- **Türkiye (Group D)**: Predicted WIN vs Australia on 2026-06-14 — was incorrect ❌ (Low confidence). Australia won 2-0.
-- **Haiti (Group C)**: Lost to Scotland 0-1 on 2026-06-14 (was opponent in Scotland's predicted win).
-- **Australia (Group D)**: Beat Türkiye 2-0 on 2026-06-14 (was opponent in Türkiye's predicted loss).
-- **USA, Paraguay, Brazil, Morocco**: No prior predictions in tracker.
+### Relevant Lessons & Heuristics for Today's Matches
 
-### Relevant lessons learned for today's matches
-
-1. **Temporary Grass Pitch Heuristic** (Seattle Stadium, Boston Stadium): Both venues have temporary grass installed over artificial turf. This slows down possession-based technical teams. USA (vs Australia) and Morocco/Scotland (Group C) need to be evaluated with this surface discount applied — discount possession-heavy teams by 10-15%.
-2. **Host Nation Advantage** (USA): Host nations playing at home have shown strong resilience (Canada beat Qatar 6-0, Mexico beat South Korea 1-0). USA vs Australia in Seattle is a home game.
-3. **Counter-Attack Efficiency Heuristic**: On heavy temporary grass pitches, direct counter-attacking teams outperform possession teams despite lower shot volume. Evaluate xG rather than possession stats.
-4. **Squad Depth & Substitution Impact**: Deep benches become decisive in the final 30 minutes — relevant for Brazil vs Haiti and USA vs Australia.
-5. **Workload Management Heuristic**: Teams with key players returning from knocks (e.g., Türkiye's Arda Güler, Hakan Çalhanoğlu) may restrict minutes, creating late-game vulnerability.
+1. **Temporary Grass Pitch Heuristic**:
+   - *Seattle Stadium (Lumen Field)*, *Boston Stadium (Gillette Stadium)*, and *Philadelphia Stadium (Lincoln Financial Field)* are multi-purpose stadiums that feature temporary natural grass pitches installed over turf/concrete bases for the World Cup. These surfaces are slower, heavier, and prone to tearing up, which slows down fluid, ground-based passing combinations and plays into the hands of physical, defensive low/mid-blocks. This discount applies to high-possession technical teams like Brazil, Scotland, and the USA.
+2. **Workload Management Heuristic**:
+   - In earlier matches, Türkiye’s key playmakers (e.g., Güler, Çalhanoğlu) were returning from illness/injury on restricted workloads. This makes them vulnerable to compact blocks in the later stages, especially on fatiguing pitches.
+3. **Scotland Midfield Pivot**:
+   - The prediction tracker notes: "Does Scotland's two-man midfield pivot remain a major vulnerability against stronger transition-focused teams in Group C?" This should be monitored during their match against Morocco.
 
 ## Match Windows
 
-- **First match kickoff:** 19:00 UTC
-- **Last match estimated halftime:** 03:47 UTC (Jun 20) — Türkiye vs Paraguay
-- **Last match estimated end:** 04:48 UTC (Jun 20) — Türkiye vs Paraguay
-- **Prediction/analysis loop window:** 18:30 to 05:15 UTC
-- **Postmortem target time:** 06:48 UTC (2h after last match ends)
+Summary of when the prediction loop should run:
+- First match kickoff: 19:00 UTC
+- Last match estimated halftime: 03:45 UTC
+- Last match estimated end: 05:00 UTC
+- Prediction/analysis loop window: 19:00 to 05:00 UTC
+- Postmortem target time: 07:00 UTC (2h after last match ends)
 
 ## Match Timing Data
 
 <!-- MATCH_DATA_START -->
-- match_1: {teams: "USA vs Australia", kickoff_utc: "19:00", estimated_end_utc: "20:48", estimated_halftime_utc: "19:47"}
-- match_2: {teams: "Scotland vs Morocco", kickoff_utc: "22:00", estimated_end_utc: "23:48", estimated_halftime_utc: "22:47"}
-- match_3: {teams: "Brazil vs Haiti", kickoff_utc: "00:30", estimated_end_utc: "02:18", estimated_halftime_utc: "01:17"}
-- match_4: {teams: "Türkiye vs Paraguay", kickoff_utc: "03:00", estimated_end_utc: "04:48", estimated_halftime_utc: "03:47"}
+- match_29: {teams: "Brazil vs. Haiti", kickoff_utc: "01:00", estimated_end_utc: "03:00", estimated_halftime_utc: "01:45"}
+- match_30: {teams: "Scotland vs. Morocco", kickoff_utc: "22:00", estimated_end_utc: "00:00", estimated_halftime_utc: "22:45"}
+- match_31: {teams: "Türkiye vs. Paraguay", kickoff_utc: "03:00", estimated_end_utc: "05:00", estimated_halftime_utc: "03:45"}
+- match_32: {teams: "USA vs. Australia", kickoff_utc: "19:00", estimated_end_utc: "21:00", estimated_halftime_utc: "19:45"}
 <!-- MATCH_DATA_END -->
