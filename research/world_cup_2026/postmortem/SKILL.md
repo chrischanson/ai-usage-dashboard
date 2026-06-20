@@ -91,26 +91,39 @@ Check if the reasoning led to the right prediction matching the actual result. D
 
 ## Step 4: Compute Accuracy Statistics
 
-Calculate and present overall statistics:
+Calculate and present overall statistics separately for **Pre-Game (Pre-Kickoff)** and **Half-Time (Frozen/Live)** predictions:
 
 ```markdown
 ## 📊 Daily Accuracy Summary
 
-| Metric | Value |
-|:-------|:------|
-| Matches predicted | X |
-| Correct predictions | Y |
-| Daily accuracy | Y/X (Z%) |
-| High confidence accuracy | a/b (c%) |
-| Medium confidence accuracy | d/e (f%) |
-| Low confidence accuracy | g/h (i%) |
+| Category | Matches Predicted | Correct Predictions | Accuracy |
+|:---------|:------------------|:--------------------|:---------|
+| Pre-Game (Pre-Kickoff) | X | Y_pre | Y_pre/X (Z_pre%) |
+| Half-Time (Frozen/Live) | X | Y_ht | Y_ht/X (Z_ht%) |
+
+### Confidence Calibration by Category
+
+#### Pre-Game (Pre-Kickoff)
+| Confidence | Correct | Total | Accuracy |
+|:-----------|:--------|:------|:---------|
+| High       | a_pre | b_pre | c_pre% |
+| Medium     | d_pre | e_pre | f_pre% |
+| Low        | g_pre | h_pre | i_pre% |
+
+#### Half-Time (Frozen/Live)
+| Confidence | Correct | Total | Accuracy |
+|:-----------|:--------|:------|:---------|
+| High       | a_ht | b_ht | c_ht% |
+| Medium     | d_ht | e_ht | f_ht% |
+| Low        | g_ht | h_ht | i_ht% |
 
 ### Confidence Calibration Assessment
-- High confidence predictions should be correct >75% of the time
-- Medium confidence predictions should be correct ~50-75% of the time  
-- Low confidence predictions should be correct <50% of the time
-- [Assessment of how well-calibrated the system is]
+- High confidence predictions should be correct >75% of the time.
+- Medium confidence predictions should be correct ~50-75% of the time.
+- Low confidence predictions should be correct <50% of the time.
+- [Assessment of how well-calibrated the system is for both Pre-Game and Half-Time categories]
 ```
+
 
 ---
 
@@ -145,17 +158,17 @@ At the end of the postmortem, include a dedicated section evaluating whether the
 This is the most critical step. Read `{TRACKER_PATH}` and update it with:
 
 ### 6a. Match Results Log
-Add a row for each match to the results table:
+Add a row for each match to the results table, separating Pre-Game and Half-Time predictions:
 
 ```markdown
-| {DATE} | [Team A] vs [Team B] | [Predicted outcome] | [Actual outcome] | ✅/❌ | [Confidence] |
+| {DATE} | [Team A] vs [Team B] | [Pre-Game Pred] (Conf) | [Half-Time Pred] (Conf) | [Actual outcome] | [Pre Correct]/[HT Correct] (✅/❌) |
 ```
 
 ### 6b. Accuracy Statistics
-Recalculate the overall tournament accuracy:
-- Total correct / total predicted (percentage)
-- Accuracy by confidence level (High/Medium/Low)
-- Accuracy by tournament phase (Group Stage, Knockout, etc.)
+Recalculate the overall tournament accuracy for both Pre-Game and Half-Time predictions:
+- Pre-Game overall accuracy and Half-Time overall accuracy.
+- Accuracy by confidence level (High/Medium/Low) for both Pre-Game and Half-Time tables.
+- Accuracy by tournament phase (Group Stage, Knockout, etc.) for both categories.
 
 ### 6c. Lessons Learned
 Append new lessons to the "Lessons Learned" section, prefixed with today's date:
