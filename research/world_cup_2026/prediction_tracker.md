@@ -10,9 +10,9 @@
 - **Dates:** June 11 – July 19, 2026
 - **Current Phase:** Group Stage
 - **Tracking Started:** 2026-06-13
-- **Total Matches Tracked:** 20
-- **Pre-Game Accuracy (Final Pre-Kickoff):** 55.0% (11/20)
-- **Half-Time Accuracy (Frozen/Live):** 50.0% (10/20)
+- **Total Matches Tracked:** 24
+- **Pre-Game Accuracy (Final Pre-Kickoff):** 58.3% (14/24)
+- **Half-Time Accuracy (Frozen/Live):** 54.2% (13/24)
 
 ---
 
@@ -21,20 +21,20 @@
 ### Pre-Game (Pre-Kickoff)
 | Confidence | Correct | Total | Accuracy |
 |:-----------|:--------|:------|:---------|
-| High       | 3       | 3     | 100%     |
-| Medium     | 6       | 11    | 54.5%    |
+| High       | 3       | 4     | 75.0%    |
+| Medium     | 9       | 14    | 64.3%    |
 | Low        | 2       | 6     | 33.3%    |
 
-*(Note: Germany vs. Curaçao was predicted as GERMANY WIN with High confidence pre-game, and USA vs. Australia was predicted as DRAW with Low confidence pre-game. This table shows pre-kickoff lineup-verified prediction performance.)*
+*(Note: Germany vs. Curaçao was predicted as GERMANY WIN with High confidence pre-game, and USA vs. Australia was predicted as DRAW with Low confidence pre-game. This table shows pre-kickoff lineup-verified prediction performance. On 2026-06-20, Ecuador vs. Curaçao was the first High-confidence prediction failure — Ecuador's clinical finishing deficiency was identified but not properly enforced as a confidence cap.)*
 
 ### Half-Time (Frozen / Live-Monitoring)
 | Confidence | Correct | Total | Accuracy |
 |:-----------|:--------|:------|:---------|
-| High       | 2       | 2     | 100%     |
-| Medium     | 6       | 10    | 60.0%    |
-| Low        | 2       | 8     | 25.0%    |
+| High       | 2       | 3     | 66.7%    |
+| Medium     | 8       | 12    | 66.7%    |
+| Low        | 3       | 9     | 33.3%    |
 
-*(Note: Under the Weighted Halftime Rule, in-play monitoring downgraded Germany vs. Curaçao to Low-confidence DRAW, and downgraded Saudi Arabia vs. Uruguay to Low-confidence URUGUAY WIN.)*
+*(Note: Under the Weighted Halftime Rule, in-play monitoring downgraded Germany vs. Curaçao to Low-confidence DRAW, and downgraded Saudi Arabia vs. Uruguay to Low-confidence URUGUAY WIN. On 2026-06-20, GER-CIV was correctly NOT frozen at HT, confidence was downgraded to Low (structural evidence approach), and the final outcome was correct.)*
 
 ---
 
@@ -42,7 +42,7 @@
 
 | Phase | Pre-Game Correct | Half-Time Correct | Total | Pre-Game Acc | Half-Time Acc |
 |:------|:-----------------|:------------------|:------|:-------------|:--------------|
-| Group Stage | 11 | 10 | 20 | 55.0% | 50.0% |
+| Group Stage | 14 | 13 | 24 | 58.3% | 54.2% |
 | Round of 32 | 0 | 0 | 0 | N/A | N/A |
 | Round of 16 | 0 | 0 | 0 | N/A | N/A |
 | Quarter-finals | 0 | 0 | 0 | N/A | N/A |
@@ -76,8 +76,12 @@
 | 2026-06-19 | Scotland vs. Morocco | DRAW (Low) | DRAW (Low) | MOROCCO WIN | ❌ / ❌ |
 | 2026-06-19 | Brazil vs. Haiti | BRAZIL WIN (High) | BRAZIL WIN (High) | BRAZIL WIN | ✅ / ✅ |
 | 2026-06-19 | Türkiye vs. Paraguay | TÜRKİYE WIN (Med) | TÜRKİYE WIN (Med) | PARAGUAY WIN | ❌ / ❌ |
+| 2026-06-20 | Netherlands vs. Sweden | NETHERLANDS WIN (Med) | NETHERLANDS WIN (Med) (FROZEN) | NETHERLANDS WIN | ✅ / ✅ |
+| 2026-06-20 | Germany vs. Côte d'Ivoire | GERMANY WIN (Med) | GERMANY WIN (Low) (NOT FROZEN) | GERMANY WIN | ✅ / ✅ |
+| 2026-06-20 | Ecuador vs. Curaçao | ECUADOR WIN (High) | ECUADOR WIN (High) (no live adjustment) | DRAW | ❌ / ❌ |
+| 2026-06-20 | Tunisia vs. Japan | JAPAN WIN (Med) | JAPAN WIN (Med) (no live adjustment) | JAPAN WIN | ✅ / ✅ |
 
-*(Note: Germany vs. Curaçao pre-match prediction was GERMANY WIN with High confidence, which was correct. However, live-monitoring in-play adjusted the prediction to DRAW with Low confidence, which was frozen at halftime and recorded as incorrect for the Half-Time category.)*
+*(Note: Germany vs. Curaçao pre-match prediction was GERMANY WIN with High confidence, which was correct. However, live-monitoring in-play adjusted the prediction to DRAW with Low confidence, which was frozen at halftime and recorded as incorrect for the Half-Time category. On 2026-06-20, GER-CIV HT was correctly NOT frozen — the prediction was downgraded to Low but kept as GERMANY WIN using the structural-evidence approach, and the final outcome validated this decision.)*
 
 ---
 
@@ -102,6 +106,13 @@
 - [2026-06-19] During live-match monitoring, never use search queries that assume a specific scoreline (e.g., "0-0 halftime"), as confirmation bias from outdated reports can lead the system to hallucinate scorelines and incorrectly freeze predictions.
 - [2026-06-19] A 10-man defensive block under a disciplined manager (e.g., Gustavo Alfaro) is highly resilient when defending a lead on a heavy temporary grass pitch. Under these conditions, the slow playing surface negates the favorite's numerical advantage and ball circulation speed.
 - [2026-06-19] Assess team finishing efficiency metrics (goals vs shots/xG) before predicting comebacks or heavy wins. High shot volume (e.g., Türkiye's 30+ shots) without actual goals indicates a systemic clinical deficiency rather than temporary bad luck.
+- [2026-06-20] The Clinical Finishing Efficiency heuristic must be enforced as a MANDATORY confidence cap, not an optional check. Ecuador's 0 goals from 16 shots vs CIV (3 woodwork hits) was correctly identified as a risk but was fatally underweighted — High confidence was assigned despite clearly triggering the cap rule. This is a compliance failure, not an analytical gap.
+- [2026-06-20] When a retractable-roof stadium is confirmed closed, the Temporary Grass Pitch Heuristic discount should be fully waived. Climate control eliminates the surface degradation risk. This was properly handled for NED-SWE at NRG Stadium.
+- [2026-06-20] A team that concedes 5+ goals in their opening match is more likely to adopt an extreme defensive posture in their second match (5-4-1) than to collapse again. The "Post-Thrashing Defensive Reset" effect produces disciplined, motivated defending against opponents who struggled to score in their own opening match.
+- [2026-06-20] Betting market odds below 1.15 should NOT automatically imply High confidence when the favorite has a documented finishing deficiency. Market odds for must-win favorites are systematically inflated by narrative pressure and do not account for finishing efficiency.
+- [2026-06-20] The Weighted Halftime Rule structural-evidence approach was validated for GER-CIV. The prediction was correctly NOT frozen at HT despite a 1-0 deficit, because the pre-match analytical foundation (Germany bench depth) identified a credible path back. Confidence was appropriately downgraded to Low.
+- [2026-06-20] New managers appointed with fewer than 7 days preparation should not receive credit beyond a low-probability risk flag. TUN-JPN confirmed this — Renard had only 4 days and Tunisia were dismantled 4-0.
+- [2026-06-20] Khel Now was unreliable for Ivory Coast lineups for two consecutive matches (June 14 and June 20). Future lineup sources should prioritize ESPN match centre displays, FotMob, and official team accounts over Khel Now.
 
 ---
 
@@ -124,6 +135,10 @@
 - **Disciplinary Risk Flag Heuristic (New)**: For players with a history of emotional or high-intensity play that could result in a red-card incident, flag this as a structural risk in the prediction reasoning, even if the probability is low. A single sending-off can invalidate any pre-match analysis.
 - **10-Man Block Defense on Heavy Pitches Heuristic (New)**: Underdogs defending a lead on a heavy temporary grass pitch can neutralize a 10-man disadvantage. If the favorite has shown poor clinical finishing efficiency, do not assume a comeback or flip predictions to them, as the slow surface slows ball movement and fatigue sets in quickly.
 - **Neutral Query Live Monitoring Heuristic (New)**: Never use search queries with specific scorelines (e.g. "0-0", "1-0") during active live tracking or score verification. All queries must use neutral terms (e.g. "score", "match events") to avoid confirmation bias and hallucinations from stale web results.
+- **Clinical Finishing Compliance Gate (New, Strengthened)**: BEFORE assigning Medium or High confidence to any predicted winner, the system MUST check and document that team's goals-vs-shots ratio from their prior tournament match(es). If goals-vs-shots ratio is < 0.05 (e.g., 0 goals from 16+ shots) OR goals-vs-xG ratio is < 0.5, confidence MUST be capped at Low. This is a non-negotiable compliance requirement — failure to apply this cap will be flagged as a SKILL.md violation in postmortems.
+- **Post-Thrashing Defensive Reset Heuristic (New)**: A team that concedes 5+ goals in their opening match is more likely to adopt an extreme defensive posture (e.g., 5-4-1 formation) in their second match than to collapse again. The psychological "reset" effect produces disciplined, motivated defending against volume-shooting opponents. When a thrashing victim faces a team with documented finishing struggles, significantly increase draw/upset probability.
+- **Must-Win Favorite Overconfidence Trap (New)**: When a team in a must-win situation (0 points, facing elimination) is priced at -800 or shorter, exercise extreme caution if that team has a documented finishing deficiency from prior matches. Market odds for desperate favorites are systematically inflated by narrative pressure. Cap confidence at Medium maximum, regardless of opponent quality, until the favorite demonstrates clinical improvement.
+- **Stadium Climate Control Mitigation (Strengthened)**: The Temporary Grass Pitch Heuristic discount is fully waived for retractable-roof stadiums confirmed as closed. Verified roof closures eliminate surface degradation risk. This was validated by NED-SWE at NRG Stadium (roof closed, no pitch impact).
 
 ### Initial Assumptions
 - Home advantage matters in World Cup group stages (host nations USA, Canada, Mexico)
@@ -140,14 +155,17 @@
 - Does the new tournament structure (groups of 4, top 2 + 8 best 3rd-place advance to Round of 32) change group-stage dynamics?
 - How do temporary grass pitch conditions evolve over the course of the tournament as the sod establishes or wears out?
 - Will Germany's reliance on young playmakers (Musiala, Wirtz) hold up when they face physical defensive blocks on temporary grass pitches later in the tournament?
-- Can Japan maintain their high tactical discipline and resilience when facing transition-heavy teams like Sweden in Group F?
+- Can Japan maintain their high tactical discipline and resilience against transition-heavy opponents in Group F after their dominant 4-0 win over Tunisia?
 - Can Cape Verde sustain their defensive low-block discipline against more direct opponents in Group H, or will they struggle when forced to play more offensively?
 - Will Uruguay's defensive organization stabilize once Ronald Araújo or José Giménez return, or are their structural defensive issues deeper under Bielsa's system?
 - Does Belgium's reliance on Romelu Lukaku's physical presence mean they are unable to break down organized blocks when he is benched or on restricted workloads?
 - How severely does player injury (e.g., Ismaël Koné's serious leg injury) affect Canada's midfield dynamics in subsequent matches?
 - Will Qatar's disciplinary collapse (two red cards) lead to a systemic team morale breakdown in their final group match?
-- Do tournament debutants (e.g., Jordan) maintain their elevated performance in subsequent group matches, or is the "debutant boost" limited to the opening match?
+- Do tournament debutants maintain their elevated performance in subsequent group matches, or is the "debutant boost" limited to the opening match? (Curaçao got their first point in Match 2 after a 7-1 loss — suggesting the boost may persist for motivated debutants after a thrashing.)
 - Can Argentina maintain their defensive solidity (clean sheet vs Algeria) against stronger attacking opponents like Austria?
 - Will the USA's reliance on home crowd support in Seattle and other venues carry them deep into the knockout stage despite captain Christian Pulisic's injury duration?
 - Can Paraguay's highly disciplined defense under Gustavo Alfaro continue to hold out against elite teams in Group D, even with Almirón serving a suspension?
 - Will Brazil's rotated players (like Matheus Cunha) maintain their starting roles once Rodrygo's injury impact is fully absorbed?
+- [2026-06-20] Do betting markets systematically overprice must-win favorites in the group stage? The ECU-CUR miss (-900 favorite, 0-0 draw) adds to evidence that market odds for desperate teams are inflated by narrative pressure. Cross-reference with other tournament mismatches.
+- [2026-06-20] Does the "Debutant Motivation Boost" extend to a team's second match when they suffered a heavy opening loss? Curaçao lost 7-1 to Germany but played disciplined, motivated defense vs Ecuador. This suggests the boost may persist into Match 2 if the debutant is not demoralized by Match 1.
+- [2026-06-20] Can a team's finishing efficiency be reliably predicted from a single prior tournament match? Ecuador had only one match (0 goals, 16 shots vs CIV). Was this variance or a systemic pattern? Their historical trend (Under in 12 of 14) suggests the latter.
