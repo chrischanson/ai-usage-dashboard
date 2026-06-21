@@ -22,11 +22,23 @@ class TestTriggers(unittest.TestCase):
         cursor = self.conn.execute("SELECT id FROM locations WHERE city='Test City' AND country='Testland'")
         location_id = cursor.fetchone()["id"]
         
+        # Insert mock URLs
+        self.conn.execute("INSERT INTO official_urls (url) VALUES ('https://test.com')")
+        off_url_id = self.conn.execute("SELECT id FROM official_urls WHERE url='https://test.com'").fetchone()["id"]
+        self.conn.execute("INSERT INTO official_urls (url) VALUES ('https://test.com/register')")
+        reg_url_id = self.conn.execute("SELECT id FROM official_urls WHERE url='https://test.com/register'").fetchone()["id"]
+        
         # 2. Insert mock race
         self.conn.execute("""
-            INSERT INTO races (id, name, location_id, distance, official_url, registration_url)
-            VALUES ('test-marathon', 'Test Marathon', ?, 'marathon', 'https://test.com', 'https://test.com/register')
-        """, (location_id,))
+            INSERT INTO races (id, name, location_id, official_url_id, registration_url_id)
+            VALUES ('test-marathon', 'Test Marathon', ?, ?, ?)
+        """, (location_id, off_url_id, reg_url_id))
+        
+        self.conn.execute("""
+            INSERT INTO race_offerings (race_id, distance)
+            VALUES ('test-marathon', 'marathon')
+        """)
+        offering_id = self.conn.execute("SELECT id FROM race_offerings WHERE race_id='test-marathon' AND distance='marathon'").fetchone()["id"]
         
         # Check change_log for race insert
         log_races = self.conn.execute("SELECT * FROM change_log WHERE record_id = 'test-marathon' AND action = 'INSERT'").fetchall()
@@ -37,10 +49,10 @@ class TestTriggers(unittest.TestCase):
         
         # 3. Insert mock race event
         self.conn.execute("""
-            INSERT INTO race_events (race_id, year, event_date, status)
-            VALUES ('test-marathon', 2027, '2027-10-10', 'active')
-        """)
-        cursor = self.conn.execute("SELECT id FROM race_events WHERE race_id='test-marathon' AND year=2027")
+            INSERT INTO race_events (race_offering_id, year, event_date, status)
+            VALUES (?, 2027, '2027-10-10', 'active')
+        """, (offering_id,))
+        cursor = self.conn.execute("SELECT id FROM race_events WHERE race_offering_id=? AND year=2027", (offering_id,))
         event_id = cursor.fetchone()["id"]
         
         # Check change_log for event insert

@@ -132,8 +132,8 @@ def main(argv: list[str] | None = None) -> int:
         # Find all matching events in previous
         race_events_in_prev = []
         if previous:
-            for (r_id, yr), prev_result in previous.items():
-                if r_id == race.id:
+            for (r_id, dist, yr), prev_result in previous.items():
+                if r_id == race.id and dist == race.distance:
                     race_events_in_prev.append(prev_result)
 
         if race_events_in_prev:

@@ -108,7 +108,17 @@ def discover_from_world_athletics() -> list[Race]:
                 subgroup = comp.get("competitionSubgroup") or ""
                 event_date = (comp.get("startDate") or "").strip()[:10]
 
+                # Infer distance from name
+                name_lower = name.lower()
+                if "half marathon" in name_lower or "half-marathon" in name_lower or "halfmarathon" in name_lower or " 21k" in name_lower or "21.1k" in name_lower:
+                    distance = "half-marathon"
+                else:
+                    distance = "marathon"
+
                 race_id = _slugify(name)
+                if distance == "half-marathon" and not race_id.endswith("half-marathon"):
+                    race_id = f"{race_id}-half-marathon"
+
                 if race_id in seen_keys:
                     continue
                 seen_keys.add(race_id)
@@ -126,15 +136,16 @@ def discover_from_world_athletics() -> list[Race]:
                         event_date=event_date or None,
                         confidence="low",
                         notes=f"Auto-discovered from World Athletics ({subgroup} - {season})",
+                        distance=distance,
                     )
                 )
     return candidates
 
 
-def discover_from_wikipedia() -> list[Race]:
+def discover_from_wikipedia_page(page_name: str, default_distance: str) -> list[Race]:
     url = (
         f"{WIKIPEDIA_API}?action=parse"
-        "&page=List_of_World_Athletics_Label_marathon_races"
+        f"&page={page_name}"
         "&prop=text&format=json"
     )
     req = urllib.request.Request(url, headers={"User-Agent": "marathon-tracker/0.1"})
@@ -142,7 +153,7 @@ def discover_from_wikipedia() -> list[Race]:
         with urllib.request.urlopen(req, timeout=20) as resp:
             raw = json.loads(resp.read().decode("utf-8"))
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
-        raise RuntimeError(f"Wikipedia parse error: {exc}") from exc
+        raise RuntimeError(f"Wikipedia parse error for {page_name}: {exc}") from exc
 
     html = raw.get("parse", {}).get("text", {}).get("*", "")
     if not html:
@@ -157,7 +168,17 @@ def discover_from_wikipedia() -> list[Race]:
     for name, city, country in rows:
         if name.lower() in ("name", "race", "event", ""):
             continue
+        
+        name_lower = name.lower()
+        if "half marathon" in name_lower or "half-marathon" in name_lower or "halfmarathon" in name_lower or " 21k" in name_lower or "21.1k" in name_lower:
+            distance = "half-marathon"
+        else:
+            distance = default_distance
+            
         race_id = _slugify(name)
+        if distance == "half-marathon" and not race_id.endswith("half-marathon"):
+            race_id = f"{race_id}-half-marathon"
+            
         if race_id in seen_keys:
             continue
         seen_keys.add(race_id)
@@ -171,15 +192,31 @@ def discover_from_wikipedia() -> list[Race]:
                 official_url="",
                 event_date=None,
                 confidence="low",
-                notes="Auto-discovered from Wikipedia (World Athletics Label list)",
+                notes=f"Auto-discovered from Wikipedia ({page_name.replace('_', ' ')})",
+                distance=distance,
             )
         )
     return candidates
 
 
+def discover_from_wikipedia() -> list[Race]:
+    candidates: list[Race] = []
+    try:
+        candidates.extend(discover_from_wikipedia_page("List_of_World_Athletics_Label_marathon_races", "marathon"))
+    except RuntimeError as exc:
+        print(f"wikipedia discovery warning (marathons): {exc}")
+        
+    try:
+        candidates.extend(discover_from_wikipedia_page("List_of_World_Athletics_Label_half_marathon_races", "half-marathon"))
+    except RuntimeError as exc:
+        print(f"wikipedia discovery warning (half-marathons): {exc}")
+        
+    return candidates
+
+
 def discover_races(sources: tuple[str, ...] = ("world-athletics",)) -> list[Race]:
     discovered: list[Race] = []
-    seen_ids: set[str] = set()
+    seen_keys: set[tuple[str, str]] = set()
 
     for source in sources:
         try:
@@ -194,8 +231,9 @@ def discover_races(sources: tuple[str, ...] = ("world-athletics",)) -> list[Race
             continue
 
         for race in batch:
-            if race.id not in seen_ids:
-                seen_ids.add(race.id)
+            key = (race.id, race.distance)
+            if key not in seen_keys:
+                seen_keys.add(key)
                 discovered.append(race)
     return discovered
 
@@ -205,36 +243,44 @@ def merge_races(
     discovered: list[Race],
     previous: dict[str, Race] | None = None,
 ) -> list[Race]:
-    merged: dict[str, Race] = {}
-    seen_urls: set[str] = set()
+    merged: dict[tuple[str, str], Race] = {}
+    seen_urls: set[tuple[str, str]] = set()
 
     for race in curated:
-        merged[race.id] = race
+        merged[(race.id, race.distance)] = race
         for url in (race.official_url, race.registration_url):
             if url:
-                seen_urls.add(url.rstrip("/"))
+                seen_urls.add((url.rstrip("/"), race.distance))
 
     if previous:
-        for race_id, race in previous.items():
-            if race_id not in merged:
+        for race_key, race in previous.items():
+            if isinstance(race_key, tuple):
+                r_id = race_key[0]
+                r_dist = race_key[1] if len(race_key) > 1 else race.distance
+            else:
+                r_id = race_key
+                r_dist = getattr(race, "distance", "marathon")
+                
+            if (r_id, r_dist) not in merged:
                 dup = False
                 for url in (race.official_url, race.registration_url):
-                    if url and url.rstrip("/") in seen_urls:
+                    if url and (url.rstrip("/"), r_dist) in seen_urls:
                         dup = True
                         break
                 if not dup:
-                    merged[race_id] = race
+                    merged[(r_id, r_dist)] = race
 
     for race in discovered:
-        if race.id in merged:
+        key = (race.id, race.distance)
+        if key in merged:
             continue
         dup = False
         for url in (race.official_url, race.registration_url):
-            if url and url.rstrip("/") in seen_urls:
+            if url and (url.rstrip("/"), race.distance) in seen_urls:
                 dup = True
                 break
         if not dup:
-            merged[race.id] = race
+            merged[key] = race
 
     return list(merged.values())
 

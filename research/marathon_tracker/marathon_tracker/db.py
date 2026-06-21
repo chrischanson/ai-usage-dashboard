@@ -11,15 +11,29 @@ def get_connection(db_path: Path) -> sqlite3.Connection:
     return conn
 
 
+import json
+import sqlite3
+from pathlib import Path
+
+
+def get_connection(db_path: Path) -> sqlite3.Connection:
+    """Returns a configured SQLite connection."""
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON;")
+    return conn
+
+
 def init_db(conn: sqlite3.Connection) -> None:
     """Initializes the database schema."""
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS locations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             city TEXT NOT NULL,
+            state_province TEXT, -- New subdivision field
             country TEXT NOT NULL,
             region TEXT NOT NULL,
-            UNIQUE(city, country)
+            UNIQUE(city, state_province, country)
         );
 
         CREATE TABLE IF NOT EXISTS event_statuses (
@@ -30,30 +44,39 @@ def init_db(conn: sqlite3.Connection) -> None:
             level TEXT PRIMARY KEY
         );
 
+        CREATE TABLE IF NOT EXISTS official_urls (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            url TEXT UNIQUE NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS races (
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
             location_id INTEGER NOT NULL,
-            distance TEXT NOT NULL DEFAULT 'marathon',
-            official_url TEXT NOT NULL,
-            registration_url TEXT,
-            FOREIGN KEY(location_id) REFERENCES locations(id)
+            official_url_id INTEGER NOT NULL, -- Normalized URL Reference
+            registration_url_id INTEGER,      -- Normalized URL Reference
+            FOREIGN KEY(location_id) REFERENCES locations(id),
+            FOREIGN KEY(official_url_id) REFERENCES official_urls(id),
+            FOREIGN KEY(registration_url_id) REFERENCES official_urls(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS race_offerings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            race_id TEXT NOT NULL,
+            distance TEXT NOT NULL, -- 'marathon', 'half-marathon', etc.
+            FOREIGN KEY(race_id) REFERENCES races(id),
+            UNIQUE(race_id, distance)
         );
 
         CREATE TABLE IF NOT EXISTS race_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            race_id TEXT NOT NULL,
+            race_offering_id INTEGER NOT NULL, -- References offering instead of parent race
             year INTEGER NOT NULL,
             event_date TEXT,
             status TEXT NOT NULL DEFAULT 'active',
-            FOREIGN KEY(race_id) REFERENCES races(id),
+            FOREIGN KEY(race_offering_id) REFERENCES race_offerings(id),
             FOREIGN KEY(status) REFERENCES event_statuses(status),
-            UNIQUE(race_id, year)
-        );
-
-        CREATE TABLE IF NOT EXISTS official_urls (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            url TEXT UNIQUE NOT NULL
+            UNIQUE(race_offering_id, year)
         );
 
         CREATE TABLE IF NOT EXISTS registration_types (
@@ -96,8 +119,191 @@ def init_db(conn: sqlite3.Connection) -> None:
             record_id TEXT NOT NULL,
             details TEXT NOT NULL
         );
+    """)
 
-        CREATE TRIGGER IF NOT EXISTS log_races_insert
+    conn.execute("INSERT OR IGNORE INTO event_statuses (status) VALUES ('active'), ('stale'), ('carried-over');")
+    conn.execute("INSERT OR IGNORE INTO confidence_levels (level) VALUES ('high'), ('medium'), ('low'), ('unknown');")
+    conn.execute("INSERT OR IGNORE INTO registration_types (type) VALUES ('standard'), ('lottery'), ('qualification'), ('charity'), ('invitation');")
+
+    cursor = conn.cursor()
+
+    # Automated schema migrations for existing database
+    conn.commit()
+    conn.execute("PRAGMA foreign_keys = OFF;")
+
+    # Drop triggers to prevent schema verification errors during table renames
+    conn.execute("DROP TRIGGER IF EXISTS log_races_insert;")
+    conn.execute("DROP TRIGGER IF EXISTS log_race_events_insert;")
+    conn.execute("DROP TRIGGER IF EXISTS log_race_events_update;")
+    conn.execute("DROP TRIGGER IF EXISTS log_registration_windows_insert;")
+    conn.execute("DROP TRIGGER IF EXISTS log_registration_windows_delete;")
+
+    # 1. Locations migration: Add state_province subdivision field
+    cursor.execute("PRAGMA table_info(locations);")
+    loc_cols = [row["name"] for row in cursor.fetchall()]
+    if "state_province" not in loc_cols:
+        cursor.execute("ALTER TABLE locations RENAME TO locations_old;")
+        conn.execute("""
+            CREATE TABLE locations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                city TEXT NOT NULL,
+                state_province TEXT,
+                country TEXT NOT NULL,
+                region TEXT NOT NULL,
+                UNIQUE(city, state_province, country)
+            );
+        """)
+        conn.execute("""
+            INSERT INTO locations (id, city, state_province, country, region)
+            SELECT id, city, NULL, country, region FROM locations_old;
+        """)
+        conn.execute("DROP TABLE locations_old;")
+
+    # 2 & 3. Races table migration to normalize URLs and remove distance
+    cursor.execute("PRAGMA table_info(races);")
+    race_cols = [row["name"] for row in cursor.fetchall()]
+    if "official_url_id" not in race_cols:
+        # Save all unique URLs to official_urls
+        conn.execute("""
+            INSERT OR IGNORE INTO official_urls (url)
+            SELECT DISTINCT official_url FROM races WHERE official_url IS NOT NULL;
+        """)
+        conn.execute("""
+            INSERT OR IGNORE INTO official_urls (url)
+            SELECT DISTINCT registration_url FROM races WHERE registration_url IS NOT NULL AND registration_url != '';
+        """)
+
+        cursor.execute("ALTER TABLE races RENAME TO races_old;")
+        conn.execute("""
+            CREATE TABLE races (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                location_id INTEGER NOT NULL,
+                official_url_id INTEGER NOT NULL,
+                registration_url_id INTEGER,
+                FOREIGN KEY(location_id) REFERENCES locations(id),
+                FOREIGN KEY(official_url_id) REFERENCES official_urls(id),
+                FOREIGN KEY(registration_url_id) REFERENCES official_urls(id)
+            );
+        """)
+        # Insert races mapping URLs to official_urls IDs
+        conn.execute("""
+            INSERT INTO races (id, name, location_id, official_url_id, registration_url_id)
+            SELECT 
+                ro.id, 
+                ro.name, 
+                ro.location_id,
+                (SELECT id FROM official_urls WHERE url = ro.official_url),
+                (SELECT id FROM official_urls WHERE url = ro.registration_url)
+            FROM races_old ro;
+        """)
+
+        # 4. Race offerings creation and populating
+        conn.execute("DROP TABLE IF EXISTS race_offerings;")
+        conn.execute("""
+            CREATE TABLE race_offerings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                race_id TEXT NOT NULL,
+                distance TEXT NOT NULL,
+                FOREIGN KEY(race_id) REFERENCES races(id),
+                UNIQUE(race_id, distance)
+            );
+        """)
+        conn.execute("""
+            INSERT OR IGNORE INTO race_offerings (race_id, distance)
+            SELECT id, IFNULL(distance, 'marathon') FROM races_old;
+        """)
+
+        # 5. Race events migration to reference race_offering_id instead of race_id
+        cursor.execute("PRAGMA table_info(race_events);")
+        re_cols = [row["name"] for row in cursor.fetchall()]
+        if "race_offering_id" not in re_cols:
+            cursor.execute("ALTER TABLE race_events RENAME TO race_events_old;")
+            
+            conn.execute("ALTER TABLE registration_windows RENAME TO registration_windows_old;")
+            conn.execute("ALTER TABLE extraction_metadata RENAME TO extraction_metadata_old;")
+            
+            conn.execute("""
+                CREATE TABLE race_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    race_offering_id INTEGER NOT NULL,
+                    year INTEGER NOT NULL,
+                    event_date TEXT,
+                    status TEXT NOT NULL DEFAULT 'active',
+                    FOREIGN KEY(race_offering_id) REFERENCES race_offerings(id),
+                    FOREIGN KEY(status) REFERENCES event_statuses(status),
+                    UNIQUE(race_offering_id, year)
+                );
+            """)
+            conn.execute("""
+                INSERT INTO race_events (id, race_offering_id, year, event_date, status)
+                SELECT 
+                    reo.id, 
+                    ro.id, 
+                    reo.year, 
+                    reo.event_date, 
+                    reo.status
+                FROM race_events_old reo
+                JOIN race_offerings ro ON reo.race_id = ro.race_id AND ro.distance = 'marathon';
+            """)
+            
+            conn.execute("""
+                CREATE TABLE registration_windows (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_id INTEGER NOT NULL,
+                    window_type TEXT NOT NULL,
+                    description TEXT,
+                    open_date TEXT,
+                    close_date TEXT,
+                    official_url_id INTEGER,
+                    FOREIGN KEY(event_id) REFERENCES race_events(id),
+                    FOREIGN KEY(window_type) REFERENCES registration_types(type),
+                    FOREIGN KEY(official_url_id) REFERENCES official_urls(id),
+                    UNIQUE(event_id, window_type, open_date, close_date)
+                );
+            """)
+            
+            conn.execute("""
+                CREATE TABLE extraction_metadata (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_id INTEGER NOT NULL,
+                    source_url_id INTEGER,
+                    extracted_at TEXT,
+                    extraction_method TEXT,
+                    confidence TEXT NOT NULL DEFAULT 'unknown',
+                    notes TEXT,
+                    raw_evidence TEXT,
+                    FOREIGN KEY(event_id) REFERENCES race_events(id),
+                    FOREIGN KEY(source_url_id) REFERENCES official_urls(id),
+                    FOREIGN KEY(confidence) REFERENCES confidence_levels(level)
+                );
+            """)
+            
+            conn.execute("""
+                INSERT INTO registration_windows (id, event_id, window_type, description, open_date, close_date, official_url_id)
+                SELECT id, event_id, window_type, description, open_date, close_date, official_url_id
+                FROM registration_windows_old;
+            """)
+            conn.execute("""
+                INSERT INTO extraction_metadata (id, event_id, source_url_id, extracted_at, extraction_method, confidence, notes, raw_evidence)
+                SELECT id, event_id, source_url_id, extracted_at, extraction_method, confidence, notes, raw_evidence
+                FROM extraction_metadata_old;
+            """)
+            
+            conn.execute("DROP TABLE registration_windows_old;")
+            conn.execute("DROP TABLE extraction_metadata_old;")
+            conn.execute("DROP TABLE race_events_old;")
+
+        conn.execute("DROP TABLE races_old;")
+
+    # Re-enable foreign keys
+    conn.commit()
+    conn.execute("PRAGMA foreign_keys = ON;")
+
+    # Recreate Triggers matching the new schema
+    conn.executescript("""
+        DROP TRIGGER IF EXISTS log_races_insert;
+        CREATE TRIGGER log_races_insert
         AFTER INSERT ON races
         BEGIN
             INSERT INTO change_log (table_name, action, record_id, details)
@@ -109,35 +315,39 @@ def init_db(conn: sqlite3.Connection) -> None:
                     'new_values', json_object(
                         'name', new.name,
                         'city', l.city,
+                        'state_province', l.state_province,
                         'country', l.country,
                         'region', l.region,
-                        'distance', new.distance,
-                        'official_url', new.official_url,
-                        'registration_url', new.registration_url
+                        'official_url', (SELECT url FROM official_urls WHERE id = new.official_url_id),
+                        'registration_url', (SELECT url FROM official_urls WHERE id = new.registration_url_id)
                     )
                 )
             FROM locations l
             WHERE l.id = new.location_id;
         END;
 
-        CREATE TRIGGER IF NOT EXISTS log_race_events_insert
+        DROP TRIGGER IF EXISTS log_race_events_insert;
+        CREATE TRIGGER log_race_events_insert
         AFTER INSERT ON race_events
         BEGIN
             INSERT INTO change_log (table_name, action, record_id, details)
-            VALUES (
+            SELECT
                 'race_events',
                 'INSERT',
-                new.race_id || ' (' || new.year || ')',
+                ro.race_id || ' (' || new.year || ')',
                 json_object(
                     'new_values', json_object(
                         'event_date', new.event_date,
-                        'status', new.status
+                        'status', new.status,
+                        'distance', ro.distance
                     )
                 )
-            );
+            FROM race_offerings ro
+            WHERE ro.id = new.race_offering_id;
         END;
 
-        CREATE TRIGGER IF NOT EXISTS log_race_events_update
+        DROP TRIGGER IF EXISTS log_race_events_update;
+        CREATE TRIGGER log_race_events_update
         AFTER UPDATE ON race_events
         WHEN (
             old.event_date IS NOT new.event_date OR
@@ -145,10 +355,10 @@ def init_db(conn: sqlite3.Connection) -> None:
         )
         BEGIN
             INSERT INTO change_log (table_name, action, record_id, details)
-            VALUES (
+            SELECT
                 'race_events',
                 'UPDATE',
-                new.race_id || ' (' || new.year || ')',
+                ro.race_id || ' (' || new.year || ')',
                 json_object(
                     'old_values', json_object(
                         'event_date', old.event_date,
@@ -159,7 +369,8 @@ def init_db(conn: sqlite3.Connection) -> None:
                         'status', new.status
                     )
                 )
-            );
+            FROM race_offerings ro
+            WHERE ro.id = new.race_offering_id;
         END;
 
         DROP TRIGGER IF EXISTS log_registration_windows_insert;
@@ -170,7 +381,7 @@ def init_db(conn: sqlite3.Connection) -> None:
             SELECT
                 'registration_windows',
                 'INSERT',
-                e.race_id || ' (' || e.year || ')',
+                ro.race_id || ' (' || e.year || ')',
                 json_object(
                     'new_values', json_object(
                         'window_type', new.window_type,
@@ -181,6 +392,7 @@ def init_db(conn: sqlite3.Connection) -> None:
                     )
                 )
             FROM race_events e
+            JOIN race_offerings ro ON e.race_offering_id = ro.id
             WHERE e.id = new.event_id;
         END;
 
@@ -192,7 +404,7 @@ def init_db(conn: sqlite3.Connection) -> None:
             SELECT
                 'registration_windows',
                 'DELETE',
-                e.race_id || ' (' || e.year || ')',
+                ro.race_id || ' (' || e.year || ')',
                 json_object(
                     'old_values', json_object(
                         'window_type', old.window_type,
@@ -203,107 +415,9 @@ def init_db(conn: sqlite3.Connection) -> None:
                     )
                 )
             FROM race_events e
+            JOIN race_offerings ro ON e.race_offering_id = ro.id
             WHERE e.id = old.event_id;
         END;
     """)
-    conn.execute("INSERT OR IGNORE INTO event_statuses (status) VALUES ('active'), ('stale'), ('carried-over');")
-    conn.execute("INSERT OR IGNORE INTO confidence_levels (level) VALUES ('high'), ('medium'), ('low'), ('unknown');")
-    conn.execute("INSERT OR IGNORE INTO registration_types (type) VALUES ('standard'), ('lottery'), ('qualification'), ('charity'), ('invitation');")
-    
-    # Automated schema migration: check if official_url_id column exists in registration_windows
-    cursor = conn.cursor()
-    cursor.execute("PRAGMA table_info(registration_windows);")
-    columns = [row["name"] for row in cursor.fetchall()]
-    if "official_url_id" not in columns:
-        conn.execute("ALTER TABLE registration_windows ADD COLUMN official_url_id INTEGER REFERENCES official_urls(id);")
-        
-        # Check if source_url exists in extraction_metadata before querying it
-        cursor.execute("PRAGMA table_info(extraction_metadata);")
-        em_cols = [row["name"] for row in cursor.fetchall()]
-        if "source_url" in em_cols:
-            # Populate official_urls table from unique URLs in extraction_metadata
-            conn.execute("""
-                INSERT OR IGNORE INTO official_urls (url)
-                SELECT DISTINCT source_url FROM extraction_metadata WHERE source_url IS NOT NULL AND source_url != '';
-            """)
-            
-            # Update existing registration_windows rows to link to official_urls
-            conn.execute("""
-                UPDATE registration_windows
-                SET official_url_id = (
-                    SELECT o.id FROM official_urls o
-                    JOIN extraction_metadata m ON o.url = m.source_url
-                    WHERE m.event_id = registration_windows.event_id
-                    LIMIT 1
-                )
-                WHERE official_url_id IS NULL;
-            """)
-    
-    # Automated schema migration: check if source_url_id column exists in extraction_metadata
-    cursor.execute("PRAGMA table_info(extraction_metadata);")
-    em_columns = [row["name"] for row in cursor.fetchall()]
-    if "source_url_id" not in em_columns:
-        if "source_url" in em_columns:
-            conn.execute("ALTER TABLE extraction_metadata ADD COLUMN source_url_id INTEGER REFERENCES official_urls(id);")
-            
-            # Populate official_urls table from unique URLs in extraction_metadata
-            conn.execute("""
-                INSERT OR IGNORE INTO official_urls (url)
-                SELECT DISTINCT source_url FROM extraction_metadata WHERE source_url IS NOT NULL AND source_url != '';
-            """)
-            
-            # Update source_url_id foreign keys matching the string source_url
-            conn.execute("""
-                UPDATE extraction_metadata
-                SET source_url_id = (
-                    SELECT id FROM official_urls WHERE url = extraction_metadata.source_url
-                )
-                WHERE source_url IS NOT NULL AND source_url != '';
-            """)
-            
-            # Drop the legacy source_url column
-            try:
-                conn.execute("ALTER TABLE extraction_metadata DROP COLUMN source_url;")
-            except sqlite3.OperationalError:
-                pass
-        else:
-            conn.execute("ALTER TABLE extraction_metadata ADD COLUMN source_url_id INTEGER REFERENCES official_urls(id);")
-
-    # Automated schema migration: check if registration_windows has a foreign key to registration_types
-    cursor.execute("PRAGMA foreign_key_list(registration_windows);")
-    fks = [row["table"] for row in cursor.fetchall()]
-    if "registration_types" not in fks:
-        conn.execute("CREATE TABLE IF NOT EXISTS registration_types (type TEXT PRIMARY KEY);")
-        conn.execute("INSERT OR IGNORE INTO registration_types (type) VALUES ('standard'), ('lottery'), ('qualification'), ('charity'), ('invitation');")
-        
-        conn.execute("ALTER TABLE registration_windows RENAME TO registration_windows_old;")
-        
-        conn.execute("""
-            CREATE TABLE registration_windows (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                event_id INTEGER NOT NULL,
-                window_type TEXT NOT NULL,
-                description TEXT,
-                open_date TEXT,
-                close_date TEXT,
-                official_url_id INTEGER,
-                FOREIGN KEY(event_id) REFERENCES race_events(id),
-                FOREIGN KEY(window_type) REFERENCES registration_types(type),
-                FOREIGN KEY(official_url_id) REFERENCES official_urls(id),
-                UNIQUE(event_id, window_type, open_date, close_date)
-            );
-        """)
-        
-        conn.execute("""
-            INSERT OR IGNORE INTO registration_types (type)
-            SELECT DISTINCT window_type FROM registration_windows_old WHERE window_type IS NOT NULL;
-        """)
-        
-        conn.execute("""
-            INSERT INTO registration_windows (id, event_id, window_type, description, open_date, close_date, official_url_id)
-            SELECT id, event_id, window_type, description, open_date, close_date, official_url_id FROM registration_windows_old;
-        """)
-        
-        conn.execute("DROP TABLE registration_windows_old;")
 
     conn.commit()

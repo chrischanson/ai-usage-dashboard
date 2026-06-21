@@ -229,32 +229,34 @@ class LoadPreviousOutputTest(unittest.TestCase):
             cursor = conn.cursor()
             cursor.execute("INSERT INTO locations (city, country, region) VALUES ('City', 'Country', 'Region')")
             location_id = cursor.execute("SELECT id FROM locations").fetchone()["id"]
-            cursor.execute("INSERT INTO races (id, name, location_id, official_url) VALUES ('test', 'Test', ?, 'https://example.com')", (location_id,))
-            cursor.execute("INSERT INTO race_events (race_id, year, event_date, status) VALUES ('test', 2026, '2026-06-01', 'active')")
-            event_id = cursor.execute("SELECT id FROM race_events").fetchone()["id"]
             cursor.execute("INSERT INTO official_urls (url) VALUES ('https://example.com')")
             url_id = cursor.execute("SELECT id FROM official_urls WHERE url = 'https://example.com'").fetchone()["id"]
+            cursor.execute("INSERT INTO races (id, name, location_id, official_url_id) VALUES ('test', 'Test', ?, ?)", (location_id, url_id))
+            cursor.execute("INSERT INTO race_offerings (race_id, distance) VALUES ('test', 'marathon')")
+            offering_id = cursor.execute("SELECT id FROM race_offerings WHERE race_id = 'test' AND distance = 'marathon'").fetchone()["id"]
+            cursor.execute("INSERT INTO race_events (race_offering_id, year, event_date, status) VALUES (?, 2026, '2026-06-01', 'active')", (offering_id,))
+            event_id = cursor.execute("SELECT id FROM race_events").fetchone()["id"]
             cursor.execute("INSERT INTO extraction_metadata (event_id, source_url_id, extracted_at, extraction_method, confidence, notes, raw_evidence) VALUES (?, ?, '2026-01-01T00:00:00+00:00', 'seed', 'high', '', '[]')", (event_id, url_id))
             
             # Insert official url and link to registration window
             cursor.execute("INSERT INTO official_urls (url) VALUES ('https://official-window.com')")
-            url_id = cursor.execute("SELECT id FROM official_urls WHERE url = 'https://official-window.com'").fetchone()["id"]
+            window_url_id = cursor.execute("SELECT id FROM official_urls WHERE url = 'https://official-window.com'").fetchone()["id"]
             cursor.execute("""
                 INSERT INTO registration_windows (event_id, window_type, description, open_date, close_date, official_url_id)
                 VALUES (?, 'standard', 'Standard Entry', '2026-01-01', '2026-02-01', ?)
-            """, (event_id, url_id))
+            """, (event_id, window_url_id))
             
             conn.commit()
             conn.close()
             
             result = load_previous_output(tmp)
             self.assertIsNotNone(result)
-            self.assertIn(("test", 2026), result)
-            self.assertEqual(result[("test", 2026)].name, "Test")
-            self.assertEqual(result[("test", 2026)].status, "active")
+            self.assertIn(("test", "marathon", 2026), result)
+            self.assertEqual(result[("test", "marathon", 2026)].name, "Test")
+            self.assertEqual(result[("test", "marathon", 2026)].status, "active")
             
             # Verify window loading and official URL mapping
-            windows = result[("test", 2026)].registration_windows
+            windows = result[("test", "marathon", 2026)].registration_windows
             self.assertEqual(len(windows), 1)
             self.assertEqual(windows[0].window_type, "standard")
             self.assertEqual(windows[0].description, "Standard Entry")

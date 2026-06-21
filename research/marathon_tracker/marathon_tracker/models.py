@@ -47,6 +47,8 @@ class Race:
     registration_windows: list[RegistrationWindow] = field(default_factory=list)
     confidence: str = "unknown"
     notes: str = ""
+    distance: str = "marathon"
+    state_province: str | None = None
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "Race":
@@ -72,7 +74,27 @@ class Race:
             registration_windows=windows,
             confidence=str(raw.get("confidence", "unknown")),
             notes=str(raw.get("notes", "")),
+            distance=str(raw.get("distance", "marathon")),
+            state_province=str(raw["state_province"]) if raw.get("state_province") else None,
         )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "city": self.city,
+            "country": self.country,
+            "region": self.region,
+            "official_url": self.official_url,
+            "registration_url": self.registration_url,
+            "source_url": self.source_url,
+            "event_date": self.event_date,
+            "registration_windows": [w.to_dict() for w in self.registration_windows],
+            "confidence": self.confidence,
+            "notes": self.notes,
+            "distance": self.distance,
+            "state_province": self.state_province,
+        }
 
 
 @dataclass
@@ -94,6 +116,8 @@ class RaceResult:
     notes: str = ""
     raw_evidence: list[str] = field(default_factory=list)
     year: int | None = None
+    distance: str = "marathon"
+    state_province: str | None = None
 
     @classmethod
     def from_race(cls, race: Race) -> "RaceResult":
@@ -117,6 +141,8 @@ class RaceResult:
             confidence=race.confidence,
             notes=race.notes,
             year=year,
+            distance=race.distance,
+            state_province=race.state_province,
         )
 
     @classmethod
@@ -143,6 +169,8 @@ class RaceResult:
             notes=str(raw.get("notes", "")),
             raw_evidence=list(raw.get("raw_evidence", [])),
             year=raw.get("year"),
+            distance=str(raw.get("distance", "marathon")),
+            state_province=str(raw["state_province"]) if raw.get("state_province") else None,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -164,4 +192,6 @@ class RaceResult:
             "notes": self.notes,
             "raw_evidence": self.raw_evidence,
             "year": self.year,
+            "distance": self.distance,
+            "state_province": self.state_province,
         }

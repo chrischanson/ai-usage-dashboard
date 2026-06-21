@@ -20,9 +20,14 @@ def load_races(path: Path = DEFAULT_DB) -> list[Race]:
     init_db(conn)
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT r.id, r.name, l.city, l.country, l.region, r.official_url, r.registration_url 
+        SELECT r.id, r.name, l.city, l.state_province, l.country, l.region, 
+               ou_off.url as official_url, ou_reg.url as registration_url,
+               ro.distance
         FROM races r
         JOIN locations l ON r.location_id = l.id
+        JOIN race_offerings ro ON r.id = ro.race_id
+        JOIN official_urls ou_off ON r.official_url_id = ou_off.id
+        LEFT JOIN official_urls ou_reg ON r.registration_url_id = ou_reg.id
     """)
     
     races = []
@@ -31,16 +36,18 @@ def load_races(path: Path = DEFAULT_DB) -> list[Race]:
             id=row["id"],
             name=row["name"],
             city=row["city"],
+            state_province=row["state_province"],
             country=row["country"],
             region=row["region"],
             official_url=row["official_url"],
-            registration_url=row["registration_url"]
+            registration_url=row["registration_url"],
+            distance=row["distance"]
         ))
     conn.close()
     return races
 
 
-def load_previous_output(path: Path = DEFAULT_DB) -> dict[tuple[str, int], RaceResult] | None:
+def load_previous_output(path: Path = DEFAULT_DB) -> dict[tuple[str, str, int], RaceResult] | None:
     if not path.exists():
         return None
     
@@ -70,12 +77,17 @@ def load_previous_output(path: Path = DEFAULT_DB) -> dict[tuple[str, int], RaceR
     # Load all events for all races
     cursor.execute("""
         SELECT 
-            r.id, r.name, l.city, l.country, l.region, r.official_url, r.registration_url,
+            r.id, r.name, l.city, l.state_province, l.country, l.region,
+            ou_off.url as official_url, ou_reg.url as registration_url,
+            ro.distance,
             e.id as event_id, e.year, e.event_date, e.status,
             ou.url as source_url, m.extracted_at, m.extraction_method, m.confidence, m.notes, m.raw_evidence
         FROM races r
         JOIN locations l ON r.location_id = l.id
-        LEFT JOIN race_events e ON r.id = e.race_id
+        JOIN race_offerings ro ON r.id = ro.race_id
+        JOIN official_urls ou_off ON r.official_url_id = ou_off.id
+        LEFT JOIN official_urls ou_reg ON r.registration_url_id = ou_reg.id
+        LEFT JOIN race_events e ON ro.id = e.race_offering_id
         LEFT JOIN extraction_metadata m ON m.id = (
             SELECT id FROM extraction_metadata
             WHERE event_id = e.id
@@ -98,10 +110,11 @@ def load_previous_output(path: Path = DEFAULT_DB) -> dict[tuple[str, int], RaceR
         ev_id = row["event_id"]
         windows = windows_by_event.get(ev_id, []) if ev_id is not None else []
             
-        results[(row["id"], year)] = RaceResult(
+        results[(row["id"], row["distance"], year)] = RaceResult(
             id=row["id"],
             name=row["name"],
             city=row["city"],
+            state_province=row["state_province"],
             country=row["country"],
             region=row["region"],
             official_url=row["official_url"],
@@ -115,7 +128,8 @@ def load_previous_output(path: Path = DEFAULT_DB) -> dict[tuple[str, int], RaceR
             status=row["status"] or "active",
             notes=row["notes"] or "",
             raw_evidence=raw_evidence,
-            year=year
+            year=year,
+            distance=row["distance"]
         )
     
     conn.close()
@@ -134,29 +148,55 @@ def save_races(races: list[Race], path: Path = DEFAULT_DB) -> None:
             # 1. Insert geography into locations
             cursor.execute(
                 """
-                INSERT OR IGNORE INTO locations (city, country, region)
-                VALUES (?, ?, ?)
+                INSERT OR IGNORE INTO locations (city, state_province, country, region)
+                VALUES (?, ?, ?, ?)
                 """,
-                (race.city, race.country, race.region)
+                (race.city, race.state_province, race.country, race.region)
             )
             
             # 2. Get location_id
-            cursor.execute(
-                "SELECT id FROM locations WHERE city = ? AND country = ?",
-                (race.city, race.country)
-            )
+            if race.state_province:
+                cursor.execute(
+                    "SELECT id FROM locations WHERE city = ? AND state_province = ? AND country = ?",
+                    (race.city, race.state_province, race.country)
+                )
+            else:
+                cursor.execute(
+                    "SELECT id FROM locations WHERE city = ? AND state_province IS NULL AND country = ?",
+                    (race.city, race.country)
+                )
             location_id = cursor.fetchone()["id"]
+
+            # 3. Resolve URL IDs
+            cursor.execute("INSERT OR IGNORE INTO official_urls (url) VALUES (?)", (race.official_url,))
+            cursor.execute("SELECT id FROM official_urls WHERE url = ?", (race.official_url,))
+            official_url_id = cursor.fetchone()["id"]
+
+            registration_url_id = None
+            if race.registration_url:
+                cursor.execute("INSERT OR IGNORE INTO official_urls (url) VALUES (?)", (race.registration_url,))
+                cursor.execute("SELECT id FROM official_urls WHERE url = ?", (race.registration_url,))
+                registration_url_id = cursor.fetchone()["id"]
             
-            # 3. Insert into races referencing the location_id
+            # 4. Insert into races referencing location and URL IDs
             cursor.execute(
                 """
-                INSERT INTO races (id, name, location_id, distance, official_url, registration_url)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT OR IGNORE INTO races (id, name, location_id, official_url_id, registration_url_id)
+                VALUES (?, ?, ?, ?, ?)
                 """,
-                (race.id, race.name, location_id, "marathon", race.official_url, race.registration_url)
+                (race.id, race.name, location_id, official_url_id, registration_url_id)
+            )
+
+            # 5. Insert into race_offerings
+            cursor.execute(
+                """
+                INSERT OR IGNORE INTO race_offerings (race_id, distance)
+                VALUES (?, ?)
+                """,
+                (race.id, race.distance)
             )
             count += 1
-        except Exception: # likely IntegrityError for existing ID
+        except Exception: # likely IntegrityError or other
             pass
             
     conn.commit()
@@ -172,6 +212,44 @@ def save_race_results(results: list[RaceResult], path: Path = DEFAULT_DB) -> Non
     cursor = conn.cursor()
     
     for result in results:
+        # Resolve location, race, offering if missing
+        cursor.execute(
+            "INSERT OR IGNORE INTO locations (city, state_province, country, region) VALUES (?, ?, ?, ?)",
+            (result.city, result.state_province, result.country, result.region)
+        )
+        if result.state_province:
+            cursor.execute("SELECT id FROM locations WHERE city=? AND state_province=? AND country=?", (result.city, result.state_province, result.country))
+        else:
+            cursor.execute("SELECT id FROM locations WHERE city=? AND state_province IS NULL AND country=?", (result.city, result.country))
+        location_id = cursor.fetchone()["id"]
+
+        cursor.execute("INSERT OR IGNORE INTO official_urls (url) VALUES (?)", (result.official_url,))
+        cursor.execute("SELECT id FROM official_urls WHERE url=?", (result.official_url,))
+        official_url_id = cursor.fetchone()["id"]
+
+        registration_url_id = None
+        if result.registration_url:
+            cursor.execute("INSERT OR IGNORE INTO official_urls (url) VALUES (?)", (result.registration_url,))
+            cursor.execute("SELECT id FROM official_urls WHERE url=?", (result.registration_url,))
+            registration_url_id = cursor.fetchone()["id"]
+
+        cursor.execute(
+            "INSERT OR IGNORE INTO races (id, name, location_id, official_url_id, registration_url_id) VALUES (?, ?, ?, ?, ?)",
+            (result.id, result.name, location_id, official_url_id, registration_url_id)
+        )
+
+        cursor.execute(
+            "INSERT OR IGNORE INTO race_offerings (race_id, distance) VALUES (?, ?)",
+            (result.id, result.distance)
+        )
+
+        # Retrieve race_offering_id
+        cursor.execute(
+            "SELECT id FROM race_offerings WHERE race_id = ? AND distance = ?",
+            (result.id, result.distance)
+        )
+        race_offering_id = cursor.fetchone()["id"]
+
         # Determine year
         year = result.year
         if not year:
@@ -188,26 +266,26 @@ def save_race_results(results: list[RaceResult], path: Path = DEFAULT_DB) -> Non
         cursor.execute(
             """
             INSERT INTO race_events (
-                race_id, year, event_date, status
+                race_offering_id, year, event_date, status
             ) VALUES (?, ?, ?, ?)
-            ON CONFLICT(race_id, year) DO UPDATE SET
+            ON CONFLICT(race_offering_id, year) DO UPDATE SET
                 event_date=excluded.event_date,
                 status=excluded.status
             """,
             (
-                result.id, year, result.event_date, status
+                race_offering_id, year, result.event_date, status
             )
         )
         
         # Get event_id to insert metadata and windows
-        cursor.execute("SELECT id FROM race_events WHERE race_id=? AND year=?", (result.id, year))
+        cursor.execute("SELECT id FROM race_events WHERE race_offering_id=? AND year=?", (race_offering_id, year))
         row = cursor.fetchone()
         event_id = row["id"]
         
         # Sync registration windows
         cursor.execute("DELETE FROM registration_windows WHERE event_id = ?", (event_id,))
         for w in result.registration_windows:
-            official_url_id = None
+            official_url_id_window = None
             if w.official_url:
                 cursor.execute(
                     """
@@ -224,14 +302,14 @@ def save_race_results(results: list[RaceResult], path: Path = DEFAULT_DB) -> Non
                 )
                 row_url = cursor.fetchone()
                 if row_url:
-                    official_url_id = row_url["id"]
+                    official_url_id_window = row_url["id"]
 
             cursor.execute(
                 """
                 INSERT OR IGNORE INTO registration_windows (event_id, window_type, description, open_date, close_date, official_url_id)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (event_id, w.window_type, w.description or w.window_type, w.open_date, w.close_date, official_url_id)
+                (event_id, w.window_type, w.description or w.window_type, w.open_date, w.close_date, official_url_id_window)
             )
         
         source_url_id = None

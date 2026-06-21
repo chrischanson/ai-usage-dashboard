@@ -6,9 +6,9 @@ import urllib.error
 import urllib.request
 
 
-SYSTEM_PROMPT = """Extract marathon race dates and registration deadlines from official race page text.
+SYSTEM_PROMPT = """Extract marathon or half-marathon race dates, registration deadlines, and distance from official race page text.
 Return only strict JSON with these keys:
-event_date, registration_windows, confidence, notes, raw_evidence.
+event_date, registration_windows, confidence, notes, raw_evidence, distance.
 
 - event_date: The race day date (ISO 8601, e.g. "2026-10-11") or null.
 - registration_windows: A list of objects representing entry/registration periods. Each object must have:
@@ -17,6 +17,7 @@ event_date, registration_windows, confidence, notes, raw_evidence.
   - open_date: ISO 8601 date when registration opens, or null
   - close_date: ISO 8601 deadline date when registration closes, or null
   Ensure all distinct entry periods (like lottery windows, charity programs, time qualifier windows) are captured as separate objects.
+- distance: Must be 'marathon' or 'half-marathon' based on the page context (or null if ambiguous or not mentioned).
 
 Use ISO 8601 dates ("YYYY-MM-DD") when a full date is available. Use null when unknown.
 raw_evidence must be a short list of source text snippets supporting the dates.

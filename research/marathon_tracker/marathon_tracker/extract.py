@@ -107,6 +107,12 @@ def apply_extraction(
     if isinstance(evidence, list):
         result.raw_evidence = [str(item)[:300] for item in evidence[:5]]
 
+    # 4. Extract distance
+    dist = extraction.get("distance")
+    if isinstance(dist, str) and dist in {"marathon", "half-marathon"}:
+        if replace_existing or result.distance == "marathon":
+            result.distance = dist
+
 
 def regex_extract(page_text: str) -> dict[str, object]:
     lines = [line.strip() for line in page_text.splitlines() if line.strip()]
@@ -115,6 +121,14 @@ def regex_extract(page_text: str) -> dict[str, object]:
         "notes": "Fallback regex extraction; verify against the official source.",
         "raw_evidence": [],
     }
+    
+    # Infer distance from page_text
+    text_lower = page_text.lower()
+    if "half marathon" in text_lower or "half-marathon" in text_lower or "halfmarathon" in text_lower or " 21k" in text_lower or "21.1k" in text_lower:
+        extraction["distance"] = "half-marathon"
+    else:
+        extraction["distance"] = "marathon"
+        
     evidence: list[str] = []
     
     # Extract event_date

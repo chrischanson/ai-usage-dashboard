@@ -62,6 +62,7 @@ Each race record should carry:
 
 - `id`
 - `name`
+- `distance` — one of `marathon`, `half-marathon` (unified model; future distances possible)
 - `city`
 - `country`
 - `region`
@@ -69,11 +70,8 @@ Each race record should carry:
 - `registration_url`
 - `source_url`
 - `event_date`
-- `registration_open_date`
-- `registration_deadline`
-- `lottery_deadline`
-- `qualification_deadline`
-- `confidence`
+- `registration_windows` — a list of typed windows (standard, lottery, qualification, charity, invitation), each with `open_date`, `close_date`, `description`, and `official_url`
+- `confidence` — one of `high`, `medium`, `low`, `unknown`
 - `status` — one of `active`, `carried-over`, `stale`, `new`
 - `notes`
 - `raw_evidence`
@@ -81,6 +79,8 @@ Each race record should carry:
 - `extraction_method`
 
 Dates should be stored as ISO 8601 values when a full date is known. If a field is not known with confidence, leave it empty rather than inventing a partial date.
+
+The `distance` field uses a unified model so that marathons and half-marathons coexist in the same tables, filterable by type. The DB schema already has `distance TEXT NOT NULL DEFAULT 'marathon'` on the `races` table.
 
 ## Update Strategy
 
@@ -97,9 +97,19 @@ The updater should prefer stable behavior over aggressive guessing.
 The output is committed directly to the repository — no separate deployment step.
 
 - `docs/marathons.md` is the human-readable summary (committed, visible on GitHub).
-- `docs/marathons.json` is the machine-readable dataset and carry-over baseline (gitignored, not committed).
-- The GitHub Actions workflow runs daily and can also be triggered manually, then commits the updated `.md` file.
-- If the repo has an `LLM_API_KEY` secret, the workflow can extract richer data in CI.
+- `docs/marathons.db` is the SQLite database (internal carry-over baseline).
+- `docs/index.html` is the polished web page (GitHub Pages now, standalone domain later).
+- The update runs daily via `run_update.sh` and can also be triggered manually.
+- If an `LLM_API_KEY` is available, the pipeline extracts richer data.
+
+### Confidence-Gated Publishing
+
+The published output (`docs/marathons.md` and `docs/index.html`) only includes races with **medium or high confidence**. Low-confidence and unknown-confidence races remain in `docs/marathons.db` for future verification but are excluded from public-facing pages. This ensures the running community sees accurate, reliable data while the discovery pipeline can cast a wide net.
+
+The render module applies this gate:
+- Races with `confidence` of `"low"` or `"unknown"` are excluded from `render_markdown()` output.
+- The total count in the header reflects only published (medium+) races.
+- The DB retains all races regardless of confidence for audit and future promotion.
 
 ## Job Design
 
@@ -368,16 +378,282 @@ The core update pipeline is fully migrated to a relational SQLite backend and su
 
 ## Next Phase (v2 Roadmap)
 
-Now that the core tracker is stable, the next useful work is to expand its scope and coverage:
+Now that the core tracker is stable, the next useful work is to expand its scope and coverage.
 
-1. **Expand Tracking Scope**: Adjust the data schema and discovery queries to officially track **Half-Marathons** alongside full marathons.
-2. **Expand Auto-Discovery Sources**: Integrate new external directories to massively expand coverage beyond World Athletics. Prioritized sources include:
-   - AIMS (Association of International Marathons and Distance Races) calendar
-   - MarathonGuide.com
-   - Registration platforms like RunSignup and Active.com
-3. **Extraction Robustness**: Continue relying on lightweight HTTP requests and LLM extraction, maintaining current strategies until significant bot-protection roadblocks necessitate headless browsers or third-party scraping APIs.
-4. **Database Change Log (Audit Table)**: Implement a structured audit trail in `marathons.db` to log whenever data changes.
-   - **Schema**: A `change_log` table tracking: timestamp, table name, action (INSERT, UPDATE, DELETE), record ID, old values, and new values.
-   - **Implementation**: Written natively via SQLite `BEFORE/AFTER` triggers inside `db.py` to ensure any modification to the `races`, `race_events`, or `extraction_metadata` tables is captured automatically (whether triggered by the Python pipeline or manual client updates).
+**Design decisions** (resolved via grill-me sessions 2026-06-21):
 
+| Decision | Answer |
+|---|---|
+| **Audience** | Public-facing resource for the running community |
+| **Primary output** | GitHub Pages now → standalone site later |
+| **Coverage** | Every marathon/half-marathon discoverable worldwide |
+| **Quality vs. breadth** | Accuracy first — prefer missing over wrong |
+| **Publication gate** | Only medium/high confidence races published; low stays in DB |
+| **Half-marathon model** | Unified model with parent `races` and child `race_offerings` (distances) |
+| **Location granularity** | Added `state_province` column to `locations` |
+| **URL normalization** | Normalized `official_url` and `registration_url` in `races` to FKs in `official_urls` |
+| **Update cadence** | Daily with smart prioritization |
 
+**Priority order:**
+
+1. **Database Refactoring & Normalization** (Task 1 - essential foundation)
+2. **Half-Marathon Discovery** (Task 2)
+3. **Pipeline & Rendering Integration** (Task 3)
+4. **Confidence-Gated Publishing** (Task 4)
+5. **Expand Auto-Discovery Sources** (Task 5 - future)
+6. **Extraction Robustness** (Task 6 - future)
+
+---
+
+### Task 1: Database Refactoring & Normalization
+
+**Scope**: Refactor the database schema in `db.py` to support normalized locations, normalized URLs, and the parent-child `races` -> `race_offerings` model. Implement a robust migration inside `db.py` to upgrade the existing database without losing data, and update python dataclasses/mappings.
+
+#### Normalized DDL Schema
+
+```sql
+CREATE TABLE IF NOT EXISTS locations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    city TEXT NOT NULL,
+    state_province TEXT, -- New subdivision field
+    country TEXT NOT NULL,
+    region TEXT NOT NULL,
+    UNIQUE(city, state_province, country)
+);
+
+CREATE TABLE IF NOT EXISTS official_urls (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    url TEXT UNIQUE NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS races (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    location_id INTEGER NOT NULL,
+    official_url_id INTEGER NOT NULL, -- Normalized URL Reference
+    registration_url_id INTEGER,      -- Normalized URL Reference
+    FOREIGN KEY(location_id) REFERENCES locations(id),
+    FOREIGN KEY(official_url_id) REFERENCES official_urls(id),
+    FOREIGN KEY(registration_url_id) REFERENCES official_urls(id)
+);
+
+CREATE TABLE IF NOT EXISTS race_offerings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    race_id TEXT NOT NULL,
+    distance TEXT NOT NULL, -- 'marathon', 'half-marathon', etc.
+    FOREIGN KEY(race_id) REFERENCES races(id),
+    UNIQUE(race_id, distance)
+);
+
+CREATE TABLE IF NOT EXISTS race_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    race_offering_id INTEGER NOT NULL, -- References offering instead of parent race
+    year INTEGER NOT NULL,
+    event_date TEXT,
+    status TEXT NOT NULL DEFAULT 'active',
+    FOREIGN KEY(race_offering_id) REFERENCES race_offerings(id),
+    FOREIGN KEY(status) REFERENCES event_statuses(status),
+    UNIQUE(race_offering_id, year)
+);
+```
+
+#### Database Migration Steps (in `init_db`)
+1. **Locations Migration**:
+   - Check if `state_province` exists in `locations`.
+   - If not, rename `locations` to `locations_old`.
+   - Create new `locations` table (with subdivision and unique constraint).
+   - Copy existing rows setting `state_province = NULL`.
+2. **URL Normalization**:
+   - For `races` URLs, check if `official_url_id` exists in `races`.
+   - If not, insert all unique `official_url` and `registration_url` values from `races` into `official_urls`.
+3. **Races Table Normalization**:
+   - Create new `races` table using `official_url_id` and `registration_url_id`.
+   - Populate from the old `races` table, mapping URLs to their IDs in `official_urls`.
+4. **Race Offerings Creation**:
+   - Create the `race_offerings` table.
+   - Insert entries from the old `races` table (`id` -> `race_id`, `distance` -> `distance`).
+5. **Race Events Migration**:
+   - Rename `race_events` to `race_events_old`.
+   - Create new `race_events` referencing `race_offering_id`.
+   - Insert entries from `race_events_old` by joining with `race_offerings` on `race_id`.
+6. **Trigger Updates**:
+   - Update `change_log` triggers (`log_races_insert`, etc.) to match the new schema structure.
+
+#### Files to modify:
+
+#### [MODIFY] `marathon_tracker/db.py`
+- Rewrite `init_db()` to implement the schema and migration steps.
+- Update all SQL triggers for `change_log` to log inserts/updates/deletes on new tables.
+
+#### [MODIFY] `marathon_tracker/models.py`
+- Update `Race` to include `state_province` and have `distance` removed (distance becomes part of `RaceResult` / `race_offerings`).
+- Update `RaceResult` to hold `distance` and `state_province`.
+- Update serialization helpers (`from_dict`, `to_dict`).
+
+#### [MODIFY] `marathon_tracker/config.py`
+- Update `load_races()` to retrieve normalized location state, URLs, and offerings.
+- Update `load_previous_output()` to fetch events joined with `race_offerings`.
+- Update `save_races()` and `save_race_results()` to resolve URLs via `official_urls` and map properties correctly to normalized tables.
+
+**Estimated size**: ~4K tokens of code changes.
+
+---
+
+### Task 2: Half-Marathon Tracking — Discovery
+
+**Scope**: Update the discovery module to find half-marathons from World Athletics and Wikipedia.
+
+**Files to modify:**
+
+#### [MODIFY] `marathon_tracker/discover.py`
+- Update `discover_from_world_athletics()` to query for half-marathon distances in addition to marathon. The WA GraphQL API filters by discipline/distance; add a second query pass for half-marathon events (42.195 km → also 21.0975 km), or broaden the competition group filter.
+- Add a `distance` field to discovered `Race` objects. Parse the competition name or subgroup to infer `"marathon"` vs `"half-marathon"`. Default to `"marathon"` if ambiguous.
+- Update `discover_from_wikipedia()` to also parse half-marathon tables if available. The current Wikipedia source is specifically about "Label marathon races" — add a secondary page `List_of_World_Athletics_Label_half_marathon_races` if it exists.
+- Update `merge_races()` to consider `distance` as part of the dedup key. Two races with the same name/city but different distances should not be deduplicated (e.g., "Tokyo Marathon" and "Tokyo Half Marathon").
+
+**Estimated size**: ~3K tokens of code changes.
+
+---
+
+### Task 3: Half-Marathon Tracking — Pipeline & Render
+
+**Scope**: Thread `distance` through the update pipeline and render output.
+
+**Files to modify:**
+
+#### [MODIFY] `marathon_tracker/update.py`
+- No structural changes needed — `distance` flows through `Race` → `RaceResult` naturally once the model is updated.
+- Update print/log messages to include distance for clarity.
+
+#### [MODIFY] `marathon_tracker/render.py`
+- Add a `Distance` column to the markdown table.
+- Update `render_markdown()` to display the distance ("Marathon" / "Half Marathon") in each row.
+- The `index.html` generator should add a distance filter control.
+
+#### [MODIFY] `marathon_tracker/extract.py`
+- Update LLM prompt to also extract distance/race type from page text if not already known.
+- If the LLM detects the page is about a half-marathon, set `distance = "half-marathon"` on the result.
+
+**Estimated size**: ~2K tokens of code changes.
+
+---
+
+### Task 4: Confidence-Gated Publishing
+
+**Scope**: Filter the published output to only show medium/high confidence races.
+
+**Files to modify:**
+
+#### [MODIFY] `marathon_tracker/render.py`
+- In `write_outputs()`, filter `results` to only include records where `confidence` is `"medium"` or `"high"` before rendering markdown.
+- Update the header count to reflect the filtered total.
+- Add a note in the markdown footer: "*Only races with medium or high confidence are shown. See the database for all tracked races.*"
+
+#### [MODIFY] `marathon_tracker/update.py`
+- No changes needed — the DB always receives all results. Filtering is render-only.
+
+**Estimated size**: ~500 tokens of code changes.
+
+---
+
+### Task 5: Expand Auto-Discovery Sources (future)
+
+**Scope**: Integrate new external directories to expand coverage beyond World Athletics.
+
+Prioritized sources:
+- AIMS (Association of International Marathons and Distance Races) calendar
+- MarathonGuide.com
+- Registration platforms like RunSignup and Active.com
+
+This task is deferred until half-marathon tracking and confidence gating are stable.
+
+---
+
+### Task 6: Extraction Robustness (future)
+
+**Scope**: Continue relying on lightweight HTTP requests and LLM extraction, maintaining current strategies until significant bot-protection roadblocks necessitate headless browsers or third-party scraping APIs.
+
+This task is deferred — no code changes until a specific extraction failure pattern emerges.
+
+---
+
+## Test Plan
+
+All tests use the standard library `unittest` framework. Run with:
+
+```bash
+PYTHONPATH=research/marathon_tracker python3 -m unittest discover -s research/marathon_tracker/tests
+```
+
+### Existing Tests (baseline — must continue passing)
+
+| Test file | What it covers |
+|---|---|
+| `tests/test_extract.py` | Date normalization, regex extraction of event dates and registration windows |
+| `tests/test_fetch.py` | URL reachability checks, page text fetching |
+| `tests/test_llm.py` | LLM extraction prompt/response parsing, fallback behavior |
+| `tests/test_discover.py` | World Athletics GraphQL parsing, Wikipedia table parsing, merge logic |
+| `tests/test_triggers.py` | SQLite change_log triggers for INSERT/UPDATE/DELETE on all tables |
+
+### New Tests for v2
+
+#### `tests/test_models_distance.py` (Task 1)
+
+| Test case | Description |
+|---|---|
+| `test_race_default_distance` | `Race()` without explicit `distance` defaults to `"marathon"` |
+| `test_race_half_marathon_distance` | `Race(distance="half-marathon")` round-trips through `from_dict()`/`to_dict()` |
+| `test_race_result_from_race_copies_distance` | `RaceResult.from_race(race)` preserves the `distance` field |
+| `test_race_result_to_dict_includes_distance` | `to_dict()` output includes `"distance"` key |
+| `test_race_from_dict_missing_distance` | `from_dict()` with no `distance` key defaults to `"marathon"` |
+
+#### `tests/test_discover_half.py` (Task 2)
+
+| Test case | Description |
+|---|---|
+| `test_wa_half_marathon_discovery` | Mock WA GraphQL response with half-marathon competitions → produces `Race` objects with `distance="half-marathon"` |
+| `test_wa_mixed_distances` | Mock response with both marathon and half-marathon entries → both distances appear in output |
+| `test_merge_same_name_different_distance` | `merge_races()` does NOT deduplicate "Tokyo Marathon" and "Tokyo Half Marathon" |
+| `test_merge_same_name_same_distance` | `merge_races()` DOES deduplicate two entries with identical name+city+distance |
+| `test_wikipedia_half_marathon_table` | Mock Wikipedia HTML for half-marathon page → produces `Race` objects with `distance="half-marathon"` |
+
+#### `tests/test_config_distance.py` (Task 1)
+
+| Test case | Description |
+|---|---|
+| `test_load_races_includes_distance` | Insert a race with `distance='half-marathon'` into SQLite → `load_races()` returns `Race` with correct `distance` |
+| `test_save_races_persists_distance` | `save_races()` with a `Race(distance="half-marathon")` → query DB confirms `distance='half-marathon'` |
+| `test_load_previous_output_includes_distance` | Full round-trip: save a `RaceResult` with `distance='half-marathon'` → `load_previous_output()` returns it with correct `distance` |
+
+#### `tests/test_render_confidence.py` (Task 4)
+
+| Test case | Description |
+|---|---|
+| `test_render_excludes_low_confidence` | `render_markdown()` with a mix of confidence levels → low/unknown races are absent from output |
+| `test_render_includes_medium_confidence` | `render_markdown()` with `confidence="medium"` race → race appears in output |
+| `test_render_includes_high_confidence` | `render_markdown()` with `confidence="high"` race → race appears in output |
+| `test_render_count_reflects_filtered` | Header count matches the number of medium+ confidence races, not total |
+| `test_render_footer_note` | Output contains a note about additional races in the database |
+
+#### `tests/test_render_distance.py` (Task 3)
+
+| Test case | Description |
+|---|---|
+| `test_render_shows_distance_column` | Markdown table header includes "Distance" column |
+| `test_render_marathon_label` | Race with `distance="marathon"` renders as "Marathon" in the table |
+| `test_render_half_marathon_label` | Race with `distance="half-marathon"` renders as "Half Marathon" in the table |
+
+### Verification Commands
+
+After each task, run:
+
+```bash
+# Unit tests
+PYTHONPATH=research/marathon_tracker python3 -m unittest discover -s research/marathon_tracker/tests
+
+# Offline pipeline smoke test (no network, no LLM)
+python3 -m marathon_tracker.update --no-network --db docs/marathons.db --docs-dir docs/
+
+# Verify rendered output is valid markdown
+head -20 research/marathon_tracker/docs/marathons.md
+```
