@@ -232,11 +232,13 @@ class LoadPreviousOutputTest(unittest.TestCase):
             cursor.execute("INSERT INTO races (id, name, location_id, official_url) VALUES ('test', 'Test', ?, 'https://example.com')", (location_id,))
             cursor.execute("INSERT INTO race_events (race_id, year, event_date, status) VALUES ('test', 2026, '2026-06-01', 'active')")
             event_id = cursor.execute("SELECT id FROM race_events").fetchone()["id"]
-            cursor.execute("INSERT INTO extraction_metadata (event_id, source_url, extracted_at, extraction_method, confidence, notes, raw_evidence) VALUES (?, 'https://example.com', '2026-01-01T00:00:00+00:00', 'seed', 'high', '', '[]')", (event_id,))
+            cursor.execute("INSERT INTO official_urls (url) VALUES ('https://example.com')")
+            url_id = cursor.execute("SELECT id FROM official_urls WHERE url = 'https://example.com'").fetchone()["id"]
+            cursor.execute("INSERT INTO extraction_metadata (event_id, source_url_id, extracted_at, extraction_method, confidence, notes, raw_evidence) VALUES (?, ?, '2026-01-01T00:00:00+00:00', 'seed', 'high', '', '[]')", (event_id, url_id))
             
             # Insert official url and link to registration window
             cursor.execute("INSERT INTO official_urls (url) VALUES ('https://official-window.com')")
-            url_id = cursor.execute("SELECT id FROM official_urls").fetchone()["id"]
+            url_id = cursor.execute("SELECT id FROM official_urls WHERE url = 'https://official-window.com'").fetchone()["id"]
             cursor.execute("""
                 INSERT INTO registration_windows (event_id, window_type, description, open_date, close_date, official_url_id)
                 VALUES (?, 'standard', 'Standard Entry', '2026-01-01', '2026-02-01', ?)

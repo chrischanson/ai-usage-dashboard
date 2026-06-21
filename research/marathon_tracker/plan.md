@@ -16,7 +16,7 @@ Build a repeatable research pipeline that:
 This project is intentionally focused on official sources and durable output.
 
 - Primary source of truth: official race websites, entry pages, and race announcements.
-- Secondary assistance: an LLM that interprets page text and normalizes dates.
+- Secondary assistance: an LLM that interprets page text and normalizes dates. The pipeline checks for `LLM_API_KEY` first. If missing, it will attempt to use local CLIs (`agy --print` or `opencode run`) to run the extraction before falling back to regex.
 - Output format: a markdown summary (committed to repo) plus a JSON baseline (internal carry-over, not published).
 - Refresh mode: manual runs and scheduled runs.
 

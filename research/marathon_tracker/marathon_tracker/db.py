@@ -56,6 +56,10 @@ def init_db(conn: sqlite3.Connection) -> None:
             url TEXT UNIQUE NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS registration_types (
+            type TEXT PRIMARY KEY
+        );
+
         CREATE TABLE IF NOT EXISTS registration_windows (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             event_id INTEGER NOT NULL,
@@ -65,6 +69,7 @@ def init_db(conn: sqlite3.Connection) -> None:
             close_date TEXT,
             official_url_id INTEGER,
             FOREIGN KEY(event_id) REFERENCES race_events(id),
+            FOREIGN KEY(window_type) REFERENCES registration_types(type),
             FOREIGN KEY(official_url_id) REFERENCES official_urls(id),
             UNIQUE(event_id, window_type, open_date, close_date)
         );
@@ -203,6 +208,7 @@ def init_db(conn: sqlite3.Connection) -> None:
     """)
     conn.execute("INSERT OR IGNORE INTO event_statuses (status) VALUES ('active'), ('stale'), ('carried-over');")
     conn.execute("INSERT OR IGNORE INTO confidence_levels (level) VALUES ('high'), ('medium'), ('low'), ('unknown');")
+    conn.execute("INSERT OR IGNORE INTO registration_types (type) VALUES ('standard'), ('lottery'), ('qualification'), ('charity'), ('invitation');")
     
     # Automated schema migration: check if official_url_id column exists in registration_windows
     cursor = conn.cursor()
@@ -262,5 +268,42 @@ def init_db(conn: sqlite3.Connection) -> None:
                 pass
         else:
             conn.execute("ALTER TABLE extraction_metadata ADD COLUMN source_url_id INTEGER REFERENCES official_urls(id);")
+
+    # Automated schema migration: check if registration_windows has a foreign key to registration_types
+    cursor.execute("PRAGMA foreign_key_list(registration_windows);")
+    fks = [row["table"] for row in cursor.fetchall()]
+    if "registration_types" not in fks:
+        conn.execute("CREATE TABLE IF NOT EXISTS registration_types (type TEXT PRIMARY KEY);")
+        conn.execute("INSERT OR IGNORE INTO registration_types (type) VALUES ('standard'), ('lottery'), ('qualification'), ('charity'), ('invitation');")
+        
+        conn.execute("ALTER TABLE registration_windows RENAME TO registration_windows_old;")
+        
+        conn.execute("""
+            CREATE TABLE registration_windows (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_id INTEGER NOT NULL,
+                window_type TEXT NOT NULL,
+                description TEXT,
+                open_date TEXT,
+                close_date TEXT,
+                official_url_id INTEGER,
+                FOREIGN KEY(event_id) REFERENCES race_events(id),
+                FOREIGN KEY(window_type) REFERENCES registration_types(type),
+                FOREIGN KEY(official_url_id) REFERENCES official_urls(id),
+                UNIQUE(event_id, window_type, open_date, close_date)
+            );
+        """)
+        
+        conn.execute("""
+            INSERT OR IGNORE INTO registration_types (type)
+            SELECT DISTINCT window_type FROM registration_windows_old WHERE window_type IS NOT NULL;
+        """)
+        
+        conn.execute("""
+            INSERT INTO registration_windows (id, event_id, window_type, description, open_date, close_date, official_url_id)
+            SELECT id, event_id, window_type, description, open_date, close_date, official_url_id FROM registration_windows_old;
+        """)
+        
+        conn.execute("DROP TABLE registration_windows_old;")
 
     conn.commit()

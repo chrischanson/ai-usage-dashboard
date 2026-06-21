@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from marathon_tracker.extract import extract_dates, normalize_date
 from marathon_tracker.models import Race
@@ -10,7 +11,9 @@ class ExtractTest(unittest.TestCase):
         self.assertEqual(normalize_date("20 April 2026"), "2026-04-20")
         self.assertEqual(normalize_date("2026-04-20"), "2026-04-20")
 
-    def test_regex_extracts_registration_deadline(self):
+    @patch("marathon_tracker.extract.extract_with_llm")
+    def test_regex_extracts_registration_deadline(self, mock_extract_llm):
+        mock_extract_llm.return_value = None
         race = Race(
             id="sample",
             name="Sample Marathon",
