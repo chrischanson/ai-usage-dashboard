@@ -123,7 +123,7 @@ def init_db(conn: sqlite3.Connection) -> None:
 
     conn.execute("INSERT OR IGNORE INTO event_statuses (status) VALUES ('active'), ('stale'), ('carried-over');")
     conn.execute("INSERT OR IGNORE INTO confidence_levels (level) VALUES ('high'), ('medium'), ('low'), ('unknown');")
-    conn.execute("INSERT OR IGNORE INTO registration_types (type) VALUES ('standard'), ('lottery'), ('qualification'), ('charity'), ('invitation');")
+    conn.execute("INSERT OR IGNORE INTO registration_types (type) VALUES ('standard'), ('lottery'), ('qualification'), ('charity'), ('invitation'), ('guaranteed-entry');")
 
     cursor = conn.cursor()
 
