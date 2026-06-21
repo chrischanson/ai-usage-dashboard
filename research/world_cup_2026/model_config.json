@@ -4,14 +4,14 @@
   "default_interval_minutes": 60,
   "high": {
     "agent": "opencode",
-    "model": "deepseek-v4-flash-free"
+    "model": "opencode/deepseek-v4-flash-free"
   },
   "medium": {
     "agent": "opencode",
-    "model": ""
+    "model": "opencode/deepseek-v4-flash-free"
   },
   "low": {
     "agent": "opencode",
-    "model": ""
+    "model": "opencode/deepseek-v4-flash-free"
   }
 }

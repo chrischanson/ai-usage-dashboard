@@ -102,6 +102,59 @@ def get_token_usage_from_db(max_id_before):
             except Exception:
                 pass
 
+def get_opencode_token_usage(session_id, start_time_ms):
+    db_path = os.path.expanduser("~/.local/share/opencode/opencode.db")
+    if not os.path.exists(db_path) or not session_id:
+        return None
+        
+    import shutil
+    temp_dir = os.path.join(WORKSPACE_DIR, "research", "world_cup_2026", "runs", ".tmp_db_opencode")
+    os.makedirs(temp_dir, exist_ok=True)
+    temp_db_path = os.path.join(temp_dir, "opencode_temp.db")
+    
+    try:
+        shutil.copy2(db_path, temp_db_path)
+        import sqlite3
+        conn = sqlite3.connect(temp_db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute(
+            "SELECT data FROM message WHERE session_id = ? AND time_created >= ?", 
+            (session_id, start_time_ms)
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        
+        total_input_tokens = 0
+        total_output_tokens = 0
+        
+        for row in rows:
+            try:
+                data = json.loads(row[0])
+                tokens = data.get("tokens", {})
+                total_input_tokens += tokens.get("input", 0)
+                total_output_tokens += tokens.get("output", 0)
+            except Exception:
+                continue
+                
+        if total_input_tokens > 0 or total_output_tokens > 0:
+            return {
+                "input_tokens": total_input_tokens,
+                "output_tokens": total_output_tokens,
+                "total_tokens": total_input_tokens + total_output_tokens
+            }
+        return None
+    except Exception as e:
+        print(f"Warning: Failed to extract opencode token usage: {e}", file=sys.stderr)
+        return None
+    finally:
+        if os.path.exists(temp_db_path):
+            try:
+                os.remove(temp_db_path)
+                os.rmdir(temp_dir)
+            except Exception:
+                pass
+
 def parse_frontmatter(content):
     """
     Parses simple YAML frontmatter delimited by --- at the top of a file.
@@ -325,6 +378,7 @@ def main():
         max_id_before = get_max_log_id()
             
     # Execute
+    start_time_epoch = time.time()
     return_code, full_output, duration = execute_agent(
         agent, model, compiled_prompt, args.dry_run,
         continue_session=args.continue_session,
@@ -337,28 +391,7 @@ def main():
         with open(os.path.join(run_dir, "output.log"), "w", encoding="utf-8") as f:
             f.write(full_output)
             
-        # Token accounting is agent-specific. The old implementation read
-        # Codex's sqlite logs, which misattributes usage for agy/opencode runs.
-        token_usage = None
-            
-        # Write execution metadata
-        metadata_summary = {
-            "skill": args.skill,
-            "agent": agent,
-            "model": model,
-            "variables": variables,
-            "timestamp": timestamp,
-            "duration_seconds": duration,
-            "return_code": return_code,
-            "status": "success" if return_code == 0 else "failed"
-        }
-        if token_usage:
-            metadata_summary["token_usage"] = token_usage
-        
-        with open(os.path.join(run_dir, "run_metadata.json"), "w", encoding="utf-8") as f:
-            json.dump(metadata_summary, f, indent=2)
-            
-        # Resolve and print session/conversation ID for the caller to reuse
+        # Resolve session/conversation ID for token usage and reuse
         current_session_id = args.session
         if agent == "opencode" and not current_session_id:
             try:
@@ -396,6 +429,34 @@ def main():
                         current_session_id = matches[-1]
                 except Exception:
                     pass
+
+        # Calculate token usage
+        token_usage = None
+        if agent == "opencode":
+            # opencode time is in milliseconds since epoch
+            start_time_ms = int(start_time_epoch * 1000)
+            token_usage = get_opencode_token_usage(current_session_id, start_time_ms)
+        elif agent == "agy":
+            token_usage = get_token_usage_from_db(max_id_before)
+            
+        # Write execution metadata
+        metadata_summary = {
+            "skill": args.skill,
+            "agent": agent,
+            "model": model,
+            "variables": variables,
+            "timestamp": timestamp,
+            "duration_seconds": duration,
+            "return_code": return_code,
+            "status": "success" if return_code == 0 else "failed"
+        }
+        if token_usage:
+            metadata_summary["token_usage"] = token_usage
+            print(f"Tokens Used - Input: {token_usage.get('input_tokens', 0)}, Output: {token_usage.get('output_tokens', 0)}, Total: {token_usage.get('total_tokens', 0)}")
+        
+        with open(os.path.join(run_dir, "run_metadata.json"), "w", encoding="utf-8") as f:
+            json.dump(metadata_summary, f, indent=2)
+
         if current_session_id and agent == "opencode":
             print(f"OPENCODE_SESSION_ID: {current_session_id}")
         elif current_session_id and agent == "agy":

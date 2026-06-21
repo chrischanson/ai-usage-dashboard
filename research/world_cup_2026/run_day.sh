@@ -306,6 +306,20 @@ echo "=========================================="
 mkdir -p "${DAY_DIR}"
 log "Created day directory: ${DAY_DIR}"
 
+# Checkpoint work before starting the run
+echo ""
+echo "--- Creating Git Checkpoint ---"
+(
+    cd "${SCRIPT_DIR}" || exit
+    git add -A "${SCRIPT_DIR}/"
+    if ! git diff --cached --quiet; then
+        git commit -m "wip: checkpoint before run ${DATE}"
+        echo "Checkpoint committed."
+    else
+        echo "No uncommitted changes to checkpoint."
+    fi
+)
+
 if [ "${POSTMORTEM_ONLY}" -eq 0 ]; then
 
 # --- Step 1: Fetch today's match schedule ---
