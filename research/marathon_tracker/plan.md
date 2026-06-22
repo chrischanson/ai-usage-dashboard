@@ -409,16 +409,26 @@ Now that the core tracker is stable, the next useful work is to expand its scope
 
 **Scope**: Refactor the database schema in `db.py` to support normalized locations, normalized URLs, and the parent-child `races` -> `race_offerings` model. Implement a robust migration inside `db.py` to upgrade the existing database without losing data, and update python dataclasses/mappings.
 
-#### Normalized DDL Schema
+#### Fully Normalized & Deduplicated DDL Schema
 
 ```sql
+CREATE TABLE IF NOT EXISTS regions (
+    name TEXT PRIMARY KEY
+);
+
+CREATE TABLE IF NOT EXISTS countries (
+    name TEXT PRIMARY KEY,
+    region_name TEXT NOT NULL,
+    FOREIGN KEY(region_name) REFERENCES regions(name)
+);
+
 CREATE TABLE IF NOT EXISTS locations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     city TEXT NOT NULL,
-    state_province TEXT, -- New subdivision field
-    country TEXT NOT NULL,
-    region TEXT NOT NULL,
-    UNIQUE(city, state_province, country)
+    state_province TEXT, -- Subdivision field
+    country_name TEXT NOT NULL,
+    FOREIGN KEY(country_name) REFERENCES countries(name),
+    UNIQUE(city, state_province, country_name)
 );
 
 CREATE TABLE IF NOT EXISTS official_urls (
@@ -430,11 +440,9 @@ CREATE TABLE IF NOT EXISTS races (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     location_id INTEGER NOT NULL,
-    official_url_id INTEGER NOT NULL, -- Normalized URL Reference
-    registration_url_id INTEGER,      -- Normalized URL Reference
+    official_url_id INTEGER NOT NULL, -- The main website for the race
     FOREIGN KEY(location_id) REFERENCES locations(id),
-    FOREIGN KEY(official_url_id) REFERENCES official_urls(id),
-    FOREIGN KEY(registration_url_id) REFERENCES official_urls(id)
+    FOREIGN KEY(official_url_id) REFERENCES official_urls(id)
 );
 
 CREATE TABLE IF NOT EXISTS race_offerings (
@@ -445,39 +453,68 @@ CREATE TABLE IF NOT EXISTS race_offerings (
     UNIQUE(race_id, distance)
 );
 
+CREATE TABLE IF NOT EXISTS event_statuses (
+    status TEXT PRIMARY KEY
+);
+
 CREATE TABLE IF NOT EXISTS race_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     race_offering_id INTEGER NOT NULL, -- References offering instead of parent race
-    year INTEGER NOT NULL,
-    event_date TEXT,
+    event_date TEXT,                    -- ISO 8601 format or NULL if TBD
     status TEXT NOT NULL DEFAULT 'active',
     FOREIGN KEY(race_offering_id) REFERENCES race_offerings(id),
     FOREIGN KEY(status) REFERENCES event_statuses(status),
-    UNIQUE(race_offering_id, year)
+    UNIQUE(race_offering_id, event_date)
+);
+
+CREATE TABLE IF NOT EXISTS registration_types (
+    type TEXT PRIMARY KEY,
+    default_description TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS registration_windows (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id INTEGER NOT NULL,
+    window_type TEXT NOT NULL,
+    description TEXT,                  -- Optional override; NULL defaults to registration_types.default_description
+    open_date TEXT,                    -- ISO 8601 format
+    close_date TEXT,                   -- ISO 8601 format
+    official_url_id INTEGER,
+    FOREIGN KEY(event_id) REFERENCES race_events(id),
+    FOREIGN KEY(window_type) REFERENCES registration_types(type),
+    FOREIGN KEY(official_url_id) REFERENCES official_urls(id),
+    UNIQUE(event_id, window_type, open_date, close_date)
 );
 ```
 
 #### Database Migration Steps (in `init_db`)
-1. **Locations Migration**:
-   - Check if `state_province` exists in `locations`.
-   - If not, rename `locations` to `locations_old`.
-   - Create new `locations` table (with subdivision and unique constraint).
-   - Copy existing rows setting `state_province = NULL`.
-2. **URL Normalization**:
-   - For `races` URLs, check if `official_url_id` exists in `races`.
-   - If not, insert all unique `official_url` and `registration_url` values from `races` into `official_urls`.
-3. **Races Table Normalization**:
-   - Create new `races` table using `official_url_id` and `registration_url_id`.
-   - Populate from the old `races` table, mapping URLs to their IDs in `official_urls`.
-4. **Race Offerings Creation**:
+1. **Regions & Countries Migration**:
+   - Create `regions` and `countries` tables.
+   - Seed them with known region/country pairs derived from the existing dataset and mapping dictionaries in python.
+2. **Locations Migration**:
+   - Rename `locations` to `locations_old`.
+   - Create new `locations` table (without `region` column, referencing `countries.name`).
+   - Populate from `locations_old` (mapping `country` names, dropping `region`).
+   - Drop `locations_old`.
+3. **URL Normalization**:
+   - Insert all unique URL strings from legacy `races` (`official_url` and `registration_url`) into `official_urls`.
+4. **Races Table Normalization**:
+   - Rename `races` to `races_old`.
+   - Create new `races` table (using `official_url_id`, dropping the redundant `registration_url_id` which is already stored on `registration_windows`).
+   - Populate by mapping `official_url` to its ID in `official_urls`.
+5. **Race Offerings Creation**:
    - Create the `race_offerings` table.
-   - Insert entries from the old `races` table (`id` -> `race_id`, `distance` -> `distance`).
-5. **Race Events Migration**:
+   - Insert entries from `races_old` (`id` -> `race_id`, `distance` -> `distance`).
+6. **Race Events Migration**:
    - Rename `race_events` to `race_events_old`.
-   - Create new `race_events` referencing `race_offering_id`.
-   - Insert entries from `race_events_old` by joining with `race_offerings` on `race_id`.
-6. **Trigger Updates**:
-   - Update `change_log` triggers (`log_races_insert`, etc.) to match the new schema structure.
+   - Create new `race_events` table (removing `year` column, referencing `race_offering_id`).
+   - Populate by joining `race_events_old` with `race_offerings` on `race_id` to map.
+   - Drop `race_events_old` and `races_old`.
+7. **Registration Types & Windows**:
+   - Create `registration_types` and seed standard values.
+   - Update `registration_windows` to make `description` nullable/optional, saving space when it matches the default description.
+8. **Trigger Updates**:
+   - Recreate all SQL triggers for `change_log` to log inserts/updates/deletes on the newly normalized tables.
 
 #### Files to modify:
 

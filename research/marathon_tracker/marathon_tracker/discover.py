@@ -5,6 +5,7 @@ import re
 import urllib.error
 import urllib.request
 from html.parser import HTMLParser
+from pathlib import Path
 from typing import Any
 
 from .models import Race
@@ -14,26 +15,118 @@ WORLD_ATHLETICS_GRAPHQL = "https://worldathletics.org/graphql"
 WIKIPEDIA_API = "https://en.wikipedia.org/w/api.php"
 
 COUNTRY_ALPHA3_TO_NAME: dict[str, str] = {}
+SUBDIVISION_MAP: dict[str, Any] = {}
 
 
 def _load_country_map() -> dict[str, str]:
+    global COUNTRY_ALPHA3_TO_NAME
     if COUNTRY_ALPHA3_TO_NAME:
         return COUNTRY_ALPHA3_TO_NAME
-    try:
-        req = urllib.request.Request(
-            "https://raw.githubusercontent.com/lukes/ISO-3166-Countries-with-Regional-Codes/main/all/all.json",
-            headers={"User-Agent": "marathon-tracker/0.1"},
-        )
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            entries = json.loads(resp.read().decode("utf-8"))
-        for entry in entries:
+    
+    cache_path = Path(__file__).parent / "iso_3166_countries.json"
+    entries = []
+    if cache_path.exists():
+        try:
+            with open(cache_path, "r", encoding="utf-8") as f:
+                entries = json.load(f)
+        except Exception:
+            pass
+            
+    if not entries:
+        try:
+            req = urllib.request.Request(
+                "https://raw.githubusercontent.com/lukes/ISO-3166-Countries-with-Regional-Codes/master/all/all.json",
+                headers={"User-Agent": "marathon-tracker/0.1"},
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                entries = json.loads(resp.read().decode("utf-8"))
+            try:
+                with open(cache_path, "w", encoding="utf-8") as f:
+                    json.dump(entries, f, indent=2)
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+    for entry in entries:
+        if isinstance(entry, dict):
             code = entry.get("alpha-3")
             name = entry.get("name")
             if code and name:
                 COUNTRY_ALPHA3_TO_NAME[code] = name
-    except Exception:
-        pass
+                
     return COUNTRY_ALPHA3_TO_NAME
+
+
+def _load_subdivision_map() -> dict[str, Any]:
+    global SUBDIVISION_MAP
+    if SUBDIVISION_MAP:
+        return SUBDIVISION_MAP
+        
+    cache_path = Path(__file__).parent / "iso_3166_2.json"
+    if not cache_path.exists():
+        try:
+            req = urllib.request.Request(
+                "https://raw.githubusercontent.com/olahol/iso-3166-2.json/master/iso-3166-2.json",
+                headers={"User-Agent": "marathon-tracker/0.1"},
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            try:
+                with open(cache_path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2)
+            except Exception:
+                pass
+            SUBDIVISION_MAP = data
+        except Exception as exc:
+            print(f"subdivision fetch warning: {exc}")
+            return {}
+    else:
+        try:
+            with open(cache_path, "r", encoding="utf-8") as f:
+                SUBDIVISION_MAP = json.load(f)
+        except Exception:
+            return {}
+            
+    return SUBDIVISION_MAP
+
+
+def _extract_state_and_city(city: str, country_code: str) -> tuple[str, str | None]:
+    """
+    Extracts subdivision code (state/province) and returns cleaned city name.
+    E.g. "Boston, MA" -> ("Boston", "MA")
+    """
+    city = city.strip()
+    country_code = country_code.upper()
+    
+    # Check for standard patterns like "City, ST" (e.g. "Boston, MA" or "Toronto, ON")
+    match = re.search(r",\s*([A-Za-z]{2})\b", city)
+    if not match:
+        return city, None
+        
+    state_code = match.group(1).upper()
+    
+    # Map country codes to their 2-letter ISO country keys (e.g., USA -> US, CAN -> CA)
+    country_key = country_code
+    if country_code == "USA":
+        country_key = "US"
+    elif country_code == "CAN":
+        country_key = "CA"
+    elif country_code == "DEU":
+        country_key = "DE"
+    elif country_code == "GBR":
+        country_key = "GB"
+        
+    sub_map = _load_subdivision_map()
+    if country_key in sub_map:
+        # Check standard divisions like "US-MA" or "CA-ON"
+        full_code = f"{country_key}-{state_code}"
+        divisions = sub_map[country_key].get("divisions", {})
+        if full_code in divisions:
+            cleaned_city = re.sub(r",\s*[A-Za-z]{2}\b", "", city).strip()
+            return cleaned_city, state_code
+            
+    return city, None
 
 
 GRAPHQL_QUERY = """query Calendar($season: Int!, $competitionGroupId: ID!) {
@@ -86,7 +179,7 @@ def discover_from_world_athletics() -> list[Race]:
     country_map = _load_country_map()
 
     candidates: list[Race] = []
-    seen_keys: set[str] = set()
+    seen_keys: set[tuple[str, str]] = set()
 
     for season in seasons:
         for group_id in ("12",):  # Label Road Races
@@ -108,6 +201,9 @@ def discover_from_world_athletics() -> list[Race]:
                 subgroup = comp.get("competitionSubgroup") or ""
                 event_date = (comp.get("startDate") or "").strip()[:10]
 
+                # Extract state/province and clean city
+                city_clean, state_province = _extract_state_and_city(city, country_code)
+
                 # Infer distance from name
                 name_lower = name.lower()
                 if "half marathon" in name_lower or "half-marathon" in name_lower or "halfmarathon" in name_lower or " 21k" in name_lower or "21.1k" in name_lower:
@@ -119,24 +215,24 @@ def discover_from_world_athletics() -> list[Race]:
                 if distance == "half-marathon" and not race_id.endswith("half-marathon"):
                     race_id = f"{race_id}-half-marathon"
 
-                if race_id in seen_keys:
+                key = (race_id, distance)
+                if key in seen_keys:
                     continue
-                seen_keys.add(race_id)
+                seen_keys.add(key)
 
                 candidates.append(
                     Race(
                         id=race_id,
                         name=name,
-                        city=city,
+                        distance=distance,
+                        city=city_clean,
+                        state_province=state_province,
                         country=country,
                         region=_guess_region(country),
                         official_url="",
-                        registration_url=None,
-                        source_url=None,
-                        event_date=event_date or None,
+                        registration_windows=[],
                         confidence="low",
                         notes=f"Auto-discovered from World Athletics ({subgroup} - {season})",
-                        distance=distance,
                     )
                 )
     return candidates
@@ -163,8 +259,9 @@ def discover_from_wikipedia_page(page_name: str, default_distance: str) -> list[
     parser.feed(html)
     rows = parser.rows
 
+    country_map = _load_country_map()
     candidates: list[Race] = []
-    seen_keys: set[str] = set()
+    seen_keys: set[tuple[str, str]] = set()
     for name, city, country in rows:
         if name.lower() in ("name", "race", "event", ""):
             continue
@@ -175,25 +272,36 @@ def discover_from_wikipedia_page(page_name: str, default_distance: str) -> list[
         else:
             distance = default_distance
             
+        # Find country code from country name for subdivision resolution
+        country_code = "Unknown"
+        for code, c_name in country_map.items():
+            if c_name.lower() == country.lower():
+                country_code = code
+                break
+                
+        city_clean, state_province = _extract_state_and_city(city, country_code)
+
         race_id = _slugify(name)
         if distance == "half-marathon" and not race_id.endswith("half-marathon"):
             race_id = f"{race_id}-half-marathon"
             
-        if race_id in seen_keys:
+        key = (race_id, distance)
+        if key in seen_keys:
             continue
-        seen_keys.add(race_id)
+        seen_keys.add(key)
         candidates.append(
             Race(
                 id=race_id,
                 name=name,
-                city=city,
+                distance=distance,
+                city=city_clean,
+                state_province=state_province,
                 country=country,
                 region=_guess_region(country),
                 official_url="",
-                event_date=None,
+                registration_windows=[],
                 confidence="low",
                 notes=f"Auto-discovered from Wikipedia ({page_name.replace('_', ' ')})",
-                distance=distance,
             )
         )
     return candidates

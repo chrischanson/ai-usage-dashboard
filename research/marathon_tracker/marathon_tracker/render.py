@@ -68,11 +68,12 @@ def render_markdown(payload: dict[str, object]) -> str:
         )
         for race in group:
             name = _esc(race.get("name", ""))
-            if race.get("year"):
-                name = f"{name} ({race['year']})"
+            event_date_val = race.get("event_date")
+            if event_date_val:
+                name = f"{name} ({str(event_date_val)[:4]})"
             
             city = _esc(race.get("city", ""))
-            state = _esc(race.get("state_province", ""))
+            state = _esc(race.get("state_province_name") or race.get("state_province", ""))
             country = _esc(race.get("country", ""))
             location_cell = f"{city}, {state}, {country}" if state else f"{city}, {country}"
             
@@ -229,14 +230,15 @@ def render_row(race: dict[str, object]) -> str:
     dist_label = "Half Marathon" if dist == "half-marathon" else "Marathon"
     
     name_str = esc_html(race.get("name", ""))
-    if race.get("year"):
-        name_str = f"{name_str} ({race['year']})"
+    event_date_val = race.get("event_date")
+    if event_date_val:
+        name_str = f"{name_str} ({str(event_date_val)[:4]})"
         
     notes_str = esc_html(race.get("notes", ""))
     notes_html = f'<br><span class="muted">{notes_str}</span>' if notes_str else ''
     
     city = esc_html(race.get("city", ""))
-    state = esc_html(race.get("state_province", ""))
+    state = esc_html(race.get("state_province_name") or race.get("state_province", ""))
     country = esc_html(race.get("country", ""))
     location_str = f"{city}, {state}, {country}" if state else f"{city}, {country}"
     
