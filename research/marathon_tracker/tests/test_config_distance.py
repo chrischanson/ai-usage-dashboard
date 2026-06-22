@@ -26,13 +26,15 @@ class TestConfigDistance(unittest.TestCase):
         init_db(conn)
         cursor = conn.cursor()
         
-        cursor.execute("INSERT INTO locations (city, country, region) VALUES ('Tokyo', 'Japan', 'Asia')")
-        loc_id = cursor.execute("SELECT id FROM locations").fetchone()["id"]
-        cursor.execute("INSERT INTO official_urls (url) VALUES ('https://tokyohalf.example.com')")
-        url_id = cursor.execute("SELECT id FROM official_urls").fetchone()["id"]
+        cursor.execute("INSERT OR IGNORE INTO loc_regions (name) VALUES ('Asia')")
+        cursor.execute("INSERT OR IGNORE INTO loc_countries (name, region_name) VALUES ('Japan', 'Asia')")
+        cursor.execute("INSERT INTO loc_locations (city, country_name) VALUES ('Tokyo', 'Japan')")
+        loc_id = cursor.execute("SELECT id FROM loc_locations WHERE city = 'Tokyo'").fetchone()["id"]
+        cursor.execute("INSERT INTO race_official_urls (url) VALUES ('https://tokyohalf.example.com')")
+        url_id = cursor.execute("SELECT id FROM race_official_urls WHERE url = 'https://tokyohalf.example.com'").fetchone()["id"]
         
         cursor.execute(
-            "INSERT INTO races (id, name, location_id, official_url_id) VALUES ('tokyo-half', 'Tokyo Half', ?, ?)",
+            "INSERT INTO race_races (id, name, location_id, official_url_id) VALUES ('tokyo-half', 'Tokyo Half', ?, ?)",
             (loc_id, url_id)
         )
         cursor.execute("INSERT INTO race_offerings (race_id, distance) VALUES ('tokyo-half', 'half-marathon')")
@@ -64,8 +66,8 @@ class TestConfigDistance(unittest.TestCase):
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
-        # Verify locations table has state_province
-        loc = cursor.execute("SELECT * FROM locations WHERE city = 'Boston'").fetchone()
+        # Verify loc_locations table has state_province
+        loc = cursor.execute("SELECT * FROM loc_locations WHERE city = 'Boston'").fetchone()
         self.assertIsNotNone(loc)
         self.assertEqual(loc["state_province"], "MA")
 

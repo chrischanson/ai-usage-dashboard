@@ -41,14 +41,13 @@ class Race:
     country: str
     region: str
     official_url: str
+    distance: str = "marathon"
+    state_province: str | None = None
+    state_province_name: str | None = None
     registration_url: str | None = None
-    source_url: str | None = None
-    event_date: str | None = None
     registration_windows: list[RegistrationWindow] = field(default_factory=list)
     confidence: str = "unknown"
     notes: str = ""
-    distance: str = "marathon"
-    state_province: str | None = None
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "Race":
@@ -64,36 +63,34 @@ class Race:
         return cls(
             id=str(raw["id"]),
             name=str(raw["name"]),
+            distance=str(raw.get("distance", "marathon")),
             city=str(raw["city"]),
+            state_province=str(raw["state_province"]) if raw.get("state_province") else None,
+            state_province_name=str(raw["state_province_name"]) if raw.get("state_province_name") else None,
             country=str(raw["country"]),
             region=str(raw["region"]),
-            official_url=str(raw["official_url"]),
-            registration_url=str(raw["registration_url"]) if raw.get("registration_url") else None,
-            source_url=str(raw["source_url"]) if raw.get("source_url") else None,
-            event_date=str(raw["event_date"]) if raw.get("event_date") else None,
+            official_url=str(raw.get("official_url", "")),
+            registration_url=raw.get("registration_url"),
             registration_windows=windows,
             confidence=str(raw.get("confidence", "unknown")),
             notes=str(raw.get("notes", "")),
-            distance=str(raw.get("distance", "marathon")),
-            state_province=str(raw["state_province"]) if raw.get("state_province") else None,
         )
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "name": self.name,
+            "distance": self.distance,
             "city": self.city,
+            "state_province": self.state_province,
+            "state_province_name": self.state_province_name,
             "country": self.country,
             "region": self.region,
             "official_url": self.official_url,
             "registration_url": self.registration_url,
-            "source_url": self.source_url,
-            "event_date": self.event_date,
             "registration_windows": [w.to_dict() for w in self.registration_windows],
             "confidence": self.confidence,
             "notes": self.notes,
-            "distance": self.distance,
-            "state_province": self.state_province,
         }
 
 
@@ -105,8 +102,12 @@ class RaceResult:
     country: str
     region: str
     official_url: str
-    registration_url: str | None
+    distance: str = "marathon"
+    state_province: str | None = None
+    state_province_name: str | None = None
+    registration_url: str | None = None
     event_date: str | None = None
+    year: int | None = None
     registration_windows: list[RegistrationWindow] = field(default_factory=list)
     source_url: str | None = None
     extracted_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat(timespec="seconds"))
@@ -115,34 +116,26 @@ class RaceResult:
     status: str = "active"
     notes: str = ""
     raw_evidence: list[str] = field(default_factory=list)
-    year: int | None = None
-    distance: str = "marathon"
-    state_province: str | None = None
 
     @classmethod
-    def from_race(cls, race: Race) -> "RaceResult":
-        year = None
-        if race.event_date:
-            try:
-                year = datetime.fromisoformat(race.event_date).year
-            except ValueError:
-                pass
+    def from_race(cls, race: Race, distance: str | None = None) -> "RaceResult":
+        dist = distance if distance is not None else race.distance
         return cls(
             id=race.id,
             name=race.name,
+            distance=dist,
             city=race.city,
+            state_province=race.state_province,
+            state_province_name=race.state_province_name,
             country=race.country,
             region=race.region,
             official_url=race.official_url,
             registration_url=race.registration_url,
-            event_date=race.event_date,
+            event_date=None,
             registration_windows=list(race.registration_windows),
-            source_url=race.source_url or race.registration_url or race.official_url,
+            source_url=race.official_url,
             confidence=race.confidence,
             notes=race.notes,
-            year=year,
-            distance=race.distance,
-            state_province=race.state_province,
         )
 
     @classmethod
@@ -154,12 +147,16 @@ class RaceResult:
         return cls(
             id=str(raw["id"]),
             name=str(raw["name"]),
+            distance=str(raw.get("distance", "marathon")),
             city=str(raw["city"]),
+            state_province=str(raw["state_province"]) if raw.get("state_province") else None,
+            state_province_name=str(raw["state_province_name"]) if raw.get("state_province_name") else None,
             country=str(raw["country"]),
             region=str(raw["region"]),
             official_url=str(raw.get("official_url", "")),
-            registration_url=str(raw["registration_url"]) if raw.get("registration_url") else None,
+            registration_url=raw.get("registration_url"),
             event_date=str(raw["event_date"]) if raw.get("event_date") else None,
+            year=raw.get("year"),
             registration_windows=windows,
             source_url=str(raw["source_url"]) if raw.get("source_url") else None,
             extracted_at=str(raw.get("extracted_at", "")),
@@ -168,21 +165,22 @@ class RaceResult:
             status=str(raw.get("status", "active")),
             notes=str(raw.get("notes", "")),
             raw_evidence=list(raw.get("raw_evidence", [])),
-            year=raw.get("year"),
-            distance=str(raw.get("distance", "marathon")),
-            state_province=str(raw["state_province"]) if raw.get("state_province") else None,
         )
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "name": self.name,
+            "distance": self.distance,
             "city": self.city,
+            "state_province": self.state_province,
+            "state_province_name": self.state_province_name,
             "country": self.country,
             "region": self.region,
             "official_url": self.official_url,
             "registration_url": self.registration_url,
             "event_date": self.event_date,
+            "year": self.year,
             "registration_windows": [w.to_dict() for w in self.registration_windows],
             "source_url": self.source_url,
             "extracted_at": self.extracted_at,
@@ -191,7 +189,4 @@ class RaceResult:
             "status": self.status,
             "notes": self.notes,
             "raw_evidence": self.raw_evidence,
-            "year": self.year,
-            "distance": self.distance,
-            "state_province": self.state_province,
         }
