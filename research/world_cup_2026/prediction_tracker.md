@@ -10,9 +10,9 @@
 - **Dates:** June 11 – July 19, 2026
 - **Current Phase:** Group Stage
 - **Tracking Started:** 2026-06-13
-- **Total Matches Tracked:** 24
-- **Pre-Game Accuracy (Final Pre-Kickoff):** 58.3% (14/24)
-- **Half-Time Accuracy (Frozen/Live):** 54.2% (13/24)
+- **Total Matches Tracked:** 28
+- **Pre-Game Accuracy (Final Pre-Kickoff):** 60.7% (17/28)
+- **Half-Time Accuracy (Frozen/Live):** 53.8% (14/26)
 
 ---
 
@@ -21,20 +21,20 @@
 ### Pre-Game (Pre-Kickoff)
 | Confidence | Correct | Total | Accuracy |
 |:-----------|:--------|:------|:---------|
-| High       | 3       | 4     | 75.0%    |
-| Medium     | 9       | 14    | 64.3%    |
-| Low        | 2       | 6     | 33.3%    |
+| High       | 4       | 5     | 80.0%    |
+| Medium     | 10      | 16    | 62.5%    |
+| Low        | 3       | 7     | 42.9%    |
 
-*(Note: Germany vs. Curaçao was predicted as GERMANY WIN with High confidence pre-game, and USA vs. Australia was predicted as DRAW with Low confidence pre-game. This table shows pre-kickoff lineup-verified prediction performance. On 2026-06-20, Ecuador vs. Curaçao was the first High-confidence prediction failure — Ecuador's clinical finishing deficiency was identified but not properly enforced as a confidence cap.)*
+*(Note: Germany vs. Curaçao was predicted as GERMANY WIN with High confidence pre-game, and USA vs. Australia was predicted as DRAW with Low confidence pre-game. This table shows pre-kickoff lineup-verified prediction performance. On 2026-06-20, Ecuador vs. Curaçao was the first High-confidence prediction failure — Ecuador's clinical finishing deficiency was identified but not properly enforced as a confidence cap. On 2026-06-21, SPAIN WIN (High) was correct, DRAW (Low) was correct, URUGUAY WIN (Medium) was incorrect (frozen at HT, lost 2-2 on set-piece goals), and EGYPT WIN (Medium) was correct (trailed 1-0 at HT but won 3-1, WHT downgraded to Low).)*
 
 ### Half-Time (Frozen / Live-Monitoring)
 | Confidence | Correct | Total | Accuracy |
 |:-----------|:--------|:------|:---------|
 | High       | 2       | 3     | 66.7%    |
-| Medium     | 8       | 12    | 66.7%    |
-| Low        | 3       | 9     | 33.3%    |
+| Medium     | 8       | 13    | 61.5%    |
+| Low        | 4       | 10    | 40.0%    |
 
-*(Note: Under the Weighted Halftime Rule, in-play monitoring downgraded Germany vs. Curaçao to Low-confidence DRAW, and downgraded Saudi Arabia vs. Uruguay to Low-confidence URUGUAY WIN. On 2026-06-20, GER-CIV was correctly NOT frozen at HT, confidence was downgraded to Low (structural evidence approach), and the final outcome was correct.)*
+*(Note: Under the Weighted Halftime Rule, in-play monitoring downgraded Germany vs. Curaçao to Low-confidence DRAW, and downgraded Saudi Arabia vs. Uruguay to Low-confidence URUGUAY WIN. On 2026-06-20, GER-CIV was correctly NOT frozen at HT, confidence was downgraded to Low (structural evidence approach), and the final outcome was correct. On 2026-06-21, WHT was applied to two matches: Uruguay-Cape Verde (correctly frozen at 2-1 Uruguay, final was 2-2 — prediction incorrect but protocol correctly applied) and NZ-Egypt (correctly downgraded to Low and NOT frozen, Egypt trailed 1-0 at HT but won 3-1 — prediction correct).)*
 
 ---
 
@@ -42,7 +42,7 @@
 
 | Phase | Pre-Game Correct | Half-Time Correct | Total | Pre-Game Acc | Half-Time Acc |
 |:------|:-----------------|:------------------|:------|:-------------|:--------------|
-| Group Stage | 14 | 13 | 24 | 58.3% | 54.2% |
+| Group Stage | 17 | 14 | 28 | 60.7% | 53.8% |
 | Round of 32 | 0 | 0 | 0 | N/A | N/A |
 | Round of 16 | 0 | 0 | 0 | N/A | N/A |
 | Quarter-finals | 0 | 0 | 0 | N/A | N/A |
@@ -80,8 +80,12 @@
 | 2026-06-20 | Germany vs. Côte d'Ivoire | GERMANY WIN (Med) | GERMANY WIN (Low) (NOT FROZEN) | GERMANY WIN | ✅ / ✅ |
 | 2026-06-20 | Ecuador vs. Curaçao | ECUADOR WIN (High) | ECUADOR WIN (High) (no live adjustment) | DRAW | ❌ / ❌ |
 | 2026-06-20 | Tunisia vs. Japan | JAPAN WIN (Med) | JAPAN WIN (Med) (no live adjustment) | JAPAN WIN | ✅ / ✅ |
+| 2026-06-21 | Spain vs. Saudi Arabia | SPAIN WIN (High) | N/A (complete by Iter 1) | SPAIN WIN 4-0 | ✅ / N/A |
+| 2026-06-21 | Belgium vs. Iran | DRAW (Low) | N/A (complete by Iter 1) | DRAW 0-0 | ✅ / N/A |
+| 2026-06-21 | Uruguay vs. Cape Verde | URUGUAY WIN (Med) | URUGUAY WIN (Med) (FROZEN) | DRAW 2-2 | ❌ / ❌ |
+| 2026-06-21 | New Zealand vs. Egypt | EGYPT WIN (Med) | EGYPT WIN (Low) (NOT FROZEN) | EGYPT WIN 3-1 | ✅ / ✅ |
 
-*(Note: Germany vs. Curaçao pre-match prediction was GERMANY WIN with High confidence, which was correct. However, live-monitoring in-play adjusted the prediction to DRAW with Low confidence, which was frozen at halftime and recorded as incorrect for the Half-Time category. On 2026-06-20, GER-CIV HT was correctly NOT frozen — the prediction was downgraded to Low but kept as GERMANY WIN using the structural-evidence approach, and the final outcome validated this decision.)*
+*(Note: Germany vs. Curaçao pre-match prediction was GERMANY WIN with High confidence, which was correct. However, live-monitoring in-play adjusted the prediction to DRAW with Low confidence, which was frozen at halftime and recorded as incorrect for the Half-Time category. On 2026-06-20, GER-CIV HT was correctly NOT frozen — the prediction was downgraded to Low but kept as GERMANY WIN using the structural-evidence approach, and the final outcome validated this decision. On 2026-06-21, Uruguay-Cape Verde was correctly frozen at HT under WHT (2-1 Uruguay confirmed URUGUAY WIN), but set-piece defensive errors in the second half produced a 2-2 draw — the WHT protocol was correctly applied despite the incorrect outcome. NZ-Egypt was correctly NOT frozen (Egypt trailed 1-0 at HT), downgraded to Low, and validated by the final 3-1 win.)*
 
 ---
 
@@ -113,6 +117,9 @@
 - [2026-06-20] The Weighted Halftime Rule structural-evidence approach was validated for GER-CIV. The prediction was correctly NOT frozen at HT despite a 1-0 deficit, because the pre-match analytical foundation (Germany bench depth) identified a credible path back. Confidence was appropriately downgraded to Low.
 - [2026-06-20] New managers appointed with fewer than 7 days preparation should not receive credit beyond a low-probability risk flag. TUN-JPN confirmed this — Renard had only 4 days and Tunisia were dismantled 4-0.
 - [2026-06-20] Khel Now was unreliable for Ivory Coast lineups for two consecutive matches (June 14 and June 20). Future lineup sources should prioritize ESPN match centre displays, FotMob, and official team accounts over Khel Now.
+- [2026-06-21] Set-piece vulnerability persists against heavy favorites even when the favorite has their preferred CB pairing. Uruguay's 2-0 HT lead was erased by two set-piece/cross-derived goals (Andrade 10', Costa 85'). Set-piece organization on dead balls is a distinct defensive skill that not all teams possess equally. For teams with known set-piece weaknesses (e.g., Bielsa's man-marking system), this should be a confidence-reducing factor even when leading comfortably.
+- [2026-06-21] The Weighted Halftime Rule's "downgrade but don't flip" approach was validated for NZ-Egypt. Despite trailing 1-0 at HT with 0.04 xG, Egypt's pre-match finishing analysis (Salah, Marmoush, Trezeguet as elite finishers) provided structural evidence that prevented a flip. Egypt scored 3 second-half goals and won 3-1. This confirms the structural-evidence approach is superior to a naive scoreline-based flip.
+- [2026-06-21] Elite individual finishing quality can overcome poor team xG. Egypt's 0.04 xG at HT was predominantly low-quality chances, but Salah, Marmoush, and Trezeguet converted 3 second-half opportunities that the xG model rated as low-probability. The WHT must evaluate finishing personnel quality — not just team-level xG — when assessing comeback likelihood.
 
 ---
 
@@ -139,6 +146,9 @@
 - **Post-Thrashing Defensive Reset Heuristic (New)**: A team that concedes 5+ goals in their opening match is more likely to adopt an extreme defensive posture (e.g., 5-4-1 formation) in their second match than to collapse again. The psychological "reset" effect produces disciplined, motivated defending against volume-shooting opponents. When a thrashing victim faces a team with documented finishing struggles, significantly increase draw/upset probability.
 - **Must-Win Favorite Overconfidence Trap (New)**: When a team in a must-win situation (0 points, facing elimination) is priced at -800 or shorter, exercise extreme caution if that team has a documented finishing deficiency from prior matches. Market odds for desperate favorites are systematically inflated by narrative pressure. Cap confidence at Medium maximum, regardless of opponent quality, until the favorite demonstrates clinical improvement.
 - **Stadium Climate Control Mitigation (Strengthened)**: The Temporary Grass Pitch Heuristic discount is fully waived for retractable-roof stadiums confirmed as closed. Verified roof closures eliminate surface degradation risk. This was validated by NED-SWE at NRG Stadium (roof closed, no pitch impact).
+
+- **Bielsa-System Defensive Fragility (New)**: Under Marcelo Bielsa's man-marking, high-pressing defensive system, individual defensive errors are more frequent because players are often isolated in one-on-one situations after the press is bypassed. Uruguay has now dropped points from a winning position (June 21 vs Cape Verde) due to individual defensive errors. When predicting matches involving Bielsa-coached teams, apply a modest confidence discount (especially for HT frozen predictions) because a single individual error can erase a lead against a set-piece-capable opponent.
+- **WHT Structural-Evidence Finishing Quality Sub-Rule (Strengthened)**: When deciding whether to flip a pre-match prediction at HT (score contradicts prediction), the key distinction is between "playing poorly" (downgrade confidence) and "structurally incapable of scoring" (justify a flip). A team with elite individual finishers (e.g., Salah-level) should rarely be considered "structurally incapable" even with very low xG at HT. The WHT must explicitly evaluate finishing personnel quality — not just team-level xG — as a structural factor against flipping.
 
 ### Initial Assumptions
 - Home advantage matters in World Cup group stages (host nations USA, Canada, Mexico)
@@ -169,3 +179,6 @@
 - [2026-06-20] Do betting markets systematically overprice must-win favorites in the group stage? The ECU-CUR miss (-900 favorite, 0-0 draw) adds to evidence that market odds for desperate teams are inflated by narrative pressure. Cross-reference with other tournament mismatches.
 - [2026-06-20] Does the "Debutant Motivation Boost" extend to a team's second match when they suffered a heavy opening loss? Curaçao lost 7-1 to Germany but played disciplined, motivated defense vs Ecuador. This suggests the boost may persist into Match 2 if the debutant is not demoralized by Match 1.
 - [2026-06-20] Can a team's finishing efficiency be reliably predicted from a single prior tournament match? Ecuador had only one match (0 goals, 16 shots vs CIV). Was this variance or a systemic pattern? Their historical trend (Under in 12 of 14) suggests the latter.
+- [2026-06-21] Does the Weighted Halftime Rule need a specific set-piece vulnerability sub-check? Uruguay's frozen prediction was invalidated by two set-piece goals. Should pre-match set-piece defensive analysis be integrated into WHT freeze decisions (i.e., a frozen prediction could still be downgraded if the opponent has a demonstrated set-piece threat)?
+- [2026-06-21] How should a team with sub-0.10 xG at HT be evaluated for comeback potential? Egypt (0.04 xG at HT, 3 goals second half) shows elite quality can overcome poor first-half performance. What xG threshold or personnel quality assessment justifies maintaining vs. flipping?
+- [2026-06-21] Is Bielsa's high-risk system inherently more vulnerable to frozen-prediction invalidation? Uruguay has now conceded 2 goals from winning positions in this tournament. Is this system-specific or opponent-specific?
