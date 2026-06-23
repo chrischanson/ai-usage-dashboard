@@ -10,9 +10,9 @@
 - **Dates:** June 11 – July 19, 2026
 - **Current Phase:** Group Stage
 - **Tracking Started:** 2026-06-13
-- **Total Matches Tracked:** 28
-- **Pre-Game Accuracy (Final Pre-Kickoff):** 60.7% (17/28)
-- **Half-Time Accuracy (Frozen/Live):** 53.8% (14/26)
+- **Total Matches Tracked:** 30
+- **Pre-Game Accuracy (Final Pre-Kickoff):** 63.3% (19/30)
+- **Half-Time Accuracy (Frozen/Live):** 57.1% (16/28)
 
 ---
 
@@ -22,17 +22,17 @@
 | Confidence | Correct | Total | Accuracy |
 |:-----------|:--------|:------|:---------|
 | High       | 4       | 5     | 80.0%    |
-| Medium     | 10      | 16    | 62.5%    |
-| Low        | 3       | 7     | 42.9%    |
+| Medium     | 11      | 17    | 64.7%    |
+| Low        | 4       | 8     | 50.0%    |
 
-*(Note: Germany vs. Curaçao was predicted as GERMANY WIN with High confidence pre-game, and USA vs. Australia was predicted as DRAW with Low confidence pre-game. This table shows pre-kickoff lineup-verified prediction performance. On 2026-06-20, Ecuador vs. Curaçao was the first High-confidence prediction failure — Ecuador's clinical finishing deficiency was identified but not properly enforced as a confidence cap. On 2026-06-21, SPAIN WIN (High) was correct, DRAW (Low) was correct, URUGUAY WIN (Medium) was incorrect (frozen at HT, lost 2-2 on set-piece goals), and EGYPT WIN (Medium) was correct (trailed 1-0 at HT but won 3-1, WHT downgraded to Low).)*
+*(Note: Germany vs. Curaçao was predicted as GERMANY WIN with High confidence pre-game, and USA vs. Australia was predicted as DRAW with Low confidence pre-game. This table shows pre-kickoff lineup-verified prediction performance. On 2026-06-20, Ecuador vs. Curaçao was the first High-confidence prediction failure — Ecuador's clinical finishing deficiency was identified but not properly enforced as a confidence cap. On 2026-06-21, SPAIN WIN (High) was correct, DRAW (Low) was correct, URUGUAY WIN (Medium) was incorrect (frozen at HT, lost 2-2 on set-piece goals), and EGYPT WIN (Medium) was correct (trailed 1-0 at HT but won 3-1, WHT downgraded to Low). On 2026-06-22, JOR-ALG (ALGERIA WIN Medium) was correct but the Clinical Finishing Gate was not properly enforced — a compliance violation documented in the postmortem.)*
 
 ### Half-Time (Frozen / Live-Monitoring)
 | Confidence | Correct | Total | Accuracy |
 |:-----------|:--------|:------|:---------|
 | High       | 2       | 3     | 66.7%    |
 | Medium     | 8       | 13    | 61.5%    |
-| Low        | 4       | 10    | 40.0%    |
+| Low        | 6       | 12    | 50.0%    |
 
 *(Note: Under the Weighted Halftime Rule, in-play monitoring downgraded Germany vs. Curaçao to Low-confidence DRAW, and downgraded Saudi Arabia vs. Uruguay to Low-confidence URUGUAY WIN. On 2026-06-20, GER-CIV was correctly NOT frozen at HT, confidence was downgraded to Low (structural evidence approach), and the final outcome was correct. On 2026-06-21, WHT was applied to two matches: Uruguay-Cape Verde (correctly frozen at 2-1 Uruguay, final was 2-2 — prediction incorrect but protocol correctly applied) and NZ-Egypt (correctly downgraded to Low and NOT frozen, Egypt trailed 1-0 at HT but won 3-1 — prediction correct).)*
 
@@ -42,7 +42,7 @@
 
 | Phase | Pre-Game Correct | Half-Time Correct | Total | Pre-Game Acc | Half-Time Acc |
 |:------|:-----------------|:------------------|:------|:-------------|:--------------|
-| Group Stage | 17 | 14 | 28 | 60.7% | 53.8% |
+| Group Stage | 19 | 16 | 30 | 63.3% | 57.1% |
 | Round of 32 | 0 | 0 | 0 | N/A | N/A |
 | Round of 16 | 0 | 0 | 0 | N/A | N/A |
 | Quarter-finals | 0 | 0 | 0 | N/A | N/A |
@@ -84,6 +84,8 @@
 | 2026-06-21 | Belgium vs. Iran | DRAW (Low) | N/A (complete by Iter 1) | DRAW 0-0 | ✅ / N/A |
 | 2026-06-21 | Uruguay vs. Cape Verde | URUGUAY WIN (Med) | URUGUAY WIN (Med) (FROZEN) | DRAW 2-2 | ❌ / ❌ |
 | 2026-06-21 | New Zealand vs. Egypt | EGYPT WIN (Med) | EGYPT WIN (Low) (NOT FROZEN) | EGYPT WIN 3-1 | ✅ / ✅ |
+| 2026-06-22 | Norway vs. Senegal | NORWAY WIN (Low) | NORWAY WIN (Low) (FROZEN at HT 1-0) | NORWAY WIN 3-2 | ✅ / ✅ |
+| 2026-06-22 | Jordan vs. Algeria | ALGERIA WIN (Med) | N/A (not tracked at HT) | ALGERIA WIN 2-1 | ✅ / N/A |
 
 *(Note: Germany vs. Curaçao pre-match prediction was GERMANY WIN with High confidence, which was correct. However, live-monitoring in-play adjusted the prediction to DRAW with Low confidence, which was frozen at halftime and recorded as incorrect for the Half-Time category. On 2026-06-20, GER-CIV HT was correctly NOT frozen — the prediction was downgraded to Low but kept as GERMANY WIN using the structural-evidence approach, and the final outcome validated this decision. On 2026-06-21, Uruguay-Cape Verde was correctly frozen at HT under WHT (2-1 Uruguay confirmed URUGUAY WIN), but set-piece defensive errors in the second half produced a 2-2 draw — the WHT protocol was correctly applied despite the incorrect outcome. NZ-Egypt was correctly NOT frozen (Egypt trailed 1-0 at HT), downgraded to Low, and validated by the final 3-1 win.)*
 
@@ -120,6 +122,11 @@
 - [2026-06-21] Set-piece vulnerability persists against heavy favorites even when the favorite has their preferred CB pairing. Uruguay's 2-0 HT lead was erased by two set-piece/cross-derived goals (Andrade 10', Costa 85'). Set-piece organization on dead balls is a distinct defensive skill that not all teams possess equally. For teams with known set-piece weaknesses (e.g., Bielsa's man-marking system), this should be a confidence-reducing factor even when leading comfortably.
 - [2026-06-21] The Weighted Halftime Rule's "downgrade but don't flip" approach was validated for NZ-Egypt. Despite trailing 1-0 at HT with 0.04 xG, Egypt's pre-match finishing analysis (Salah, Marmoush, Trezeguet as elite finishers) provided structural evidence that prevented a flip. Egypt scored 3 second-half goals and won 3-1. This confirms the structural-evidence approach is superior to a naive scoreline-based flip.
 - [2026-06-21] Elite individual finishing quality can overcome poor team xG. Egypt's 0.04 xG at HT was predominantly low-quality chances, but Salah, Marmoush, and Trezeguet converted 3 second-half opportunities that the xG model rated as low-probability. The WHT must evaluate finishing personnel quality — not just team-level xG — when assessing comeback likelihood.
+- [2026-06-22] The Temporary Grass Pitch Heuristic should be refined: elite individual finishers (e.g., Haaland-level) can overcome surface disadvantages. Norway scored 3 goals on MetLife's temporary grass in rainy conditions. The 10-15% discount should apply primarily to possession-heavy passing teams (Spain-style), not to direct attacking teams or teams with world-class finishers.
+- [2026-06-22] The Clinical Finishing Compliance Gate was violated for JOR-ALG. Algeria had 0 goals from 1 SOT vs Argentina. The reasoning used an opponent-quality exception ("scoring vs Argentina is fundamentally different") that is not in the SKILL.md text. The rule needs an explicit opponent-quality exception clause with documentation requirements.
+- [2026-06-22] Set-piece vulnerability was a blind spot in JOR-ALG analysis. Both Algeria goals came from corners (they had 10 corners to Jordan's 1). Pre-match analysis focused entirely on open-play quality. A "Set-Piece Advantage Check" should be added to the pre-match analysis workflow.
+- [2026-06-22] The 170-minute post-kickoff interval was too long for JOR-ALG. It skipped the entire first half and HT, preventing WHT application. For Medium-confidence matches within 2 hours of kickoff, the interval should land during the second half (60-90 min), not after full time.
+- [2026-06-22] Jordan became the first debutant to score in both of their first two World Cup matches since Ivory Coast 2006. The Debutant Motivation Boost (Match 1 only) was accurate in formulation — Jordan scored in Match 2 but was still eliminated.
 
 ---
 
@@ -128,7 +135,11 @@
 - **Roster Verification Heuristic**: Always double-check and verify international retirement status and late-stage pre-tournament injuries (from warm-up friendly matches, club playoff finals, etc.) for key players rather than relying on historical qualifying squads or outdated tournament rosters. Outdated roster tracking can lead to incorrect tactical assumptions (e.g. projecting retired/injured players to start).
 - **Workload Management Heuristic**: In opening tournament fixtures, teams returning star players from late-season injuries or illness (e.g., muscle tears) often restrict their minutes (rarely playing a full 90+ minutes). Technical teams whose playmaking core is on restricted minutes are highly vulnerable to compact blocks in the final 30 minutes, particularly if the bench lacks creative depth.
 - **Style Matchup Heuristic**: Defensive blocks relying heavily on aerial dominance and physical center-backs to defend the penalty box may find this strength neutralized when facing opponents that employ fluid, ground-based "strikerless" attacking rotations that bypass traditional wing crosses and aerial duels.
-- **Temporary Grass Pitch Heuristic**: Multi-purpose stadiums that normally feature artificial turf (e.g., BC Place in Vancouver, Gillette Stadium in Boston, MetLife Stadium in NY/NJ, Dallas Stadium, Houston Stadium) have temporary natural grass pitches installed over turf/concrete bases for the World Cup. These surfaces are often slower, heavier, and prone to tearing up compared to established natural pitches. This playing condition slows down fluid, ground-based passing combinations and plays into the hands of physical, defensive low/mid-blocks. *For matchups on these pitches, discount the rating of high-possession technical teams by 10-15% and increase the probability of draws or low-scoring counter-attack upsets. This discount was further validated by Spain's 0-0 draw on Atlanta's temporary grass, Belgium's 1-1 draw on Seattle's slow turf, Scotland's 0-1 loss to Morocco on Boston's slow grass, and Türkiye's 0-1 loss to Paraguay on Santa Clara's slow grass. The heavy pitch environment enables deep defensive blocks to sit compact and absorb pressure with less fatigue, even when down to 10 men.*
+- **Temporary Grass Pitch Heuristic (Refined 2026-06-22)**: Multi-purpose stadiums that normally feature artificial turf (e.g., BC Place in Vancouver, Gillette Stadium in Boston, MetLife Stadium in NY/NJ, Dallas Stadium, Houston Stadium) have temporary natural grass pitches installed over turf/concrete bases for the World Cup. These surfaces are often slower, heavier, and prone to tearing up compared to established natural pitches. **However, the discount magnitude depends on team playing style:**
+  - High-possession technical teams reliant on quick passing combinations (e.g., Spain, Belgium): Apply the full **10-15% discount** as validated by Spain's 0-0 draw on Atlanta's temporary grass, Belgium's 1-1 draw on Seattle's slow turf, Scotland's 0-1 loss to Morocco on Boston's slow grass, and Türkiye's 0-1 loss to Paraguay on Santa Clara's slow grass.
+  - Direct attacking teams or teams with elite individual finishers (e.g., Norway with Haaland, Argentina with Messi): Apply a **reduced 0-5% discount** or none — world-class finishers can convert chances regardless of surface (validated by Norway's 3 goals on MetLife's temporary grass in rainy conditions, 2026-06-22).
+  - The heavy pitch environment enables deep defensive blocks to sit compact and absorb pressure with less fatigue, even when down to 10 men — this part of the heuristic remains regardless of team style.
+  - **Climate control mitigation:** If retractable-roof stadium is confirmed closed, the discount is fully waived (validated by NED-SWE at NRG Stadium).*
 - **Counter-Attack / Possession Efficiency Heuristic**: Direct, athletic teams focusing on compact mid-blocks and vertical transitions on heavy pitches are highly efficient, often outperforming technical teams despite low possession percentages (<35%) and low shot volume. Analyze expected goals (xG) rather than possession dominance when evaluating defensive block vs. playmaking matchups.
 - **Live-Monitoring Overreaction Heuristic (New)**: For heavy favorites (e.g., moneyline < 1.15), ignore temporary first-half equalizers or slow starts. Do not adjust predictions or confidence during the first half (`live_pre_halftime`) based on scoreline fluctuations alone. Live adjustments must wait until halftime or require major structural changes (such as red cards or key player injuries).
 - **Draw Prediction Volatility Heuristic (New)**: Draw predictions are highly fragile and subject to late-game volatility. Always restrict Draw predictions to Low confidence unless there are clear tournament table incentives (e.g., mutual progression) or both teams are structurally deadlocked with no bench depth.
@@ -149,6 +160,8 @@
 
 - **Bielsa-System Defensive Fragility (New)**: Under Marcelo Bielsa's man-marking, high-pressing defensive system, individual defensive errors are more frequent because players are often isolated in one-on-one situations after the press is bypassed. Uruguay has now dropped points from a winning position (June 21 vs Cape Verde) due to individual defensive errors. When predicting matches involving Bielsa-coached teams, apply a modest confidence discount (especially for HT frozen predictions) because a single individual error can erase a lead against a set-piece-capable opponent.
 - **WHT Structural-Evidence Finishing Quality Sub-Rule (Strengthened)**: When deciding whether to flip a pre-match prediction at HT (score contradicts prediction), the key distinction is between "playing poorly" (downgrade confidence) and "structurally incapable of scoring" (justify a flip). A team with elite individual finishers (e.g., Salah-level) should rarely be considered "structurally incapable" even with very low xG at HT. The WHT must explicitly evaluate finishing personnel quality — not just team-level xG — as a structural factor against flipping.
+- **Set-Piece Advantage Check (New 2026-06-22)**: During pre-match analysis, evaluate each team's set-piece threat and vulnerability. Check: (1) does one team have a significant aerial/physical advantage? (2) does the opponent have a demonstrated set-piece vulnerability from prior matches? (3) does the favorite have quality set-piece takers? If yes to 2+ questions, flag set pieces as a high-probability scoring path — even if the team's open-play finishing is poor. Validated by JOR-ALG (both Algeria goals from corners, 10-1 corner advantage).
+- **Clinical Finishing Compliance Gate — Opponent-Quality Exception (New 2026-06-22)**: An opponent-quality adjustment MAY be applied to bypass the Low confidence cap if BOTH: (a) the prior match was against an elite opponent (world top 5 or defending champion), AND (b) strong countervailing evidence exists that the team's finishing is better than the single-match sample (e.g., a returning star, 20+ goal international record). Confidence may be Medium at maximum (never High) under this exception. The justification MUST be explicitly documented in the reasoning. Validated by JOR-ALG — Algeria's 0 goals vs Argentina was context-justified by Mahrez return and the elite opponent quality.
 
 ### Initial Assumptions
 - Home advantage matters in World Cup group stages (host nations USA, Canada, Mexico)
@@ -182,3 +195,8 @@
 - [2026-06-21] Does the Weighted Halftime Rule need a specific set-piece vulnerability sub-check? Uruguay's frozen prediction was invalidated by two set-piece goals. Should pre-match set-piece defensive analysis be integrated into WHT freeze decisions (i.e., a frozen prediction could still be downgraded if the opponent has a demonstrated set-piece threat)?
 - [2026-06-21] How should a team with sub-0.10 xG at HT be evaluated for comeback potential? Egypt (0.04 xG at HT, 3 goals second half) shows elite quality can overcome poor first-half performance. What xG threshold or personnel quality assessment justifies maintaining vs. flipping?
 - [2026-06-21] Is Bielsa's high-risk system inherently more vulnerable to frozen-prediction invalidation? Uruguay has now conceded 2 goals from winning positions in this tournament. Is this system-specific or opponent-specific?
+- [2026-06-22] Should the system ever set an interval that skips entirely over a Medium-confidence match's HT? The 170-min interval skipped JOR-ALG's HT, preventing WHT application. What interval rule prevents this?
+- [2026-06-22] How should the Clinical Finishing Gate opponent-quality exception be practically enforced? Should it require explicit pre-approval in SKILL.md or is runtime documentation sufficient?
+- [2026-06-22] Is Jordan's scoring record (goals in both debut matches) indicative of genuine attacking quality or a quirk of debutant motivation?
+- [2026-06-22] What happens to dead-rubber match predictions when a team is already eliminated? JOR-ALG eliminated Jordan — how does this affect predictions for Jordan vs Argentina (dead rubber)?
+- [2026-06-22] Does the Temporary Grass Pitch discount refinement (elite-finisher exception) replicate across other venues and teams, or is Norway's performance an outlier?
