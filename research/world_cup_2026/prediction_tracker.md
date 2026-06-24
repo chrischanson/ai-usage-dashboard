@@ -86,8 +86,12 @@
 | 2026-06-21 | New Zealand vs. Egypt | EGYPT WIN (Med) | EGYPT WIN (Low) (NOT FROZEN) | EGYPT WIN 3-1 | ✅ / ✅ |
 | 2026-06-22 | Norway vs. Senegal | NORWAY WIN (Low) | NORWAY WIN (Low) (FROZEN at HT 1-0) | NORWAY WIN 3-2 | ✅ / ✅ |
 | 2026-06-22 | Jordan vs. Algeria | ALGERIA WIN (Med) | N/A (not tracked at HT) | ALGERIA WIN 2-1 | ✅ / N/A |
+| 2026-06-23 | Portugal vs. Uzbekistan | N/A (system missed) | N/A (system missed) | PORTUGAL WIN 5-0 | N/A |
+| 2026-06-23 | England vs. Ghana | N/A (system missed) | N/A (system missed) | DRAW 0-0 | N/A |
+| 2026-06-23 | Panama vs. Croatia | N/A (system missed) | N/A (system missed) | CROATIA WIN 1-0 | N/A |
+| 2026-06-23 | Colombia vs. DR Congo | N/A (system missed) | N/A (system missed) | COLOMBIA WIN 1-0 | N/A |
 
-*(Note: Germany vs. Curaçao pre-match prediction was GERMANY WIN with High confidence, which was correct. However, live-monitoring in-play adjusted the prediction to DRAW with Low confidence, which was frozen at halftime and recorded as incorrect for the Half-Time category. On 2026-06-20, GER-CIV HT was correctly NOT frozen — the prediction was downgraded to Low but kept as GERMANY WIN using the structural-evidence approach, and the final outcome validated this decision. On 2026-06-21, Uruguay-Cape Verde was correctly frozen at HT under WHT (2-1 Uruguay confirmed URUGUAY WIN), but set-piece defensive errors in the second half produced a 2-2 draw — the WHT protocol was correctly applied despite the incorrect outcome. NZ-Egypt was correctly NOT frozen (Egypt trailed 1-0 at HT), downgraded to Low, and validated by the final 3-1 win.)*
+*(Note: Germany vs. Curaçao pre-match prediction was GERMANY WIN with High confidence, which was correct. However, live-monitoring in-play adjusted the prediction to DRAW with Low confidence, which was frozen at halftime and recorded as incorrect for the Half-Time category. On 2026-06-20, GER-CIV HT was correctly NOT frozen — the prediction was downgraded to Low but kept as GERMANY WIN using the structural-evidence approach, and the final outcome validated this decision. On 2026-06-21, Uruguay-Cape Verde was correctly frozen at HT under WHT (2-1 Uruguay confirmed URUGUAY WIN), but set-piece defensive errors in the second half produced a 2-2 draw — the WHT protocol was correctly applied despite the incorrect outcome. NZ-Egypt was correctly NOT frozen (Egypt trailed 1-0 at HT), downgraded to Low, and validated by the final 3-1 win. On 2026-06-23, the system missed all 4 matches — prediction loop started after the matchday ended.)*
 
 ---
 
@@ -127,6 +131,9 @@
 - [2026-06-22] Set-piece vulnerability was a blind spot in JOR-ALG analysis. Both Algeria goals came from corners (they had 10 corners to Jordan's 1). Pre-match analysis focused entirely on open-play quality. A "Set-Piece Advantage Check" should be added to the pre-match analysis workflow.
 - [2026-06-22] The 170-minute post-kickoff interval was too long for JOR-ALG. It skipped the entire first half and HT, preventing WHT application. For Medium-confidence matches within 2 hours of kickoff, the interval should land during the second half (60-90 min), not after full time.
 - [2026-06-22] Jordan became the first debutant to score in both of their first two World Cup matches since Ivory Coast 2006. The Debutant Motivation Boost (Match 1 only) was accurate in formulation — Jordan scored in Match 2 but was still eliminated.
+- [2026-06-23] System timing is critical: The prediction loop must launch before the first match kickoff. 4 matches on this matchday received no predictions because the system ran after all matches had completed. Total tokens burned: 37,508 across 2 iterations with zero prediction value.
+- [2026-06-23] Gillette Stadium temporary grass validated: England (79% possession, 1.36 xG, 19 shots) failed to score against Ghana. Matches the Temporary Grass Pitch Heuristic pattern — possession-heavy technical teams struggle on heavy temporary surfaces regardless of quality advantage. This is the fifth validation of this heuristic.
+- [2026-06-23] England's clinical finishing deficiency is persistent: 19 shots, 3 on target (16%), 1.36 xG, 0 goals. Despite dominant possession and territory, England could not break a deep block on temporary grass. This reinforces the Clinical Finishing Compliance Gate — finishing efficiency from prior matches is predictive across matchdays.
 
 ---
 
@@ -200,3 +207,4 @@
 - [2026-06-22] Is Jordan's scoring record (goals in both debut matches) indicative of genuine attacking quality or a quirk of debutant motivation?
 - [2026-06-22] What happens to dead-rubber match predictions when a team is already eliminated? JOR-ALG eliminated Jordan — how does this affect predictions for Jordan vs Argentina (dead rubber)?
 - [2026-06-22] Does the Temporary Grass Pitch discount refinement (elite-finisher exception) replicate across other venues and teams, or is Norway's performance an outlier?
+- [2026-06-23] How can the prediction loop be guaranteed to start before the first match kickoff, rather than after the matchday ends? Current orchestration allowed a complete matchday to pass without any predictions.

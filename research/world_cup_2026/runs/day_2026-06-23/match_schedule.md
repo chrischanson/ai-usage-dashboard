@@ -2,7 +2,7 @@
 date: "2026-06-23"
 match_count: 4
 tournament_phase: "Group Stage"
-generated_at: "2026-06-24T05:02:00Z"
+generated_at: "2026-06-24T05:12:00Z"
 ---
 
 # 📅 World Cup 2026 — Match Schedule for 2026-06-23
