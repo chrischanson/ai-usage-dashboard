@@ -311,8 +311,10 @@ def init_db(conn: sqlite3.Connection) -> None:
                 race_offering_id INTEGER NOT NULL,
                 event_date TEXT,
                 status TEXT NOT NULL DEFAULT 'active',
+                official_url_id INTEGER,
                 FOREIGN KEY(race_offering_id) REFERENCES race_offerings(id),
                 FOREIGN KEY(status) REFERENCES race_event_statuses(status),
+                FOREIGN KEY(official_url_id) REFERENCES race_official_urls(id),
                 UNIQUE(race_offering_id, event_date)
             );
         """)
@@ -470,8 +472,10 @@ def init_db(conn: sqlite3.Connection) -> None:
                 race_offering_id INTEGER NOT NULL,
                 event_date TEXT,
                 status TEXT NOT NULL DEFAULT 'active',
+                official_url_id INTEGER,
                 FOREIGN KEY(race_offering_id) REFERENCES race_offerings(id),
                 FOREIGN KEY(status) REFERENCES event_statuses(status),
+                FOREIGN KEY(official_url_id) REFERENCES race_official_urls(id),
                 UNIQUE(race_offering_id, event_date)
             );
         """)
@@ -565,8 +569,10 @@ def init_db(conn: sqlite3.Connection) -> None:
             race_offering_id INTEGER NOT NULL,
             event_date TEXT,
             status TEXT NOT NULL DEFAULT 'active',
+            official_url_id INTEGER,
             FOREIGN KEY(race_offering_id) REFERENCES race_offerings(id),
             FOREIGN KEY(status) REFERENCES race_event_statuses(status),
+            FOREIGN KEY(official_url_id) REFERENCES race_official_urls(id),
             UNIQUE(race_offering_id, event_date)
         );
 
@@ -694,8 +700,10 @@ def init_db(conn: sqlite3.Connection) -> None:
                 race_offering_id INTEGER NOT NULL,
                 event_date TEXT,
                 status TEXT NOT NULL DEFAULT 'active',
+                official_url_id INTEGER,
                 FOREIGN KEY(race_offering_id) REFERENCES race_offerings(id),
                 FOREIGN KEY(status) REFERENCES race_event_statuses(status),
+                FOREIGN KEY(official_url_id) REFERENCES race_official_urls(id),
                 UNIQUE(race_offering_id, event_date)
             );
         """)
@@ -731,123 +739,141 @@ def init_db(conn: sqlite3.Connection) -> None:
         conn.isolation_level = old_isolation
         conn.commit()
 
-    # 6. Recreate SQL Triggers
-    conn.executescript("""
-        DROP TRIGGER IF EXISTS log_races_insert;
-        CREATE TRIGGER log_races_insert
-        AFTER INSERT ON race_races
-        BEGIN
-            INSERT INTO change_log (table_name, action, record_id, details)
-            SELECT
-                'race_races',
-                'INSERT',
-                new.id,
-                json_object(
-                    'new_values', json_object(
-                        'name', new.name,
-                        'city', l.city,
-                        'state_province', l.state_province,
-                        'country', l.country_name,
-                        'official_url', (SELECT url FROM race_official_urls WHERE id = new.official_url_id)
-                    )
-                )
-            FROM loc_locations l
-            WHERE l.id = new.location_id;
-        END;
+    # 5d. Migrate race_events table to add official_url_id if missing
+    cursor.execute("PRAGMA table_info(race_events);")
+    event_cols = [row["name"] for row in cursor.fetchall()]
+    if event_cols and "official_url_id" not in event_cols:
+        conn.execute("ALTER TABLE race_events ADD COLUMN official_url_id INTEGER REFERENCES race_official_urls(id);")
+        conn.execute("""
+            UPDATE race_events
+            SET official_url_id = (
+                SELECT r.official_url_id
+                FROM race_races r
+                JOIN race_offerings ro ON r.id = ro.race_id
+                WHERE ro.id = race_events.race_offering_id
+            )
+            WHERE official_url_id IS NULL;
+        """)
+        conn.commit()
 
-        DROP TRIGGER IF EXISTS log_race_events_insert;
-        CREATE TRIGGER log_race_events_insert
-        AFTER INSERT ON race_events
-        BEGIN
-            INSERT INTO change_log (table_name, action, record_id, details)
-            SELECT
-                'race_events',
-                'INSERT',
-                ro.race_id || ' - ' || ro.distance || ' (' || coalesce(new.event_date, 'TBD') || ')',
-                json_object(
-                    'new_values', json_object(
-                        'event_date', new.event_date,
-                        'status', new.status,
-                        'distance', ro.distance
+    # 6. Recreate SQL Triggers (Paused/Disabled during system building)
+    if False:
+        conn.executescript("""
+            DROP TRIGGER IF EXISTS log_races_insert;
+            CREATE TRIGGER log_races_insert
+            AFTER INSERT ON race_races
+            BEGIN
+                INSERT INTO change_log (table_name, action, record_id, details)
+                SELECT
+                    'race_races',
+                    'INSERT',
+                    new.id,
+                    json_object(
+                        'new_values', json_object(
+                            'name', new.name,
+                            'city', l.city,
+                            'state_province', l.state_province,
+                            'country', l.country_name,
+                            'official_url', (SELECT url FROM race_official_urls WHERE id = new.official_url_id)
+                        )
                     )
-                )
-            FROM race_offerings ro
-            WHERE ro.id = new.race_offering_id;
-        END;
+                FROM loc_locations l
+                WHERE l.id = new.location_id;
+            END;
 
-        DROP TRIGGER IF EXISTS log_race_events_update;
-        CREATE TRIGGER log_race_events_update
-        AFTER UPDATE ON race_events
-        WHEN (
-            old.event_date IS NOT new.event_date OR
-            old.status IS NOT new.status
-        )
-        BEGIN
-            INSERT INTO change_log (table_name, action, record_id, details)
-            SELECT
-                'race_events',
-                'UPDATE',
-                ro.race_id || ' - ' || ro.distance || ' (' || coalesce(new.event_date, 'TBD') || ')',
-                json_object(
-                    'old_values', json_object(
-                        'event_date', old.event_date,
-                        'status', old.status
-                    ),
-                    'new_values', json_object(
-                        'event_date', new.event_date,
-                        'status', new.status
+            DROP TRIGGER IF EXISTS log_race_events_insert;
+            CREATE TRIGGER log_race_events_insert
+            AFTER INSERT ON race_events
+            BEGIN
+                INSERT INTO change_log (table_name, action, record_id, details)
+                SELECT
+                    'race_events',
+                    'INSERT',
+                    ro.race_id || ' - ' || ro.distance || ' (' || coalesce(new.event_date, 'TBD') || ')',
+                    json_object(
+                        'new_values', json_object(
+                            'event_date', new.event_date,
+                            'status', new.status,
+                            'distance', ro.distance
+                        )
                     )
-                )
-            FROM race_offerings ro
-            WHERE ro.id = new.race_offering_id;
-        END;
+                FROM race_offerings ro
+                WHERE ro.id = new.race_offering_id;
+            END;
 
-        DROP TRIGGER IF EXISTS log_registration_windows_insert;
-        CREATE TRIGGER log_registration_windows_insert
-        AFTER INSERT ON race_registration_windows
-        BEGIN
-            INSERT INTO change_log (table_name, action, record_id, details)
-            SELECT
-                'race_registration_windows',
-                'INSERT',
-                ro.race_id || ' - ' || ro.distance || ' (' || coalesce(e.event_date, 'TBD') || ')',
-                json_object(
-                    'new_values', json_object(
-                        'window_type', new.window_type,
-                        'description', new.description,
-                        'open_date', new.open_date,
-                        'close_date', new.close_date,
-                        'official_url', (SELECT url FROM race_official_urls WHERE id = new.official_url_id)
+            DROP TRIGGER IF EXISTS log_race_events_update;
+            CREATE TRIGGER log_race_events_update
+            AFTER UPDATE ON race_events
+            WHEN (
+                old.event_date IS NOT new.event_date OR
+                old.status IS NOT new.status
+            )
+            BEGIN
+                INSERT INTO change_log (table_name, action, record_id, details)
+                SELECT
+                    'race_events',
+                    'UPDATE',
+                    ro.race_id || ' - ' || ro.distance || ' (' || coalesce(new.event_date, 'TBD') || ')',
+                    json_object(
+                        'old_values', json_object(
+                            'event_date', old.event_date,
+                            'status', old.status
+                        ),
+                        'new_values', json_object(
+                            'event_date', new.event_date,
+                            'status', new.status
+                        )
                     )
-                )
-            FROM race_events e
-            JOIN race_offerings ro ON e.race_offering_id = ro.id
-            WHERE e.id = new.event_id;
-        END;
+                FROM race_offerings ro
+                WHERE ro.id = new.race_offering_id;
+            END;
 
-        DROP TRIGGER IF EXISTS log_registration_windows_delete;
-        CREATE TRIGGER log_registration_windows_delete
-        AFTER DELETE ON race_registration_windows
-        BEGIN
-            INSERT INTO change_log (table_name, action, record_id, details)
-            SELECT
-                'race_registration_windows',
-                'DELETE',
-                ro.race_id || ' - ' || ro.distance || ' (' || coalesce(e.event_date, 'TBD') || ')',
-                json_object(
-                    'old_values', json_object(
-                        'window_type', old.window_type,
-                        'description', old.description,
-                        'open_date', old.open_date,
-                        'close_date', old.close_date,
-                        'official_url', (SELECT url FROM race_official_urls WHERE id = old.official_url_id)
+            DROP TRIGGER IF EXISTS log_registration_windows_insert;
+            CREATE TRIGGER log_registration_windows_insert
+            AFTER INSERT ON race_registration_windows
+            BEGIN
+                INSERT INTO change_log (table_name, action, record_id, details)
+                SELECT
+                    'race_registration_windows',
+                    'INSERT',
+                    ro.race_id || ' - ' || ro.distance || ' (' || coalesce(e.event_date, 'TBD') || ')',
+                    json_object(
+                        'new_values', json_object(
+                            'window_type', new.window_type,
+                            'description', new.description,
+                            'open_date', new.open_date,
+                            'close_date', new.close_date,
+                            'official_url', (SELECT url FROM race_official_urls WHERE id = new.official_url_id)
+                        )
                     )
-                )
-            FROM race_events e
-            JOIN race_offerings ro ON e.race_offering_id = ro.id
-            WHERE e.id = old.event_id;
-        END;
-    """)
+                FROM race_events e
+                JOIN race_offerings ro ON e.race_offering_id = ro.id
+                WHERE e.id = new.event_id;
+            END;
+
+            DROP TRIGGER IF EXISTS log_registration_windows_delete;
+            CREATE TRIGGER log_registration_windows_delete
+            AFTER DELETE ON race_registration_windows
+            BEGIN
+                INSERT INTO change_log (table_name, action, record_id, details)
+                SELECT
+                    'race_registration_windows',
+                    'DELETE',
+                    ro.race_id || ' - ' || ro.distance || ' (' || coalesce(e.event_date, 'TBD') || ')',
+                    json_object(
+                        'old_values', json_object(
+                            'window_type', old.window_type,
+                            'description', old.description,
+                            'open_date', old.open_date,
+                            'close_date', old.close_date,
+                            'official_url', (SELECT url FROM race_official_urls WHERE id = old.official_url_id)
+                        )
+                    )
+                FROM race_events e
+                JOIN race_offerings ro ON e.race_offering_id = ro.id
+                WHERE e.id = old.event_id;
+            END;
+        """)
 
     conn.commit()
 

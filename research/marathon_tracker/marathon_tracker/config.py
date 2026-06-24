@@ -76,7 +76,7 @@ def load_previous_output(path: Path = DEFAULT_DB) -> dict[tuple[str, str, int | 
     cursor.execute("""
         SELECT 
             r.id, r.name, ro.distance, l.city, l.state_province, s.name AS state_province_name, l.country_name, c.region_name,
-            ou_off.url as official_url,
+            COALESCE(ou_ev.url, ou_race.url) as official_url,
             e.id as event_id, e.event_date, e.status,
             cl.timestamp as extracted_at,
             json_extract(cl.details, '$.source_url') as source_url,
@@ -88,9 +88,10 @@ def load_previous_output(path: Path = DEFAULT_DB) -> dict[tuple[str, str, int | 
         JOIN loc_locations l ON r.location_id = l.id
         JOIN loc_countries c ON l.country_name = c.name
         JOIN race_offerings ro ON r.id = ro.race_id
-        JOIN race_official_urls ou_off ON r.official_url_id = ou_off.id
+        JOIN race_official_urls ou_race ON r.official_url_id = ou_race.id
         LEFT JOIN loc_subdivisions s ON l.country_name = s.country_name AND l.state_province = s.code
         LEFT JOIN race_events e ON ro.id = e.race_offering_id
+        LEFT JOIN race_official_urls ou_ev ON e.official_url_id = ou_ev.id
         LEFT JOIN change_log cl ON cl.id = (
             SELECT id FROM change_log
             WHERE table_name = 'race_events'
@@ -308,19 +309,19 @@ def save_race_results(results: list[RaceResult], path: Path = DEFAULT_DB) -> Non
                 event_id = row["id"]
 
         if event_id:
-            # Update the event_date and status
+            # Update the event_date, status, and official_url_id
             cursor.execute(
-                "UPDATE race_events SET event_date = ?, status = ? WHERE id = ?",
-                (result.event_date, result.status or "active", event_id)
+                "UPDATE race_events SET event_date = ?, status = ?, official_url_id = ? WHERE id = ?",
+                (result.event_date, result.status or "active", official_url_id, event_id)
             )
         else:
             # Insert new event
             cursor.execute(
                 """
-                INSERT INTO race_events (race_offering_id, event_date, status)
-                VALUES (?, ?, ?)
+                INSERT INTO race_events (race_offering_id, event_date, status, official_url_id)
+                VALUES (?, ?, ?, ?)
                 """,
-                (race_offering_id, result.event_date, result.status or "active")
+                (race_offering_id, result.event_date, result.status or "active", official_url_id)
             )
             event_id = cursor.lastrowid
         

@@ -113,6 +113,13 @@ def apply_extraction(
         if replace_existing or result.distance == "marathon":
             result.distance = dist
 
+    # 5. Extract official_url
+    url_val = extraction.get("official_url")
+    if isinstance(url_val, str) and url_val.startswith("http"):
+        if replace_existing or not result.official_url or result.official_url == "":
+            result.official_url = url_val
+
+
 
 def regex_extract(page_text: str) -> dict[str, object]:
     lines = [line.strip() for line in page_text.splitlines() if line.strip()]

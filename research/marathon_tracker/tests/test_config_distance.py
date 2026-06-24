@@ -109,6 +109,51 @@ class TestConfigDistance(unittest.TestCase):
         self.assertEqual(loaded.confidence, "high")
         self.assertEqual(loaded.state_province, None)
 
+    def test_event_level_official_url_saved_and_loaded(self):
+        # 1. Create a RaceResult with an event-level official URL that differs from the race level
+        result = RaceResult(
+            id="chicago-marathon",
+            name="Chicago Marathon",
+            city="Chicago",
+            state_province="IL",
+            country="United States",
+            region="North America",
+            official_url="https://chicagomarathon2026.example.com",
+            registration_url=None,
+            distance="marathon",
+            event_date="2026-10-11",
+            year=2026,
+            confidence="high",
+            status="active"
+        )
+        
+        # 2. Save the race result
+        save_race_results([result], self.db_path)
+        
+        # 3. Verify event official_url is saved and loaded correctly
+        previous = load_previous_output(self.db_path)
+        self.assertIsNotNone(previous)
+        key = ("chicago-marathon", "marathon", 2026)
+        self.assertIn(key, previous)
+        self.assertEqual(previous[key].official_url, "https://chicagomarathon2026.example.com")
+        
+        # 4. Connect to database and directly query race_events to check if official_url_id is set
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        # Check event's official_url_id joins to our new URL
+        row = cursor.execute("""
+            SELECT e.official_url_id, ou.url
+            FROM race_events e
+            JOIN race_official_urls ou ON e.official_url_id = ou.id
+        """).fetchone()
+        self.assertIsNotNone(row)
+        self.assertEqual(row["url"], "https://chicagomarathon2026.example.com")
+        
+        conn.close()
+
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -6,9 +6,9 @@ import urllib.error
 import urllib.request
 
 
-SYSTEM_PROMPT = """Extract marathon or half-marathon race dates, registration deadlines, and distance from official race page text.
+SYSTEM_PROMPT = """Extract marathon or half-marathon race dates, registration deadlines, specific event official URL, and distance from official race page text.
 Return only strict JSON with these keys:
-event_date, registration_windows, confidence, notes, raw_evidence, distance.
+event_date, registration_windows, confidence, notes, raw_evidence, distance, official_url.
 
 - event_date: The race day date (ISO 8601, e.g. "2026-10-11") or null.
 - registration_windows: A list of objects representing entry/registration periods. Each object must have:
@@ -18,6 +18,7 @@ event_date, registration_windows, confidence, notes, raw_evidence, distance.
   - close_date: ISO 8601 deadline date when registration closes, or null
   Ensure all distinct entry periods (like lottery windows, charity programs, time qualifier windows) are captured as separate objects.
 - distance: Must be 'marathon' or 'half-marathon' based on the page context (or null if ambiguous or not mentioned).
+- official_url: The official website or specific subpage URL for this specific event/year (or null if not found/different from the current page).
 
 Use ISO 8601 dates ("YYYY-MM-DD") when a full date is available. Use null when unknown.
 raw_evidence must be a short list of source text snippets supporting the dates.
@@ -147,6 +148,93 @@ def extract_with_llm(race_name: str, page_text: str) -> dict[str, object] | None
                 "notes": f"opencode CLI extraction failed: {exc}",
                 "raw_evidence": [],
             }
+
+    return None
+
+
+def resolve_official_url(race_name: str) -> str | None:
+    """
+    Asks the LLM for the official website URL of the given race.
+    """
+    import re
+    prompt = (
+        f"What is the official homepage website URL for the marathon/half-marathon race named '{race_name}'? "
+        "Return ONLY the clean URL (e.g., https://www.example.com). Do not include any other text, markdown formatting, or explainers."
+    )
+    
+    # First try API key if configured
+    api_key = os.environ.get("LLM_API_KEY")
+    if api_key:
+        api_base = os.environ.get("LLM_API_BASE", "https://api.openai.com/v1").rstrip("/")
+        model = os.environ.get("LLM_MODEL", "gpt-4.1-mini")
+        timeout = int(os.environ.get("LLM_TIMEOUT_SECONDS", "45"))
+        body = {
+            "model": model,
+            "temperature": 0,
+            "messages": [
+                {"role": "user", "content": prompt}
+            ],
+        }
+        request = urllib.request.Request(
+            f"{api_base}/chat/completions",
+            data=json.dumps(body).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                raw = json.loads(response.read().decode("utf-8"))
+            text = raw.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+            # Clean markdown/code block formatting
+            text = text.replace("`", "").strip()
+            match = re.search(r"https?://[^\s`\"']+", text)
+            if match:
+                return match.group(0)
+        except Exception:
+            pass
+
+    # Fallback to local agy CLI
+    import shutil
+    import subprocess
+    agy_path = shutil.which("agy")
+    if agy_path:
+        try:
+            result = subprocess.run(
+                ["agy", "--print", prompt],
+                capture_output=True,
+                text=True,
+                timeout=45
+            )
+            if result.returncode == 0:
+                text = result.stdout.strip()
+                text = text.replace("`", "").strip()
+                match = re.search(r"https?://[^\s`\"']+", text)
+                if match:
+                    return match.group(0)
+        except Exception:
+            pass
+
+    # Fallback to local opencode CLI
+    opencode_path = shutil.which("opencode")
+    if opencode_path:
+        try:
+            result = subprocess.run(
+                ["opencode", "run", prompt],
+                capture_output=True,
+                text=True,
+                timeout=45
+            )
+            if result.returncode == 0:
+                text = result.stdout.strip()
+                text = text.replace("`", "").strip()
+                match = re.search(r"https?://[^\s`\"']+", text)
+                if match:
+                    return match.group(0)
+        except Exception:
+            pass
 
     return None
 

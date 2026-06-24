@@ -115,6 +115,32 @@ def main(argv: list[str] | None = None) -> int:
 
     races = merge_races(curated, discovered, previous=previous)
 
+    # Resolve missing official URLs for races using LLM
+    if not no_network:
+        from .llm import resolve_official_url
+        import dataclasses
+        resolved_races = []
+        for r in races:
+            if not r.official_url or r.official_url == "":
+                print(f"Resolving missing official URL for {r.name}...")
+                resolved_url = resolve_official_url(r.name)
+                if resolved_url:
+                    print(f"  -> Resolved to: {resolved_url}")
+                    r = dataclasses.replace(r, official_url=resolved_url)
+            resolved_races.append(r)
+        races = resolved_races
+
+        # Update discovered list with resolved URLs so they save correctly
+        resolved_discovered = []
+        for d in discovered:
+            if not d.official_url or d.official_url == "":
+                # Find matching resolved race by ID/distance
+                match = next((r for r in races if r.id == d.id and r.distance == d.distance), None)
+                if match and match.official_url:
+                    d = dataclasses.replace(d, official_url=match.official_url)
+            resolved_discovered.append(d)
+        discovered = resolved_discovered
+
     new_discoveries = [d for d in discovered if (d.id, d.distance) not in curated_map]
     if new_discoveries and not no_network:
         save_races(new_discoveries, args.db)
@@ -211,11 +237,26 @@ def main(argv: list[str] | None = None) -> int:
                 fresh = scraper(race_obj)
             else:
                 url = result.source_url or result.official_url
-                if not url:
-                    result.status = "stale"
-                    result.confidence = "low"
-                    result.notes = "No source URL available for this race."
-                    continue
+                if not url or url == "":
+                    from .llm import resolve_official_url
+                    print(f"Resolving missing URL in Phase C for {result.name}...")
+                    resolved_url = resolve_official_url(result.name)
+                    if resolved_url:
+                        print(f"  -> Resolved to: {resolved_url}")
+                        result.official_url = resolved_url
+                        result.source_url = resolved_url
+                        url = resolved_url
+                        
+                        # Re-bind the race_obj so it has the new URL too
+                        if race_obj:
+                            import dataclasses
+                            race_obj = dataclasses.replace(race_obj, official_url=resolved_url)
+                            races_by_key[(result.id, result.distance)] = race_obj
+                    else:
+                        result.status = "stale"
+                        result.confidence = "low"
+                        result.notes = "No source URL available for this race."
+                        continue
 
                 reachable, error = check_url(url)
                 if not reachable:
