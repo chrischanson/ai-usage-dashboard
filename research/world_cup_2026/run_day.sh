@@ -476,7 +476,7 @@ predictions_hash() {
     fi
 }
 
-while [ "$(date -u +%s)" -lt "${LAST_END_EPOCH}" ]; do
+while [ "$(date -u +%s)" -lt "${LAST_END_EPOCH}" ] || [ ! -f "${PREDICTIONS_PATH}" ] || [ "${ITERATION}" -eq 0 ]; do
     ITERATION=$((ITERATION + 1))
     echo ""
     echo "=== Prediction Iteration ${ITERATION} — $(date -u +%H:%M:%S) UTC (staleness: ${STALENESS_COUNT}) ==="
@@ -654,7 +654,7 @@ fi # end if [ "${POSTMORTEM_ONLY}" -eq 0 ]
 echo ""
 echo "--- Step 4: Postmortem (2 hours after last match end) ---"
 NOW_EPOCH=$(date -u +%s)
-if [ "${POSTMORTEM_ONLY}" -eq 0 ] && [ "${NOW_EPOCH}" -lt "${POSTMORTEM_EPOCH}" ]; then
+if [ "${POSTMORTEM_ONLY}" -eq 0 ] && [ "${NOW_EPOCH}" -lt "${POSTMORTEM_EPOCH}" ] && [ "${DATE}" = "$(date -u +%Y-%m-%d)" ]; then
     WAIT_SECONDS=$((POSTMORTEM_EPOCH - NOW_EPOCH))
     log "Waiting until $(format_utc_epoch "${POSTMORTEM_EPOCH}") for final results to settle (${WAIT_SECONDS}s)."
     sleep "${WAIT_SECONDS}"
