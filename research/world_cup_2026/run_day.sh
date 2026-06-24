@@ -254,16 +254,19 @@ AGENT="opencode"
 FALLBACK_AGENT="agy"
 DATE=""
 POSTMORTEM_ONLY=0
+PASS_ARGS=()
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --opencode)
             AGENT="opencode"
             FALLBACK_AGENT="agy"
+            PASS_ARGS+=("--opencode")
             shift
             ;;
         --postmortem)
             POSTMORTEM_ONLY=1
+            PASS_ARGS+=("--postmortem")
             shift
             ;;
         *)
@@ -277,6 +280,40 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# --- Catch-up Check ---
+if [ -z "${DATE}" ]; then
+    log "Checking for missed tournament days to catch up..."
+    LAST_COMPLETED=""
+    if [ -d "${SCRIPT_DIR}/runs" ]; then
+        for d_dir in $(find "${SCRIPT_DIR}/runs" -maxdepth 1 -name "day_*" | sort); do
+            if [ -f "${d_dir}/postmortem.md" ]; then
+                LAST_COMPLETED=$(basename "${d_dir}" | sed 's/day_//')
+            fi
+        done
+    fi
+
+    if [ -n "${LAST_COMPLETED}" ]; then
+        TODAY_UTC=$(date -u +%Y-%m-%d)
+        CURR_DATE="${LAST_COMPLETED}"
+        while true; do
+            NEXT_CATCHUP=$(date -u -d "${CURR_DATE} +1 day" +%Y-%m-%d)
+            if [ "${NEXT_CATCHUP}" = "${TODAY_UTC}" ]; then
+                break
+            fi
+            
+            if [ "$(date -u -d "${NEXT_CATCHUP}" +%s)" -lt "$(date -u -d "${TODAY_UTC}" +%s)" ]; then
+                log ">>> AUTOMATIC CATCH-UP: Running orchestrator for missed day ${NEXT_CATCHUP} <<<"
+                bash "${BASH_SOURCE[0]}" "${PASS_ARGS[@]:-}" "${NEXT_CATCHUP}" || {
+                    log "Warning: Catch-up run for ${NEXT_CATCHUP} failed. Continuing..."
+                }
+                CURR_DATE="${NEXT_CATCHUP}"
+            else
+                break
+            fi
+        done
+    fi
+fi
 
 DATE="${DATE:-$(date -u +%Y-%m-%d)}"
 DAY_DIR="${SCRIPT_DIR}/runs/day_${DATE}"
@@ -612,7 +649,6 @@ else:
         COVERED=$(grep -E '^matches_covered:' "${PREDICTIONS_PATH}" | head -n 1 | cut -d':' -f2 | tr -d ' ' || echo "1")
         if [ "${COVERED}" = "0" ]; then
             log "Prediction skill reports no matches left to cover; skipping further invocations and waiting until all games end at $(format_utc_epoch "${LAST_END_EPOCH}")."
-            local max_interval
             max_interval=$(python3 -c "import json; c=json.load(open('${SCRIPT_DIR}/model_config.json')); print(c.get('max_interval_minutes', 45))" 2>/dev/null || echo "${MAX_INTERVAL_MINS}")
             sleep_until_or_interval_change "${LAST_END_EPOCH}" "${max_interval}"
             break
