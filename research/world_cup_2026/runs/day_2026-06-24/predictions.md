@@ -1,15 +1,15 @@
 ---
 date: "2026-06-24"
-iteration: 10
-last_updated: "2026-06-25T00:08:00Z"
+iteration: 11
+last_updated: "2026-06-25T05:21:00Z"
 matches_covered: 6
-overall_confidence: "Iteration 10: Group C both COMPLETE. SCO 0-3 BRA FT (Vinicius 7', 45'+3', Cunha 60') — Brazil dominant (4.46 xG), Neymar sub 76'. Prediction correct, frozen at Medium. MAR 4-2 HAI FT (OG Bounou 10', Hakimi 39', Isidor 43', Saibari 45'+1', Rahimi 78', Yassine 89') — Morocco broke through in 2H (3.26 xG). Prediction correct, frozen at Medium. Group A both not_started — lineups confirmed. CZE-MEX: Schick/Soucek benched for Czechia, Ochoa/Jimenez/Gimenez benched for Mexico (heavy rotation both sides). RSA-KOR: Son Heung-min ON BENCH for Korea — massive downgrade. Oh Hyeon-gyu leads line. South Africa missing Mokoena (suspended). Predictions unchanged at Low confidence."
+overall_confidence: "Iteration 11: All 6 matches complete. Group A FT results verified: MEX 3-0 CZE (Chávez 55', Quiñones 61', Fidalgo 90+') — prediction correct ✅. RSA 1-0 KOR (Maseko 63') — prediction incorrect ❌. Final tally: 4/6 correct (66.7%). Groups B+C: 4/4 correct. Group A: 0/2 correct. Next interval set to 180 (all matches complete, no further predictions needed for June 24)."
 model: "opencode: deepseek-v4-flash-free"
-next_interval_minutes: 100
-next_difficulty: "medium"
+next_interval_minutes: 180
+next_difficulty: "low"
 ---
 
-# World Cup 2026 Predictions for 2026-06-24 - Iteration 10
+# World Cup 2026 Predictions for 2026-06-24 - Iteration 11
 
 ## 📊 Executive Summary Table
 
@@ -19,8 +19,8 @@ next_difficulty: "medium"
 | Bosnia and Herzegovina vs. Qatar | complete | BOSNIA WIN ✅ | Low | 2026-06-24T19:52:00Z |
 | Scotland vs. Brazil | complete (0-3) | BRAZIL WIN ✅ | Medium | 2026-06-25T00:08:00Z |
 | Morocco vs. Haiti | complete (4-2) | MOROCCO WIN ✅ | Medium | 2026-06-25T00:08:00Z |
-| Czechia vs. Mexico | not_started | MEXICO WIN | Low | 2026-06-25T00:08:00Z |
-| South Africa vs. South Korea | not_started | SOUTH KOREA WIN | Low | 2026-06-25T00:08:00Z |
+| Czechia vs. Mexico | complete (3-0) | MEXICO WIN ✅ | Low | 2026-06-25T05:21:00Z |
+| South Africa vs. South Korea | complete (0-1) | SOUTH KOREA WIN ❌ | Low | 2026-06-25T05:21:00Z |
 
 ---
 
@@ -243,40 +243,32 @@ WHT validated: The ambiguous HT scoreline (2-2) was correctly frozen at Medium. 
 
 ### Match 53: Czechia vs. Mexico
 
-**Status:** not_started
+**Status:** complete (FT: 3-0)
 **Kickoff:** 01:00 UTC (Jun 25) | **Venue:** Estadio Azteca, Mexico City | **Group/Round:** Group A (Matchday 3)
 
-### Prediction: MEXICO WIN
+### Prediction: MEXICO WIN ✅
 **Confidence:** Low
 
 ### Reasoning
-**Confirmed lineups available (Khel Now, cross-referenced).** Both teams have made significant rotations, reflecting their respective positions: Mexico already qualified top of Group A, Czechia eliminated (0 points).
+**FINAL SCORE: Czechia 0-3 Mexico** (AP, NBC News, verified ~05:21 UTC). Goals: Mateo Chávez 55', Julián Quiñones 61', Álvaro Fidalgo 90' (stoppage time). Mexico completed a perfect group stage (3 wins, 0 losses) for the first time in World Cup history.
 
-**Czechia XI (3-4-2-1):** Matej Kovar (GK); Robin Hranac, Tomas Holes, Ladislav Krejci (C); Vladimir Coufal, Michal Sadilek, Lukas Cerv, David Doudera; Denis Visinsky, Pavel Sulc; Adam Hlozek.
+Mexico dominant throughout. Chávez (22, first World Cup) opened scoring in 55th minute; Quiñones scored his second of the tournament six minutes later; Fidalgo added a third in stoppage time. Mexico's rotated XI — Rangel starting GK, Martinez Ayala leading line, no Ochoa/Jimenez/Gimenez — was sufficient against Czechia's even more rotated side (Schick and Soucek both benched). Czechia registered only 2 SOG and were eliminated with 0 points.
 
-**CRITICAL:** Patrik Schick — Czechia's star striker — is DROPPED to the bench. Tomas Soucek (West Ham, midfield anchor) also benched. Adam Hlozek (Bayer Leverkusen) starts as lone striker. This is a massively weakened Czechia XI — their primary goal threat and midfield organizer both absent.
-
-**Mexico XI (4-3-3):** Raul Rangel (GK); Jorge Sanchez, Israel Reyes, Cesar Montes, Luis Gerardo Chavez; Edson Alvarez, Gilberto Mora, Luis Romo; Roberto Alvarado, Martinez Ayala, Julian Quinones.
-
-**CRITICAL:** Guillermo Ochoa, Raul Jimenez, and Santiago Gimenez ALL on the bench — heavy rotation confirmed. Rangel starts in goal. Martinez Ayala (unproven) leads the line. However, Cesar Montes starts (returned from suspension), Edson Alvarez and Luis Romo anchor midfield, Quinones provides attacking threat.
-
-**Analysis:** Both teams rotating heavily. Czechia drops its two best players (Schick, Soucek). Mexico benches star GK and both star strikers. Net impact favors Mexico: (1) Mexico's squad depth substantially greater — second XI still competitive internationally; (2) Czechia depth poor without Schick/Soucek; (3) Estadio Azteca altitude (7,200 ft) regardless of rotation; (4) Mexico keeps defensive anchor Montes and midfield anchor Alvarez.
-
-Prediction maintained at MEXICO WIN, Low. Rotation makes this lower-confidence but Mexico's structural advantages (home, altitude, depth) still favor them.
+WHT not applicable — match started after Iteration 10 ended. Prediction (MEXICO WIN, Low) correct. Mexico's squad depth, home advantage, and altitude (7,200 ft) overcame heavy rotation. Gilberto Mora (17) became youngest Mexico WC starter.
 
 ### Key Factors
-- [strong] Khel Now: **Czechia CONFIRMED XI** — Schick DROPPED (bench), Soucek benched, Hlozek lone ST
-- [strong] Khel Now: **Mexico CONFIRMED XI** — Ochoa/Jimenez/Gimenez all benched, Rangel starts GK, Martinez Ayala ST
-- [strong] Cesar Montes STARTS — returns from suspension, defensive anchor
-- [strong] Edson Alvarez STARTS — midfield anchor
-- [strong] Estadio Azteca (7,200 ft) — altitude advantage regardless of rotation
-- [risk] Mexico heavy rotation weakens attack — Martinez Ayala unproven
-- [risk] Mexico already qualified top — motivation question
-- [risk] Neither team has advancement incentive (dead rubber)
+- [strong] AP (June 25): **FT: CZE 0-3 MEX** — Chávez 55', Quiñones 61', Fidalgo 90'
+- [strong] NBC News: Mexico "3-0 win over Czechia" — perfect group stage
+- [strong] Mexico 62% possession, 8 SOG vs Czechia 2 SOG
+- [strong] **Heavy rotation validated**: Mexico bench (Ochoa, Jimenez, Gimenez) unused. Rangel clean sheet.
+- [strong] **Schick/Soucek bench**: Czechia without both stars created no attacking threat
+- [strong] Gilberto Mora (17) — youngest Mexico WC starter
+- [pass] WHT: Not applicable (match post-Iteration 10). Prediction held.
 
 ### Evidence Gathered This Iteration
-- [strong] Khel Now (Jun 25, ~00:00 UTC): **Czechia CONFIRMED XI** — Kovar; Hranac, Holes, Krejci (C); Coufal, Sadilek, Cerv, Doudera; Visinsky, Sulc; Hlozek. 3-4-2-1. Schick/Soucek on bench.
-- [strong] Khel Now (Jun 25, ~00:00 UTC): **Mexico CONFIRMED XI** — Rangel; Sanchez, Reyes, Montes, Chavez; E. Alvarez, Mora, Romo; Alvarado, Martinez Ayala, Quinones. 4-3-3. Ochoa/Jimenez/Gimenez on bench.
+- [strong] AP News (June 25): **CZE 0-3 MEX FT** — Chávez 55', Quiñones 61', Fidalgo 90'
+- [strong] NBC News (June 25): Confirms 3-0 scoreline, Mexico perfect group stage
+- [strong] beIN Sports: All goals video confirmed
 
 ### Search History
 - **Iteration 1**: `World Cup 2026 June 24 Czechia vs Mexico preview injuries odds`, `Czechia vs Mexico injury suspension list predicted XIs`
@@ -284,53 +276,51 @@ Prediction maintained at MEXICO WIN, Low. Rotation makes this lower-confidence b
 - **Iteration 5**: `Mexico Czechia World Cup 2026 June 24 rotation latest lineup news`
 - **Iteration 6**: (no searches — lineup gate not yet open)
 - **Iteration 10**: `Czechia Mexico confirmed lineup World Cup June 25 2026`
+- **Iteration 11**: `Mexico Czechia 3-0 goalscorers World Cup 2026 June 24`
 
 ### Questions for Next Iteration
-1. LIVE MATCH (~01:50 UTC): Halftime score — apply WHT. Does Mexico's rotated attack create chances?
-2. LIVE MATCH: Does Czechia's youth XI hold up against Mexico's second-string?
-3. Clinical Finishing Check PASS? Verify Mexico's tournament shot conversion rate.
+- (Match complete — no active questions)
 
 ### Prediction Changes
-- **Previous prediction (Iteration 9):** MEXICO WIN (Low)
-- **Change:** Prediction unchanged (MEXICO WIN, Low). Heavy rotation from both teams. Schick/Soucek bench for Czechia is more impactful than Mexico's rotation (Czechia less depth). Mexico's squad depth, home, altitude sustain prediction.
+- **Previous prediction (Iteration 10):** MEXICO WIN (Low)
+- **Final result:** CZECHIA 0-3 MEXICO ✅ **Prediction correct.** Mexico's rotated squad handled Czechia's even more rotated squad. Chávez 55', Quiñones 61', Fidalgo 90'. Mexico perfect group stage. Low confidence was appropriate — rotation created genuine uncertainty but Mexico's structural advantages (depth, home, altitude) prevailed.
+- **Audit note:** Low confidence was appropriate given heavy rotation both sides. Prediction relied on Mexico's depth advantage over Czechia — validated. Schick/Soucek absence more impactful than Ochoa/Jimenez/Gimenez absence.
 
 ---
 
 ### Match 54: South Africa vs. South Korea
 
-**Status:** not_started
+**Status:** complete (FT: 1-0)
 **Kickoff:** 01:00 UTC (Jun 25) | **Venue:** Estadio BBVA, Monterrey | **Group/Round:** Group A (Matchday 3)
 
-### Prediction: SOUTH KOREA WIN
+### Prediction: SOUTH KOREA WIN ❌
 **Confidence:** Low
 
 ### Reasoning
-**Confirmed lineups available (Khel Now, Soccer Laduma, cross-referenced).**
+**FINAL SCORE: South Africa 1-0 South Korea** (The Athletic, FIFA.com, GMA News, verified ~05:21 UTC). Goal: Thapelo Maseko 63'. South Africa's win eliminated South Korea from the tournament while keeping RSA's knockout hopes alive.
 
-**South Korea XI (3-4-2-1):** Kim Seung-gyu (GK); Lee Han-beom, Kim Min-jae (C), Lee Gi-hyuk; Seol Young-woo, Hwang In-beom, Paik Seung-ho, Lee Tae-seok; Lee Kang-in, Hwang Hee-chan; Oh Hyeon-gyu.
+**PREDICTION INCORRECT.** Root causes:
+1. **Motivation asymmetry underestimated**: South Africa needed a win to advance (must-win). Korea needed only a draw — created conservatism that negated quality advantage.
+2. **Son benching correctly identified as massive downgrade** but I still favored Korea based on squad depth. Without Son starting, Korea lacked creative incision against motivated RSA defense.
+3. **Maseko 63'**: South Africa's goal came from quality that Korea's rotated defense couldn't handle.
+4. **Son subbed on but couldn't change game**: Korea's best player entered as sub but couldn't unlock RSA's defense — pressure of needing to chase while initially set up conservatively.
+5. **Sithole return effective**: South Africa's midfield with Sithole, Mbatha, Mofokeng performed well.
 
-**CRITICAL:** Son Heung-min (captain, all-time leading scorer, primary attacking threat) is ON THE BENCH. This is a MASSIVE downgrade to South Korea's attacking capability. Oh Hyeon-gyu (2 tournament goals) starts as lone striker. Lee Kang-in (PSG) and Hwang Hee-chan (Wolves) support from attacking midfield. Kim Min-jae captains.
-
-**South Africa XI (4-3-3):** Ronwen Williams (c); Khuliso Mudau, Ime Okon, Mbekezeli Mbokazi, Aubrey Modiba; Thalente Mbatha, Sphephelo Sithole, Relebohile Mofokeng; Thapelo Maseko, Evidence Makgopa, Oswin Appollis.
-
-South Africa missing Mokoena (yellow card accumulation — scored penalty equalizer vs Mexico) and Zwane (3-match ban). Sithole returns from suspension as expected.
-
-**Analysis:** Son's benching is the headline story. Without him starting, Korea's primary creative force and goal threat unavailable from start. However: (1) Korea still has quality in Lee Kang-in, Hwang Hee-chan, Hwang In-beom; (2) Kim Min-jae anchors defense (Bayern quality); (3) Son available as second-half sub — potentially decisive; (4) South Africa's midfield weakened without Mokoena; (5) Korea needs only draw to advance — possible conservatism.
-
-Prediction maintained at SOUTH KOREA WIN, Low. Son's benching is significant downgrade but Korea's overall squad quality and South Africa's absences maintain directional prediction.
+South Africa deserved the win. Korea created limited chances and couldn't find an equalizer. This elimination is a massive disappointment for Korean football.
 
 ### Key Factors
-- [strong] Khel Now: **South Korea CONFIRMED XI** — Son Heung-min ON BENCH, Oh Hyeon-gyu ST, Kim Min-jae (C)
-- [strong] Soccer Laduma: **South Africa CONFIRMED XI** — Williams (C); Mudau, Okon, Mbokazi, Modiba; Mbatha, Sithole, Mofokeng; Maseko, Makgopa, Appollis. 4-3-3.
-- [strong] **Son on bench** — massive downgrade to Korea's attacking capability
-- [strong] **Mokoena OUT for RSA** — suspension, scored penalty equalizer vs Mexico
-- [strong] **Sithole returns for RSA** — back from suspension, midfield reinforcement
-- [risk] Korea needs only draw — potential conservatism
-- [risk] Son available as second-half sub — could be decisive
+- [strong] The Athletic (June 25): **FT: RSA 1-0 KOR** — Maseko 63'. "South Africa beat South Korea 1-0."
+- [strong] FIFA.com (June 25): Confirms 1-0 result. South Africa stays alive, Korea eliminated.
+- [strong] GMA News (June 25): "Thapelo Maseko 63' goal lifted South Africa to a must-win 1-0 result."
+- [strong] **Motivation asymmetry**: RSA must-win vs KOR draw-sufficient — critical factor I underestimated
+- [strong] **Son on bench**: Correctly identified but failed to weigh dead-rubber mindset impact
+- [strong] **Korea eliminated** — Group A bottom with 1 point
+- [fail] **Prediction incorrect** — underestimated RSA's desperation and KOR's conservatism
 
 ### Evidence Gathered This Iteration
-- [strong] Khel Now (Jun 25, ~00:00 UTC): **South Korea CONFIRMED XI** — Kim Seung-gyu; Lee Han-beom, Kim Min-jae (C), Lee Gi-hyuk; Seol Young-woo, Hwang In-beom, Paik Seung-ho, Lee Tae-seok; Lee Kang-in, Hwang Hee-chan; Oh Hyeon-gyu. 3-4-2-1.
-- [strong] Soccer Laduma (Jun 25, ~00:00 UTC): **South Africa CONFIRMED XI** — Williams; Mudau, Okon, Mbokazi, Modiba; Mbatha, Sithole, Mofokeng; Maseko, Makgopa, Appollis. 4-3-3.
+- [strong] The Athletic (June 25): South Africa 1-0 South Korea FT — Maseko 63' winner
+- [strong] FIFA.com: Official result confirmed
+- [strong] NBC News: "South Africa, Switzerland, Bosnia-Herzegovina, Morocco and Brazil were all victorious"
 
 ### Search History
 - **Iteration 1**: `World Cup 2026 June 24 South Africa vs South Korea preview injuries odds`, `South Africa vs South Korea injury suspension list predicted XIs`
@@ -338,12 +328,12 @@ Prediction maintained at SOUTH KOREA WIN, Low. Son's benching is significant dow
 - **Iteration 5**: `World Cup 2026 June 24 betting odds movement Switzerland Canada Brazil`
 - **Iteration 6**: (no searches — lineup gate not yet open)
 - **Iteration 10**: `South Africa South Korea confirmed lineup World Cup June 25 2026`
+- **Iteration 11**: `South Africa South Korea result World Cup June 24 2026 FT score`
 
 ### Questions for Next Iteration
-1. LIVE MATCH (~01:50 UTC): Halftime score — apply WHT. Does Son enter as sub?
-2. LIVE MATCH: How does Korea's attack function without Son starting?
-3. Clinical Finishing Check PASS? Verify Korea's tournament shot conversion rate.
+- (Match complete — no active questions)
 
 ### Prediction Changes
-- **Previous prediction (Iteration 9):** SOUTH KOREA WIN (Low)
-- **Change:** Prediction unchanged (SOUTH KOREA WIN, Low). Son's benching significant but Korea's quality depth and RSA's absences maintain directional prediction. Low confidence even more appropriate now.
+- **Previous prediction (Iteration 10):** SOUTH KOREA WIN (Low)
+- **Final result:** SOUTH AFRICA 1-0 SOUTH KOREA ❌ **Prediction incorrect.**
+- **Audit note:** This was a structural miss — not lack of data but failure to weigh motivation asymmetry. Dead-rubber dynamic (RSA must-win, KOR draw-sufficient) should have been given more weight. In future dead rubber predictions: (1) check both teams' advancement scenarios and compute motivation delta; (2) if one team must-win and opponent only needs draw, reduce confidence by at least one tier; (3) Son benching + dead rubber = stronger case for downgrade than applied.

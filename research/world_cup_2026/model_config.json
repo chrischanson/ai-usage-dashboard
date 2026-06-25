@@ -1,5 +1,5 @@
 {
-  "min_interval_minutes": 60,
+  "min_interval_minutes": 30,
   "max_interval_minutes": 180,
   "default_interval_minutes": 60,
   "high": {

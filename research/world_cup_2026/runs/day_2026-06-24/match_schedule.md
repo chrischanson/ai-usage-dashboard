@@ -2,87 +2,56 @@
 date: "2026-06-24"
 match_count: 6
 tournament_phase: "Group Stage (Matchday 3)"
-generated_at: "2026-06-24T05:14:32Z"
+generated_at: "2026-06-24T05:14:00Z"
 ---
 
 # 📅 World Cup 2026 — Match Schedule for 2026-06-24
 
 ## Today's Matches
 
-*All groups' final matchday fixtures kick off simultaneously to ensure competitive fairness.*
-
 | # | Kickoff (UTC) | Match | Venue | Group/Round |
 |:--|:--------------|:------|:------|:------------|
-| 51 | 19:00 | Switzerland vs Canada | BC Place, Vancouver | Group B |
-| 52 | 19:00 | Bosnia and Herzegovina vs Qatar | Lumen Field, Seattle | Group B |
-| 49 | 22:00 | Scotland vs Brazil | Hard Rock Stadium, Miami Gardens | Group C |
-| 50 | 22:00 | Morocco vs Haiti | Mercedes-Benz Stadium, Atlanta | Group C |
-| 53 | 01:00* | Czechia vs Mexico | Estadio Azteca, Mexico City | Group A |
-| 54 | 01:00* | South Africa vs South Korea | Estadio BBVA, Monterrey | Group A |
-
-*\*01:00 UTC = 25 June 2026 (late-night slot)*
-
-## Group Standings (Before Today)
-
-### Group A
-| Pos | Team | Pld | W | D | L | GD | Pts |
-|:----|:-----|:---|:--|:--|:--|:---|:----|
-| 1 | Mexico | 2 | 2 | 0 | 0 | +3 | 6 |
-| 2 | South Korea | 2 | 1 | 0 | 1 | 0 | 3 |
-| 3 | Czechia | 2 | 0 | 1 | 1 | -1 | 1 |
-| 4 | South Africa | 2 | 0 | 1 | 1 | -2 | 1 |
-
-### Group B
-| Pos | Team | Pld | W | D | L | GD | Pts |
-|:----|:-----|:---|:--|:--|:--|:---|:----|
-| 1 | Canada | 2 | 1 | 1 | 0 | +6 | 4 |
-| 2 | Switzerland | 2 | 1 | 1 | 0 | +3 | 4 |
-| 3 | Bosnia and Herzegovina | 2 | 0 | 1 | 1 | -3 | 1 |
-| 4 | Qatar | 2 | 0 | 1 | 1 | -6 | 1 |
-
-### Group C
-| Pos | Team | Pld | W | D | L | GD | Pts |
-|:----|:-----|:---|:--|:--|:--|:---|:----|
-| 1 | Brazil | 2 | 1 | 1 | 0 | +3 | 4 |
-| 2 | Morocco | 2 | 1 | 1 | 0 | +1 | 4 |
-| 3 | Scotland | 2 | 1 | 0 | 1 | 0 | 3 |
-| 4 | Haiti | 2 | 0 | 0 | 2 | -4 | 0 |
+| 51 | 19:00 UTC | Switzerland vs. Canada | BC Place, Vancouver | Group B |
+| 52 | 19:00 UTC | Bosnia and Herzegovina vs. Qatar | Lumen Field, Seattle | Group B |
+| 49 | 22:00 UTC | Scotland vs. Brazil | Hard Rock Stadium, Miami Gardens | Group C |
+| 50 | 22:00 UTC | Morocco vs. Haiti | Mercedes-Benz Stadium, Atlanta | Group C |
+| 53 | 01:00 UTC (Jun 25) | Czechia vs. Mexico | Estadio Azteca, Mexico City | Group A |
+| 54 | 01:00 UTC (Jun 25) | South Africa vs. South Korea | Estadio BBVA, Monterrey | Group A |
 
 ## Historical Context
 
-Prior predictions involving today's teams (from prediction_tracker.md):
+### Group A
+- **Mexico**: Predicted MEXICO WIN vs South Africa (Jun 11, opening match) — ✅ correct. Predicted MEXICO WIN (Low) vs South Korea (Jun 18) — ✅ correct. Mexico already qualified top of Group A (6 pts, +4 GD).
+- **South Korea**: Beat Czechia 2-1 (Jun 11), lost to Mexico 2-0 (Jun 18). Currently 3 pts, +1 GD. Needs at least a draw to advance.
+- **South Africa**: Lost 2-0 to Mexico (Jun 11), beat Czechia 2-0 (Jun 18). Currently 3 pts, 0 GD. Needs a win to advance.
+- **Czechia**: Lost 2-1 to South Korea (Jun 11), lost 2-0 to South Africa (Jun 18). 0 pts, eliminated.
 
-- **Switzerland**: Predicted SWITZERLAND WIN (Medium) vs Bosnia (Jun 18), correct ✅. Overall: 1/1.
-- **Canada**: Predicted CANADA WIN (Medium) vs Qatar (Jun 18), correct ✅. Overall: 1/1.
-- **Scotland**: Predicted SCOTLAND WIN (Medium) vs Haiti (Jun 14), correct ✅. Predicted DRAW (Low) vs Morocco (Jun 19), actual MOROCCO WIN ❌. Overall: 1/2.
-- **Brazil**: Predicted BRAZIL WIN (High) vs Haiti (Jun 19), correct ✅. Overall: 1/1.
-- **Morocco**: Not directly predicted as winner; predicted DRAW (Low) vs Scotland (Jun 19), actual MOROCCO WIN ❌.
-- **Haiti**: Not predicted as winner in either appearance (vs Scotland loss, vs Brazil loss — both correctly predicted as losses for Haiti).
-- **Bosnia, Qatar, Czechia, Mexico, South Africa, South Korea**: No direct winner predictions in prior matches.
+### Group B
+- **Switzerland**: Predicted SWITZERLAND WIN (Med) vs Bosnia (Jun 18) — ✅ correct. Currently 4 pts, +2 GD. Draw clinches advancement.
+- **Canada**: Drew Bosnia 1-1 (Jun 12), beat Qatar 1-0 (Jun 18). Currently 4 pts, +1 GD. Draw clinches advancement.
+- **Bosnia and Herzegovina**: Drew Canada 1-1 (Jun 12), lost to Switzerland 0-2 (Jun 18). Currently 1 pt, eliminated with a loss.
+- **Qatar**: Drew Switzerland 1-1 (Jun 13), lost to Canada 1-0 (Jun 18). Currently 1 pt, eliminated with a loss.
 
-**Key Heuristics That Apply Today:**
+### Group C
+- **Brazil**: Predicted BRAZIL WIN (High) vs Haiti (Jun 19) — ✅ correct. Predicted BRAZIL WIN (High, frozen) vs Morocco (Jun 13) — ❌ (0-0 → Morocco equalized). Currently 4 pts, +5 GD. Win clinches top spot.
+- **Scotland**: Predicted SCOTLAND WIN (Medium) vs Haiti (Jun 14) — ✅ correct. Predicted DRAW (Low) vs Morocco (Jun 19) — ❌ (lost 0-1). Currently 3 pts, -1 GD. Needs win vs Brazil likely.
+- **Morocco**: Drew Brazil 1-1 (Jun 13), beat Scotland 1-0 (Jun 19). Currently 4 pts, +1 GD. Needs at least a draw to advance.
+- **Haiti**: Lost 0-1 to Scotland (Jun 14), lost 0-6 to Brazil (Jun 19). Currently 0 pts, -7 GD, eliminated.
 
-1. **Temporary Grass Pitch Heuristic**: BC Place (Vancouver) and Lumen Field (Seattle) have temporary grass. Possession-heavy technical teams (Switzerland) may struggle. However, Canada is at home at BC Place, which may mitigate.
-2. **Host-Nation Home Advantage**: Canada plays at BC Place (Vancouver); Mexico plays at Estadio Azteca (Mexico City). Both have shown strong home resilience (Canada 6-0 vs Qatar, Mexico 1-0 vs South Korea).
-3. **Clinical Finishing Compliance Gate**: Scotland had 1 goal from 10 shots vs Morocco (Jun 19) — finishing efficiency needs checking before assigning Medium/High confidence.
-4. **Set-Piece Advantage Check**: Mexico has aerial/physical threats and set-piece takers, playing at altitude in Mexico City — relevant for Czechia vs Mexico.
-5. **Must-Win Scenarios**: Scotland (3 pts, must beat Brazil to have best chance), Czechia (1 pt, must beat Mexico), South Africa (1 pt, must beat South Korea). These are elimination-threatened teams.
+### Key Lessons from Prior Matchdays
+- **Temporary Grass Pitch Heuristic**: Multiple Group B/C stadiums (BC Place, Lumen Field, Mercedes-Benz, Hard Rock) use temporary grass — applies varying discounts based on playing style. Climate-control (closed roof) waives the discount.
+- **Clinical Finishing Compliance Gate**: Mandatory pre-Matchday 3 check of each team's goals-vs-shots ratio before assigning Medium+ confidence.
+- **Weighted Halftime Rule**: Active monitoring required for all Medium+ confidence matches. Halftime checks at ~19:50 UTC (Group B) and ~22:50 UTC (Group C), then ~01:50 UTC Jun 25 (Group A).
+- **Lineup Gate Timing**: Official XIs released ~60 min before kickoff — Group B at ~18:00 UTC, Group C at ~21:00 UTC, Group A at ~00:00 UTC Jun 25.
 
 ## Match Windows
 
-| Event | Time (UTC) |
-|:------|:-----------|
-| First match kickoff | 19:00 UTC |
-| Group B matches estimated halftime | ~19:50 UTC |
-| Group B matches estimated end | ~20:50 UTC |
-| Group C matches kickoff | 22:00 UTC |
-| Group C matches estimated halftime | ~22:50 UTC |
-| Group C matches estimated end | ~23:50 UTC |
-| Group A matches kickoff | 01:00 UTC (Jun 25) |
-| Group A matches estimated halftime | ~01:50 UTC (Jun 25) |
-| Last match estimated end | ~02:50 UTC (Jun 25) |
-| **Prediction/analysis loop window** | **19:00 UTC to 02:50 UTC (Jun 25)** |
-| **Postmortem target time** | **04:50 UTC (Jun 25)** *(2h after last match ends)* |
+- **First match kickoff**: 19:00 UTC
+- **Last match kickoff**: 01:00 UTC (Jun 25)
+- **Last match estimated halftime**: ~01:50 UTC (Jun 25)
+- **Last match estimated end**: ~02:50 UTC (Jun 25)
+- **Prediction/analysis loop window**: 17:45 UTC (lineup gate opens for Group B) to 02:50 UTC Jun 25 (last match ends)
+- **Postmortem target time**: 04:50 UTC Jun 25 (2h after last match ends)
 
 ## Match Timing Data
 
