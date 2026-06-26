@@ -27,6 +27,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Source for auto-discovery.",
     )
     parser.add_argument("--race-id", type=str, help="Update only the specified race ID.")
+    parser.add_argument(
+        "--plan", action="store_true",
+        help="Plan mode: Output what updates and resolutions will be performed, without executing them or modifying the database.",
+    )
     return parser
 
 
@@ -46,7 +50,7 @@ def _days_until(date_str: str | None) -> float | None:
         return None
 
 
-def _needs_refresh(result: RaceResult) -> bool:
+def _get_refresh_reason(result: RaceResult) -> str | None:
     # If the event year is in the past, it never needs refresh
     current_year = datetime.now(timezone.utc).year
     event_year = None
@@ -57,38 +61,45 @@ def _needs_refresh(result: RaceResult) -> bool:
             pass
             
     if event_year and event_year < current_year:
-        return False
+        return None
         
     # Check if event date is soon (within 90 days)
     event_days = _days_until(result.event_date)
     if event_days is not None and event_days < 0:
-        return False
+        return None
         
-    event_soon = event_days is not None and 0 <= event_days <= 90
-    
+    if event_days is not None and 0 <= event_days <= 90:
+        return f"Event date ({result.event_date}) is soon (within {int(event_days)} days)"
+        
     # Check if any registration window deadline is soon
-    window_days = [_days_until(w.close_date) for w in result.registration_windows]
-    window_soon = any(d is not None and 0 <= d <= 90 for d in window_days)
-    
-    milestone_soon = event_soon or window_soon
-    
+    for w in result.registration_windows:
+        d = _days_until(w.close_date)
+        if d is not None and 0 <= d <= 90:
+            return f"Registration window '{w.description or w.window_type}' deadline is soon (within {int(d)} days)"
+            
     # Incomplete data: event is in the future/TBD but we have no registration windows
-    missing_milestones = (
-        (event_days is None or event_days > 0)
-        and len(result.registration_windows) == 0
-    )
-    
+    if (event_days is None or event_days > 0) and len(result.registration_windows) == 0:
+        return "Event has no registration windows configured"
+        
+    # Stale check
     if not result.extracted_at or result.extraction_method == "carried-over":
-        stale = True
-    else:
-        try:
-            extracted = datetime.fromisoformat(result.extracted_at)
-            if extracted.tzinfo is None:
-                extracted = extracted.replace(tzinfo=timezone.utc)
-            stale = (_now() - extracted).total_seconds() > 30 * 86400
-        except (ValueError, TypeError):
-            stale = True
-    return milestone_soon or missing_milestones or stale
+        return "No previous extraction history or carried-over status"
+        
+    try:
+        extracted = datetime.fromisoformat(result.extracted_at)
+        if extracted.tzinfo is None:
+            extracted = extracted.replace(tzinfo=timezone.utc)
+        diff_days = (_now() - extracted).total_seconds() / 86400
+        if diff_days > 30:
+            return f"Data is stale (last extracted {int(diff_days)} days ago)"
+    except (ValueError, TypeError):
+        return "Invalid last extraction timestamp"
+        
+    return None
+
+
+def _needs_refresh(result: RaceResult) -> bool:
+    return _get_refresh_reason(result) is not None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -116,7 +127,9 @@ def main(argv: list[str] | None = None) -> int:
     races = merge_races(curated, discovered, previous=previous)
 
     # Resolve missing official URLs for races using LLM
-    if not no_network:
+    races_to_resolve = [r for r in races if not r.official_url or r.official_url == ""]
+
+    if not no_network and not args.plan:
         from .llm import resolve_official_url
         import dataclasses
         resolved_races = []
@@ -142,7 +155,7 @@ def main(argv: list[str] | None = None) -> int:
         discovered = resolved_discovered
 
     new_discoveries = [d for d in discovered if (d.id, d.distance) not in curated_map]
-    if new_discoveries and not no_network:
+    if new_discoveries and not no_network and not args.plan:
         save_races(new_discoveries, args.db)
 
     if args.limit:
@@ -156,6 +169,7 @@ def main(argv: list[str] | None = None) -> int:
     results: list[RaceResult] = []
     refresh_count = 0
     carry_count = 0
+    planned_refreshes = []
 
     current_year = today.year
 
@@ -190,16 +204,19 @@ def main(argv: list[str] | None = None) -> int:
                 result.event_date = prev.event_date
                 result.registration_windows = list(prev.registration_windows)
 
-                needs = True if args.race_id else (_needs_refresh(result) if not no_network else False)
+                if args.race_id:
+                    needs = (race.id == args.race_id)
+                else:
+                    needs = (_needs_refresh(result) if not no_network else False)
 
                 if needs:
                     result.status = "active"
                     refresh_count += 1
+                    reason = _get_refresh_reason(result) or "Targeted update via --race-id"
+                    planned_refreshes.append((race, result, reason))
                 else:
-                    if result.status not in ("active", "stale", "carried-over"):
-                        result.status = "carried-over"
-                    if result.extraction_method not in ("llm", "regex", "seed"):
-                        result.extraction_method = "carried-over"
+                    result.status = "carried-over"
+                    result.extraction_method = "carried-over"
                     carry_count += 1
 
                 results.append(result)
@@ -207,11 +224,16 @@ def main(argv: list[str] | None = None) -> int:
         # Seed a new event if none exists, or if only past events exist
         if not has_current_or_future:
             result = RaceResult.from_race(race, distance=race.distance)
-            needs = True if args.race_id else (_needs_refresh(result) if not no_network else False)
+            if args.race_id:
+                needs = (race.id == args.race_id)
+            else:
+                needs = (_needs_refresh(result) if not no_network else False)
 
             if needs:
                 result.status = "active"
                 refresh_count += 1
+                reason = _get_refresh_reason(result) or "New event / no current history"
+                planned_refreshes.append((race, result, reason))
             else:
                 result.status = "carried-over"
                 result.extraction_method = "carried-over"
@@ -219,9 +241,34 @@ def main(argv: list[str] | None = None) -> int:
 
             results.append(result)
 
+    if args.plan:
+        print("\n=== MARATHON TRACKER UPDATE PLAN ===")
+        print(f"Races loaded: {len(curated)} curated, {len(discovered)} discovered, {len(races)} total")
+        print("\n[URL Resolutions]")
+        if races_to_resolve:
+            for r in races_to_resolve:
+                print(f"  - Would resolve official URL for: {r.name} ({r.distance})")
+        else:
+            print("  - No missing URLs to resolve.")
+
+        print("\n[Planned Refreshes]")
+        if planned_refreshes:
+            for race, result, reason in planned_refreshes:
+                date_label = result.event_date if result.event_date else "TBD"
+                print(f"  - Would refresh: {race.name} ({race.distance}) ({date_label})")
+                print(f"    Reason: {reason}")
+        else:
+            print("  - No events scheduled for refresh.")
+
+        print("\n[Carried Over]")
+        print(f"  - {carry_count} events would be carried over without modifications.")
+        print("====================================\n")
+        return 0
+
     print(f"phase-b: {refresh_count} to refresh, {carry_count} carried over")
 
     # ── Phase C: Refresh ────────────────────────────────────────────
+    refreshed_results = []
     if not no_network:
         for result in results:
             if result.status != "active":
@@ -289,9 +336,31 @@ def main(argv: list[str] | None = None) -> int:
             if fresh.source_url and not result.source_url:
                 result.source_url = fresh.source_url
             result.extracted_at = today.isoformat(timespec="seconds")
+            refreshed_results.append(result)
 
     refreshed = sum(1 for r in results if r.extraction_method not in ("carried-over",))
     print(f"phase-c: {refreshed} refreshed, {carry_count} carried over")
+
+    if refreshed_results:
+        print("\n=== MARATHON TRACKER UPDATE SUMMARY ===")
+        for r in refreshed_results:
+            date_label = r.event_date if r.event_date else "TBD"
+            print(f"- [REFRESHED] {r.name} ({r.distance})")
+            print(f"  Event Date:   {date_label}")
+            print(f"  Official URL: {r.official_url}")
+            if r.registration_windows:
+                print("  Registration Windows:")
+                for w in r.registration_windows:
+                    desc = w.description or w.window_type.replace("-", " ").title()
+                    dates = f"{w.open_date or 'TBD'} to {w.close_date or 'TBD'}"
+                    print(f"    * {desc}: {dates}")
+            else:
+                print("  Registration Windows: None found")
+            print(f"  Confidence:   {r.confidence}")
+            if r.notes:
+                print(f"  Notes:        {r.notes}")
+            print()
+        print("=======================================\n")
 
     from .config import save_race_results
     save_race_results(results)

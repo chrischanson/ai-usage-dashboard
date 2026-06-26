@@ -13,11 +13,6 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-# Verify LLM_API_KEY is available
-if [ -z "$LLM_API_KEY" ]; then
-  echo "WARNING: LLM_API_KEY is not set. The LLM extraction step may fail or bypass data." >&2
-  echo "Please export LLM_API_KEY before running this script, or pass it inline." >&2
-fi
 
 # Change directory to repo root so python can locate the module correctly
 cd "$REPO_ROOT"

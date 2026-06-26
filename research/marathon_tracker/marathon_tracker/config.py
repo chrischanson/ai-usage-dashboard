@@ -206,14 +206,22 @@ def save_races(races: list[Race], path: Path = DEFAULT_DB) -> None:
             cursor.execute("SELECT id FROM race_official_urls WHERE url = ?", (race.official_url,))
             official_url_id = cursor.fetchone()["id"]
             
-            # 4. Insert into race_races referencing location and URL ID
-            cursor.execute(
-                """
-                INSERT OR IGNORE INTO race_races (id, name, location_id, official_url_id)
-                VALUES (?, ?, ?, ?)
-                """,
-                (race.id, race.name, location_id, official_url_id)
-            )
+            # 4. Insert or update race_races referencing location and URL ID
+            cursor.execute("SELECT official_url_id FROM race_races WHERE id = ?", (race.id,))
+            row = cursor.fetchone()
+            if row:
+                cursor.execute(
+                    "UPDATE race_races SET official_url_id = ? WHERE id = ?",
+                    (official_url_id, race.id)
+                )
+            else:
+                cursor.execute(
+                    """
+                    INSERT INTO race_races (id, name, location_id, official_url_id)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (race.id, race.name, location_id, official_url_id)
+                )
 
             # 5. Insert into race_offerings
             cursor.execute(
@@ -250,10 +258,18 @@ def save_race_results(results: list[RaceResult], path: Path = DEFAULT_DB) -> Non
         cursor.execute("SELECT id FROM race_official_urls WHERE url=?", (result.official_url,))
         official_url_id = cursor.fetchone()["id"]
 
-        cursor.execute(
-            "INSERT OR IGNORE INTO race_races (id, name, location_id, official_url_id) VALUES (?, ?, ?, ?)",
-            (result.id, result.name, location_id, official_url_id)
-        )
+        cursor.execute("SELECT official_url_id FROM race_races WHERE id = ?", (result.id,))
+        row = cursor.fetchone()
+        if row:
+            cursor.execute(
+                "UPDATE race_races SET official_url_id = ? WHERE id = ?",
+                (official_url_id, result.id)
+            )
+        else:
+            cursor.execute(
+                "INSERT INTO race_races (id, name, location_id, official_url_id) VALUES (?, ?, ?, ?)",
+                (result.id, result.name, location_id, official_url_id)
+            )
 
         cursor.execute(
             "INSERT OR IGNORE INTO race_offerings (race_id, distance) VALUES (?, ?)",
