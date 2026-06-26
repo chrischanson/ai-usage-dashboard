@@ -1,5 +1,50 @@
 # 📝 World Cup 2026 Prediction Changelog — 2026-06-25
 
+## Iteration 11 - 2026-06-26T03:55:00Z
+**Model Used:** opencode: deepseek-v4-flash-free
+**Next Interval:** 180 minutes
+**Tokens:** [injected post-execution by orchestrator]
+
+**Tokens:** 0 input + 0 output = 0 total
+### Eligible Matches
+- Curaçao vs. Côte d'Ivoire: complete ✅
+- Ecuador vs. Germany: complete ❌
+- Japan vs. Sweden: complete ❌
+- Tunisia vs. Netherlands: complete ✅
+- Türkiye vs. USA: complete (FT: 2-2) ❌
+- Paraguay vs. Australia: complete (FT: 0-0) ✅
+
+### Changes
+- TUR-USA: Marked complete (FT 2-2). Prediction ❌ incorrect (USA WIN → actual DRAW). USA equalized through Berhalter (57') after trailing 2-1 at HT. Pulisic's HT introduction sparked the comeback. Final prediction: USA WIN / Low — incorrect.
+- PAR-AUS: Marked complete (FT 0-0). Prediction ✅ correct (DRAW / Low). Most defensive match of the day: total xG 0.49. Australia had more chances in the second half but Gill held firm.
+- Postmortem written to `skills/runs/run_20260626_033500_wc_postmortem/postmortem.md`.
+
+### Search Queries Executed
+- TUR-USA FT: `Turkey 2-2 USA full time World Cup 2026 June 25 final`, `Turkiye USA fotmob match events full time 2-2`
+- PAR-AUS FT: `Paraguay 0-0 Australia full time World Cup 2026`
+
+### New Evidence
+- TUR-USA: [strong] [BBC Sport / FWC Times] FT 2-2. Goals: Trusty 3', Berhalter 57' (USA); Güler 10', Kökçü 31' (TUR). USA equalized in the second half after Pulisic's HT introduction.
+- TUR-USA: [strong] [The Sun 2026-06-26 04:20 updated] "Berhalter's sublime strike puts Americans back on level terms." Confirms 2-2 score.
+- PAR-AUS: [strong] [BBC Sport final fixtures summary] "Final fixtures in Group D: Paraguay 0-0 Australia & USA 2-2 Turkey."
+- PAR-AUS: [strong] [FotMob] FT 0-0. Total xG: PAR 0.12 - AUS 0.37. Shots 4-9. Australia dominated chances but couldn't score.
+- CIV-CUR: [strong] Final verified: Curaçao 0-1 Côte d'Ivoire ✅
+- ECU-GER: [strong] [official] Final verified: Ecuador 2-1 Germany ❌
+- JPN-SWE: [strong] [official] Final verified: Japan 1-1 Sweden ❌
+- TUN-NED: [strong] [official] Final verified: Tunisia 0-2 Netherlands ✅
+
+### Open Questions Resolved
+- TUR-USA FT: [strong] 2-2 draw. USA WIN prediction ❌ incorrect. USA's extreme rotation (8 changes) was the structural cause.
+- PAR-AUS FT: [strong] 0-0 draw. DRAW prediction ✅ correct. Frozen at HT, held through FT.
+
+### New Questions Raised
+- Should draw-sufficiency have been a pre-match confidence modifier for Japan? It was the decisive factor in JPN-SWE's 1-1 draw.
+- Should the Extreme Rotation Floor Rule be added to SKILL.md? USA's 8 changes dropped them from a potential win to a draw against a winless opponent.
+- Was the 10-iteration cycle token-efficient? Total ~1M tokens for 6 matches with only 1 prediction change.
+
+### Next Interval Reason
+- Wrote 180 minutes to prediction_interval.txt because all 6 matches are complete. No further iterations needed for this matchday. The matchday is fully resolved with postmortem analysis complete.
+
 ## Iteration 10 - 2026-06-26T02:55:00Z
 **Model Used:** opencode: deepseek-v4-flash-free
 **Next Interval:** 60 minutes

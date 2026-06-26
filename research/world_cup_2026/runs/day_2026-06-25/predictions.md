@@ -1,15 +1,15 @@
 ---
 date: "2026-06-25"
-iteration: 10
-last_updated: "2026-06-26T02:55:00Z"
-matches_covered: 2
-overall_confidence: "02:00 matches at HT. TUR-USA 2-1 (USA WIN contradicted — structural cause: extreme rotation underestimated). PAR-AUS 0-0 (DRAW confirmed — frozen)."
+iteration: 11
+last_updated: "2026-06-26T03:55:00Z"
+matches_covered: 0
+overall_confidence: "All 6 matches complete. Final accuracy: 3/6 (50%). Three misses: ECU-GER (Dead Rubber Motivation Asymmetry), JPN-SWE (Draw-Sufficiency), TUR-USA (Extreme Rotation)."
 model: "opencode: deepseek-v4-flash-free"
-next_interval_minutes: 60
-next_difficulty: "high"
+next_interval_minutes: 180
+next_difficulty: "low"
 ---
 
-# World Cup 2026 Predictions for 2026-06-25 — Iteration 10
+# World Cup 2026 Predictions for 2026-06-25 — Iteration 11 (Final)
 
 ## 📊 Executive Summary Table
 
@@ -19,8 +19,8 @@ next_difficulty: "high"
 | Ecuador vs. Germany | complete | GERMANY WIN | Medium | 2026-06-25T11:53:09Z |
 | Japan vs. Sweden | complete | JAPAN WIN | Low | 2026-06-25T23:50:32Z |
 | Tunisia vs. Netherlands | complete | NETHERLANDS WIN | Medium | 2026-06-25T13:59:34Z |
-| Türkiye vs. USA | live_post_halftime | USA WIN | Low | 2026-06-25T13:59:34Z |
-| Paraguay vs. Australia | live_post_halftime | DRAW | Low | 2026-06-25T13:59:34Z |
+| Türkiye vs. USA | complete | USA WIN | Low | 2026-06-25T13:59:34Z |
+| Paraguay vs. Australia | complete | DRAW | Low | 2026-06-25T13:59:34Z |
 
 ---
 
@@ -164,74 +164,67 @@ next_difficulty: "high"
 
 ### Match: Türkiye vs. USA
 
-**Status:** live_post_halftime (HT: 2-1 Türkiye)
+**Status:** complete (FT: 2-2)
 **Kickoff:** 02:00 UTC (June 26) | **Venue:** SoFi Stadium, Inglewood | **Group/Round:** Group D
 
 ### Prediction: USA WIN
 **Confidence:** Low
 
 ### Reasoning
-HT 2-1 Türkiye. USA scored first (Trusty 3', Berhalter assist) but Türkiye responded with two quality goals: Güler 10' (Yilmaz) and Kökçü 31' (Elmali). HT xG: TUR 1.30 - USA 0.52 — Türkiye clearly the better side despite lower possession (42-58). **CORRECTION from Iteration 9:** Sofascore's "confirmed" Türkiye lineup was inaccurate. Actual confirmed XI (per FotMob live match center): Çakir; Çelik(C), Bardakci, Kabak, Elmali; Kökçü, Özcan; Aydin, Güler, Yildiz; Yilmaz. **Calhanoglu did NOT start** — he was on the bench. This makes Türkiye's performance even more impressive: their young core (Güler, Kökçü, Yildiz) broke the 62-shot goal drought without their captain. **WHT applied:** Score (2-1 TUR) CONTRADICTS prediction (USA WIN). A structural cause exists — USA's extreme rotation (8 changes) produced a disjointed XI that is being structurally outplayed (xG 0.52, trailing to a motivated opponent that just broke its goal drought). Since the structural cause WAS anticipated as a risk (Low confidence), but the magnitude was underestimated, I will NOT flip to TÜRKIYE WIN but flag for strong postmortem review. Pulisic entered at HT as substitute.
+❌ **PREDICTION INCORRECT.** FT 2-2. USA scored first (Trusty 3', Berhalter assist) but Türkiye responded with Güler 10' and Kökçü 31'. USA equalized through Berhalter (57') after Pulisic's HT introduction. FT xG: TUR 1.30 - USA 0.52 (first half) with additional second-half xG. The draw was a fair result: USA's extreme rotation (8 changes) created a disjointed XI that was outplayed for long periods, while Türkiye finally broke their 62-shot goal drought. Pulisic's second-half cameo salvaged the draw but masked the structural weakness of the rotated XI.
 
 ### Key Factors
-- [official] [FotMob live match data] HT: Türkiye 2-1 USA. Goals: Trusty 3' (Berhalter), Güler 10' (Yilmaz), Kökçü 31' (Elmali). Berhalter YC 19'.
-- [strong] [FotMob] Possession 42-58. xG: TUR 1.30 - USA 0.52. Shots 4-6, SOT 2-3. Türkiye 2 big chances, USA 1.
-- [official] [FotMob confirmed lineup — CORRECTED] Türkiye (3-4-2-1): Çakir; Çelik(C), Bardakci, Kabak, Elmali; Kökçü, Özcan; Aydin, Güler, Yildiz; Yilmaz. **Calhanoglu on bench** — Sofascore data in Iteration 9 was incorrect.
-- [official] [FotMob/BBC confirmed lineup] USA (4-3-3): Turner; Scally, McKenzie, Trusty, Arfsten; Berhalter, Tillman, Weah; Reyna, Zendejas, Wright. Pulisic substituted in at HT.
-- [strong] [Sporting News / BBC] Pre-match reports of Calhanoglu benched were CORRECT — contradicts Sofascore projected data. Türkiye's XI was young and rotated.
-- [risk] WHT: Score contradicts USA WIN prediction. Structural cause (extreme USA rotation underestimated) exists. Downgrade not possible (already Low). FT may require a flip for the postmortem.
-- [risk] USA's disjointed XI created only 0.52 xG in the first half vs a Türkiye defense conceding freely.
+- [strong] [BBC Sport / FWC Times] FT: Türkiye 2-2 USA. Goals: Trusty 3', Berhalter 57' (USA); Güler 10', Kökçü 31' (TUR).
+- [strong] [The Sun 2026-06-26 04:20 updated] "Berhalter's sublime strike puts Americans back on level terms."
+- [official] [FotMob confirmed lineup — CORRECTED] Türkiye (3-4-2-1): Çakir; Çelik(C), Bardakci, Kabak, Elmali; Kökçü, Özcan; Aydin, Güler, Yildiz; Yilmaz. Calhanoglu on bench.
+- [risk] USA's 8 changes created a disjointed XI — they were outplayed in the first half (0.52 xG) and needed Pulisic's HT introduction to equalize.
+- [risk] Prediction ❌ incorrect (USA WIN → actual DRAW).
 
 ### Evidence Gathered This Iteration
-- [official] [FotMob] HT: Türkiye 2-1 USA. Full first-half data including xG, shots, cards. Confirmed lineups (CORRECTED).
-- [strong] [BBC Sport / Yahoo Sports / SportScore] Multiple sources confirm HT 2-1 scoreline.
-- [strong] [BBC Sport 2026-06-26] "Trusty's goal is the second fastest goal in USA's World Cup history (02:13). Turkey responded through Güler and Kökçü."
-- [strong] [FotMob] xG: TUR 1.30 - USA 0.52. Türkiye generated 1.25 xG from open play — sustainable attacking patterns.
+- [strong] [BBC Sport] "Final fixtures in Group D: Paraguay 0-0 Australia & USA 2-2 Turkey."
+- [strong] [The Sun] Confirms Berhalter equalizer at 57'. Pulisic introduced at HT.
+- [strong] [FotMob] HT data only (first half): TUR 1.30 - USA 0.52 xG. Match ended 2-2.
 
 ### Search History
-- **Iteration 10**: `USA Turkey World Cup 2026 live score match events halftime 02:00`, `Turkiye USA fotmob live score match stats`, `Turkey USA halftime 2-1 Guler Kokcu goals match stats`
+- **Iteration 11**: `Turkey 2-2 USA full time World Cup 2026 June 25 final`, `Turkiye USA fotmob match events full time 2-2`
 
 ### Questions for Next Iteration
-1. FT score — does Türkiye hold the lead? Can USA equalize with Pulisic on the field?
-2. Second-half events — any further goals, cards, or structural changes?
-3. If FT is a Türkiye win (2-1 or more), flip prediction to TÜRKIYE WIN for audit. If USA equalizes, the WHT downgrade was overcautious.
+- N/A — match complete. Postmortem identified: (1) Extreme Rotation Floor Rule needed — 8 changes should cap confidence at Low. (2) USA's squad depth is good but not elite — 8 changes produced a significant quality drop.
 
 ### Prediction Changes
-- **Previous prediction:** USA WIN / Low (Iteration 3, unchanged through Iteration 9)
-- **Change:** No change to outcome or confidence, but prediction is under severe structural pressure. WHT applied: score contradicts, structural cause exists (extreme rotation impact underestimated). Pulisic's HT introduction is a potential game-changer. Correction: Sofascore data in Iteration 9 was inaccurate — Calhanoglu did NOT start. Türkiye's young core (Güler, Kökçü) broke their goal drought without him.
+- **Previous prediction:** USA WIN / Low (Iteration 3)
+- **Change:** ❌ Prediction incorrect (actual DRAW 2-2). Postmortem recommends codifying Extreme Rotation Floor Rule.
 
 ---
 
 ### Match: Paraguay vs. Australia
 
-**Status:** live_post_halftime (HT: 0-0)
+**Status:** complete (FT: 0-0)
 **Kickoff:** 02:00 UTC (June 26) | **Venue:** Levi's Stadium, Santa Clara | **Group/Round:** Group D
 
 ### Prediction: DRAW
 **Confidence:** Low
 
 ### Reasoning
-HT 0-0 — exactly as predicted. Extremely low-event half: Paraguay 0 shots, 0.00 xG. Australia 4 shots, 0.14 xG, 2 SOT. Possession: PAR 36-64 AUS. The only notable event was a Jackson Irvine shot saved by Gill. Both teams playing conservatively as expected — Australia needs only a draw to advance (4pts, better GD), Paraguay would likely advance with 4pts as best 3rd-place team. Levi's Stadium temporary grass is slowing play significantly. **WHT applied: FROZEN.** Score (0-0) CONFIRMS the DRAW prediction. No structural changes (no goals, no cards, no injuries). Freeze at Low confidence.
+✅ **PREDICTION CORRECT.** FT 0-0 — the most defensive match of the day. Total match xG: PAR 0.12 - AUS 0.37. Australia dominated possession (61%), shots (9-4), and xG but could not break through Paraguay's 5-4-1 block. Paraguay never threatened: 4 total shots, 0.12 xG, 0 big chances. The draw was sufficient for Australia (advanced as Group D runners-up) and likely enough for Paraguay (advancing as a best third-place team). The DRAW prediction was correctly frozen at HT under WHT and held through FT. Mutual advancement incentives were the decisive structural factor — both teams played not to lose rather than to win.
 
 ### Key Factors
-- [official] [FotMob live match data] HT: Paraguay 0-0 Australia. xG: PAR 0.00 - AUS 0.14. Shots 0-4, SOT 0-2.
-- [strong] [FOX Sports live box score] HT: 0-0. POSS: 39-61. 0 chances created (Paraguay), 3 (Australia).
-- [strong] [BBC Sport 2026-06-26] "We've reached the hydration break in San Francisco and a Jackson Irvine shot for Australia, pushed away by Gill, is the only action of note."
-- [strong] [FotMob] Paraguay 0 big chances, 0 corners. Australia 0 big chances, 3 corners. No cards.
-- [medium] WHT: Score CONFIRMS prediction → frozen at Low.
+- [strong] [BBC Sport final fixtures summary] "Final fixtures in Group D: Paraguay 0-0 Australia & USA 2-2 Turkey."
+- [strong] [FotMob] FT 0-0. Total match xG: PAR 0.12 - AUS 0.37. Shots: PAR 4 - AUS 9. SOT: PAR 1 - AUS 3.
+- [strong] [FOX Sports box score] FT: PAR 0-0 AUS. Australia 61% possession, 3 chances created, 2 shots on goal. Paraguay 0 big chances, 0 corners.
+- [strong] [ABC News / Bundesliga.com] FT 0-0 confirmed. Australia advances as Group D runner-up (4pts).
+- [medium] WHT correctly applied at HT: frozen at Low. Score confirmed prediction. No structural changes. The 0-0 held.
 
 ### Evidence Gathered This Iteration
-- [official] [FotMob / FOX Sports] HT: 0-0. Minimal events. First-half xG total: 0.14 (lowest of any match today).
-- [strong] [BBC Sport live blog] Confirms only notable event was Irvine's shot saved by Gill. "Australia earn the first corner — Harry Souttar is the target."
+- [strong] [BBC Sport] Confirms final score: Paraguay 0-0 Australia. "Australia will progress with draw."
+- [strong] [FotMob full match data] Total xG: PAR 0.12 - AUS 0.37. Australia had more chances in the second half but couldn't finish.
 
 ### Search History
-- **Iteration 10**: `Paraguay Australia World Cup 2026 live score match events halftime`, `Paraguay Australia 0-0 halftime World Cup 2026 stats shots`
+- **Iteration 11**: `Paraguay 0-0 Australia full time World Cup 2026`
 
 ### Questions for Next Iteration
-1. FT score verification — does 0-0 hold, or does one team break through in the second half?
-2. If Paraguay scores (must-win), does Australia respond or does the draw incentive shift?
-3. Any second-half cards, injuries, or substitutions that change the match state?
+- N/A — match complete. DRAW prediction validated. Mutual advancement incentives (both teams needing at most a draw) correctly identified as the decisive factor.
 
 ### Prediction Changes
 - **Previous prediction:** DRAW / Low (Iteration 3)
-- **Change:** No change. WHT applied: Score (0-0) confirms prediction. Frozen at Low. First-half data reinforces the defensive stalemate prediction.
+- **Change:** ✅ Prediction correct. WHT correctly applied (frozen at Low). No changes needed.
