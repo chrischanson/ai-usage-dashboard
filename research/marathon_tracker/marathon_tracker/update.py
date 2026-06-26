@@ -1,9 +1,10 @@
 import argparse
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .config import DEFAULT_DB, DEFAULT_DOCS_DIR, load_previous_output, load_races, save_races
+from .config import DEFAULT_DB, DEFAULT_DOCS_DIR, load_previous_output, load_races, save_races, save_race_results
 from .discover import discover_races, merge_races
 from .extract import extract_dates
 from .fetch import check_url, fetch_text
@@ -30,6 +31,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--plan", action="store_true",
         help="Plan mode: Output what updates and resolutions will be performed, without executing them or modifying the database.",
+    )
+    parser.add_argument(
+        "--llm-mode", choices=["api", "agy", "opencode", "auto"], default="auto",
+        help="LLM execution mode. 'auto' selects LLM_API_KEY, then agy CLI, then opencode CLI.",
     )
     return parser
 
@@ -104,6 +109,7 @@ def _needs_refresh(result: RaceResult) -> bool:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    os.environ["LLM_MODE"] = args.llm_mode
     no_network = args.no_network or False
     today = _now()
 
@@ -269,103 +275,119 @@ def main(argv: list[str] | None = None) -> int:
 
     # ── Phase C: Refresh ────────────────────────────────────────────
     refreshed_results = []
-    if not no_network:
-        for result in results:
-            if result.status != "active":
-                continue
+    try:
+        if not no_network:
+            for result in results:
+                if result.status != "active":
+                    continue
 
-            race_obj = races_by_key.get((result.id, result.distance))
-            if not race_obj:
-                continue
+                race_obj = races_by_key.get((result.id, result.distance))
+                if not race_obj:
+                    continue
 
-            scraper = get_scraper(result.id)
-            if scraper:
-                print(f"Using custom scraper for {result.id}")
-                fresh = scraper(race_obj)
-            else:
-                url = result.source_url or result.official_url
-                if not url or url == "":
-                    from .llm import resolve_official_url
-                    print(f"Resolving missing URL in Phase C for {result.name}...")
-                    resolved_url = resolve_official_url(result.name)
-                    if resolved_url:
-                        print(f"  -> Resolved to: {resolved_url}")
-                        result.official_url = resolved_url
-                        result.source_url = resolved_url
-                        url = resolved_url
+                scraper = get_scraper(result.id)
+                if scraper:
+                    print(f"Using custom scraper for {result.id}")
+                    fresh = scraper(race_obj)
+                else:
+                    from urllib.parse import urlparse
+                    is_base_domain = False
+                    if result.official_url:
+                        parsed = urlparse(result.official_url)
+                        path = parsed.path.strip("/")
+                        if not path or path == "":
+                            is_base_domain = True
+
+                    if not result.official_url or result.official_url == "" or is_base_domain:
+                        from .llm import resolve_event_webpage
+                        event_year = result.year
+                        if not event_year and result.event_date:
+                            try:
+                                event_year = int(result.event_date[:4])
+                            except (ValueError, TypeError):
+                                pass
                         
-                        # Re-bind the race_obj so it has the new URL too
-                        if race_obj:
-                            import dataclasses
-                            race_obj = dataclasses.replace(race_obj, official_url=resolved_url)
-                            races_by_key[(result.id, result.distance)] = race_obj
-                    else:
+                        print(f"Resolving specific event webpage for {result.name}...")
+                        resolved_webpage = resolve_event_webpage(result.name, event_year)
+                        if resolved_webpage:
+                            print(f"  -> Resolved webpage to: {resolved_webpage}")
+                            result.official_url = resolved_webpage
+                            result.source_url = resolved_webpage
+                        elif not result.official_url or result.official_url == "":
+                            # Fallback to the race's official website URL
+                            result.official_url = race_obj.official_url
+                            result.source_url = race_obj.official_url
+                    
+                    url = result.source_url or result.official_url
+                    if not url or url == "":
                         result.status = "stale"
                         result.confidence = "low"
                         result.notes = "No source URL available for this race."
                         continue
 
-                reachable, error = check_url(url)
-                if not reachable:
-                    result.status = "stale"
-                    result.confidence = "low"
-                    result.notes = f"Source URL returned {error}; last known data preserved."
-                    continue
+                    reachable, error = check_url(url)
+                    if not reachable:
+                        result.status = "stale"
+                        result.confidence = "low"
+                        result.notes = f"Source URL returned {error}; last known data preserved."
+                        continue
 
-                page_text = None
-                try:
-                    page_text = fetch_text(url)
-                except RuntimeError as exc:
-                    print(f"warning: could not fetch {url}: {exc}", file=sys.stderr)
+                    page_text = None
+                    try:
+                        page_text = fetch_text(url)
+                    except RuntimeError as exc:
+                        print(f"warning: could not fetch {url}: {exc}", file=sys.stderr)
 
-                if page_text:
-                    fresh = extract_dates(race_obj, page_text, source_url=url)
+                    if page_text:
+                        fresh = extract_dates(race_obj, page_text, source_url=url)
+                        if fresh.notes and "429" in fresh.notes:
+                            print("ERROR: LLM quota/rate limit exceeded (429). Saving progress and exiting.", file=sys.stderr)
+                            break
+                    else:
+                        result.status = "stale"
+                        result.confidence = "low"
+                        result.notes = "Page fetch returned no content; last known data preserved."
+                        continue
+
+                # Update dates and details
+                result.event_date = fresh.event_date
+                result.registration_windows = list(fresh.registration_windows)
+                result.extraction_method = fresh.extraction_method
+                result.confidence = fresh.confidence
+                result.notes = fresh.notes
+                result.raw_evidence = list(fresh.raw_evidence)
+                if fresh.source_url and not result.source_url:
+                    result.source_url = fresh.source_url
+                result.extracted_at = today.isoformat(timespec="seconds")
+                refreshed_results.append(result)
+    finally:
+        refreshed = sum(1 for r in results if r.extraction_method not in ("carried-over",))
+        print(f"phase-c: {refreshed} refreshed, {carry_count} carried over")
+
+        if refreshed_results:
+            print("\n=== MARATHON TRACKER UPDATE SUMMARY ===")
+            for r in refreshed_results:
+                date_label = r.event_date if r.event_date else "TBD"
+                print(f"- [REFRESHED] {r.name} ({r.distance})")
+                print(f"  Event Date:   {date_label}")
+                print(f"  Official URL: {r.official_url}")
+                if r.registration_windows:
+                    print("  Registration Windows:")
+                    for w in r.registration_windows:
+                        desc = w.description or w.window_type.replace("-", " ").title()
+                        dates = f"{w.open_date or 'TBD'} to {w.close_date or 'TBD'}"
+                        print(f"    * {desc}: {dates}")
                 else:
-                    result.status = "stale"
-                    result.confidence = "low"
-                    result.notes = "Page fetch returned no content; last known data preserved."
-                    continue
+                    print("  Registration Windows: None found")
+                print(f"  Confidence:   {r.confidence}")
+                if r.notes:
+                    print(f"  Notes:        {r.notes}")
+                print()
+            print("=======================================\n")
 
-            # Update dates and details
-            result.event_date = fresh.event_date
-            result.registration_windows = list(fresh.registration_windows)
-            result.extraction_method = fresh.extraction_method
-            result.confidence = fresh.confidence
-            result.notes = fresh.notes
-            result.raw_evidence = list(fresh.raw_evidence)
-            if fresh.source_url and not result.source_url:
-                result.source_url = fresh.source_url
-            result.extracted_at = today.isoformat(timespec="seconds")
-            refreshed_results.append(result)
-
-    refreshed = sum(1 for r in results if r.extraction_method not in ("carried-over",))
-    print(f"phase-c: {refreshed} refreshed, {carry_count} carried over")
-
-    if refreshed_results:
-        print("\n=== MARATHON TRACKER UPDATE SUMMARY ===")
-        for r in refreshed_results:
-            date_label = r.event_date if r.event_date else "TBD"
-            print(f"- [REFRESHED] {r.name} ({r.distance})")
-            print(f"  Event Date:   {date_label}")
-            print(f"  Official URL: {r.official_url}")
-            if r.registration_windows:
-                print("  Registration Windows:")
-                for w in r.registration_windows:
-                    desc = w.description or w.window_type.replace("-", " ").title()
-                    dates = f"{w.open_date or 'TBD'} to {w.close_date or 'TBD'}"
-                    print(f"    * {desc}: {dates}")
-            else:
-                print("  Registration Windows: None found")
-            print(f"  Confidence:   {r.confidence}")
-            if r.notes:
-                print(f"  Notes:        {r.notes}")
-            print()
-        print("=======================================\n")
-
-    from .config import save_race_results
-    save_race_results(results)
-    write_outputs(results, args.docs_dir)
-    print(f"wrote {len(results)} races to {args.docs_dir}")
+        save_race_results(results)
+        write_outputs(results, args.docs_dir)
+        print(f"wrote {len(results)} races to {args.docs_dir}")
     return 0
 
 

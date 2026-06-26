@@ -762,80 +762,165 @@ def init_db(conn: sqlite3.Connection) -> None:
         conn.commit()
 
     # 5e. Migrate race_official_urls to race_official_websites and race_official_webpages
-    cursor.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='race_official_urls';")
-    if cursor.fetchone():
-        conn.execute("ALTER TABLE race_official_urls RENAME TO race_official_websites;")
-        conn.commit()
-
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS race_official_websites (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            url TEXT UNIQUE NOT NULL
-        );
-    """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS race_official_webpages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            url TEXT UNIQUE NOT NULL
-        );
-    """)
-    conn.commit()
-
     cursor.execute("PRAGMA table_info(race_races);")
     races_cols = [row["name"] for row in cursor.fetchall()]
-    if "official_url_id" in races_cols and "official_website_id" not in races_cols:
-        conn.execute("ALTER TABLE race_races RENAME COLUMN official_url_id TO official_website_id;")
+    if "official_url_id" in races_cols:
         conn.commit()
+        old_isolation = conn.isolation_level
+        conn.isolation_level = None
+        conn.execute("PRAGMA foreign_keys = OFF;")
+        conn.execute("PRAGMA legacy_alter_table = ON;")
 
-    cursor.execute("PRAGMA table_info(race_events);")
-    event_cols = [row["name"] for row in cursor.fetchall()]
-    if "official_webpage_id" not in event_cols:
-        conn.execute("ALTER TABLE race_events ADD COLUMN official_webpage_id INTEGER REFERENCES race_official_webpages(id);")
-        conn.commit()
-        if "official_url_id" in event_cols:
+        # Ensure race_official_websites and race_official_webpages exist
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS race_official_websites (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                url TEXT UNIQUE NOT NULL
+            );
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS race_official_webpages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                url TEXT UNIQUE NOT NULL
+            );
+        """)
+
+        # If race_official_urls exists, copy its data into race_official_websites
+        cursor.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='race_official_urls';")
+        if cursor.fetchone():
+            conn.execute("INSERT OR IGNORE INTO race_official_websites (id, url) SELECT id, url FROM race_official_urls;")
+
+        # Rename old tables
+        conn.execute("DROP TABLE IF EXISTS race_races_temp;")
+        conn.execute("ALTER TABLE race_races RENAME TO race_races_temp;")
+        conn.execute("DROP TABLE IF EXISTS race_events_temp;")
+        conn.execute("ALTER TABLE race_events RENAME TO race_events_temp;")
+        conn.execute("DROP TABLE IF EXISTS race_registration_windows_temp;")
+        conn.execute("ALTER TABLE race_registration_windows RENAME TO race_registration_windows_temp;")
+
+        # Create new tables referencing the new website/webpage tables
+        conn.execute("""
+            CREATE TABLE race_races (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                location_id INTEGER NOT NULL,
+                official_website_id INTEGER NOT NULL,
+                FOREIGN KEY(location_id) REFERENCES loc_locations(id),
+                FOREIGN KEY(official_website_id) REFERENCES race_official_websites(id)
+            );
+        """)
+        conn.execute("""
+            CREATE TABLE race_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                race_offering_id INTEGER NOT NULL,
+                event_date TEXT,
+                status TEXT NOT NULL DEFAULT 'active',
+                official_webpage_id INTEGER,
+                FOREIGN KEY(race_offering_id) REFERENCES race_offerings(id),
+                FOREIGN KEY(status) REFERENCES race_event_statuses(status),
+                FOREIGN KEY(official_webpage_id) REFERENCES race_official_webpages(id),
+                UNIQUE(race_offering_id, event_date)
+            );
+        """)
+        conn.execute("""
+            CREATE TABLE race_registration_windows (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_id INTEGER NOT NULL,
+                window_type TEXT NOT NULL,
+                description TEXT,
+                open_date TEXT,
+                close_date TEXT,
+                official_webpage_id INTEGER,
+                FOREIGN KEY(event_id) REFERENCES race_events(id),
+                FOREIGN KEY(window_type) REFERENCES race_registration_types(type),
+                FOREIGN KEY(official_webpage_id) REFERENCES race_official_webpages(id),
+                UNIQUE(event_id, window_type, open_date, close_date)
+            );
+        """)
+
+        # Copy data to race_races
+        conn.execute("""
+            INSERT INTO race_races (id, name, location_id, official_website_id)
+            SELECT id, name, location_id, official_url_id FROM race_races_temp;
+        """)
+
+        # Populating race_official_webpages from the referenced URLs
+        cursor.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='race_official_urls';")
+        if cursor.fetchone():
             conn.execute("""
                 INSERT OR IGNORE INTO race_official_webpages (url)
                 SELECT DISTINCT w.url
-                FROM race_events e
-                JOIN race_official_websites w ON e.official_url_id = w.id
+                FROM race_events_temp e
+                JOIN race_official_urls w ON e.official_url_id = w.id
                 WHERE e.official_url_id IS NOT NULL;
             """)
             conn.execute("""
-                UPDATE race_events
-                SET official_webpage_id = (
-                    SELECT p.id
-                    FROM race_official_webpages p
-                    JOIN race_official_websites w ON p.url = w.url
-                    WHERE w.id = race_events.official_url_id
-                )
-                WHERE official_url_id IS NOT NULL;
-            """)
-            conn.commit()
-
-    cursor.execute("PRAGMA table_info(race_registration_windows);")
-    window_cols = [row["name"] for row in cursor.fetchall()]
-    if "official_webpage_id" not in window_cols:
-        conn.execute("ALTER TABLE race_registration_windows ADD COLUMN official_webpage_id INTEGER REFERENCES race_official_webpages(id);")
-        conn.commit()
-        if "official_url_id" in window_cols:
-            conn.execute("""
                 INSERT OR IGNORE INTO race_official_webpages (url)
                 SELECT DISTINCT w.url
-                FROM race_registration_windows rw
-                JOIN race_official_websites w ON rw.official_url_id = w.id
+                FROM race_registration_windows_temp rw
+                JOIN race_official_urls w ON rw.official_url_id = w.id
                 WHERE rw.official_url_id IS NOT NULL;
             """)
+            
+            # Copy data to race_events using mapping from race_official_urls
             conn.execute("""
-                UPDATE race_registration_windows
-                SET official_webpage_id = (
-                    SELECT p.id
-                    FROM race_official_webpages p
-                    JOIN race_official_websites w ON p.url = w.url
-                    WHERE w.id = race_registration_windows.official_url_id
-                )
-                WHERE official_url_id IS NOT NULL;
+                INSERT INTO race_events (id, race_offering_id, event_date, status, official_webpage_id)
+                SELECT 
+                    e.id, 
+                    e.race_offering_id, 
+                    e.event_date, 
+                    e.status,
+                    (
+                        SELECT p.id 
+                        FROM race_official_webpages p
+                        JOIN race_official_urls w ON p.url = w.url
+                        WHERE w.id = e.official_url_id
+                    )
+                FROM race_events_temp e;
             """)
-            conn.commit()
+            
+            # Copy data to race_registration_windows using mapping from race_official_urls
+            conn.execute("""
+                INSERT INTO race_registration_windows (id, event_id, window_type, description, open_date, close_date, official_webpage_id)
+                SELECT 
+                    rw.id, 
+                    rw.event_id, 
+                    rw.window_type, 
+                    rw.description, 
+                    rw.open_date, 
+                    rw.close_date,
+                    (
+                        SELECT p.id 
+                        FROM race_official_webpages p
+                        JOIN race_official_urls w ON p.url = w.url
+                        WHERE w.id = rw.official_url_id
+                    )
+                FROM race_registration_windows_temp rw;
+            """)
+        else:
+            conn.execute("""
+                INSERT INTO race_events (id, race_offering_id, event_date, status, official_webpage_id)
+                SELECT id, race_offering_id, event_date, status, NULL FROM race_events_temp;
+            """)
+            conn.execute("""
+                INSERT INTO race_registration_windows (id, event_id, window_type, description, open_date, close_date, official_webpage_id)
+                SELECT id, event_id, window_type, description, open_date, close_date, NULL FROM race_registration_windows_temp;
+            """)
+
+        # Drop temp tables
+        conn.execute("DROP TABLE race_races_temp;")
+        conn.execute("DROP TABLE race_events_temp;")
+        conn.execute("DROP TABLE race_registration_windows_temp;")
+
+        # Drop old race_official_urls if it exists
+        cursor.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='race_official_urls';")
+        if cursor.fetchone():
+            conn.execute("DROP TABLE race_official_urls;")
+
+        conn.execute("PRAGMA foreign_keys = ON;")
+        conn.execute("PRAGMA legacy_alter_table = OFF;")
+        conn.isolation_level = old_isolation
+        conn.commit()
 
     # 6. Recreate SQL Triggers (Paused/Disabled during system building)
     if False:
@@ -855,7 +940,7 @@ def init_db(conn: sqlite3.Connection) -> None:
                             'city', l.city,
                             'state_province', l.state_province,
                             'country', l.country_name,
-                            'official_url', (SELECT url FROM race_official_urls WHERE id = new.official_url_id)
+                            'official_url', (SELECT url FROM race_official_websites WHERE id = new.official_website_id)
                         )
                     )
                 FROM loc_locations l
@@ -924,7 +1009,7 @@ def init_db(conn: sqlite3.Connection) -> None:
                             'description', new.description,
                             'open_date', new.open_date,
                             'close_date', new.close_date,
-                            'official_url', (SELECT url FROM race_official_urls WHERE id = new.official_url_id)
+                            'official_url', (SELECT url FROM race_official_webpages WHERE id = new.official_webpage_id)
                         )
                     )
                 FROM race_events e
@@ -947,7 +1032,7 @@ def init_db(conn: sqlite3.Connection) -> None:
                             'description', old.description,
                             'open_date', old.open_date,
                             'close_date', old.close_date,
-                            'official_url', (SELECT url FROM race_official_urls WHERE id = old.official_url_id)
+                            'official_url', (SELECT url FROM race_official_webpages WHERE id = old.official_webpage_id)
                         )
                     )
                 FROM race_events e

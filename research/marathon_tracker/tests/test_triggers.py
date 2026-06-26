@@ -28,12 +28,12 @@ class TestTriggers(unittest.TestCase):
         location_id = cursor.fetchone()["id"]
         
         # Insert mock URLs
-        self.conn.execute("INSERT INTO race_official_urls (url) VALUES ('https://test.com')")
-        off_url_id = self.conn.execute("SELECT id FROM race_official_urls WHERE url='https://test.com'").fetchone()["id"]
+        self.conn.execute("INSERT INTO race_official_websites (url) VALUES ('https://test.com')")
+        off_url_id = self.conn.execute("SELECT id FROM race_official_websites WHERE url='https://test.com'").fetchone()["id"]
         
         # 2. Insert mock race
         self.conn.execute("""
-            INSERT INTO race_races (id, name, location_id, official_url_id)
+            INSERT INTO race_races (id, name, location_id, official_website_id)
             VALUES ('test-marathon', 'Test Marathon', ?, ?)
         """, (location_id, off_url_id))
         
@@ -97,11 +97,11 @@ class TestTriggers(unittest.TestCase):
         self.assertEqual(count_after, count_before + 1)
         
         # 6. Insert mock registration window linked to official URL
-        self.conn.execute("INSERT INTO race_official_urls (url) VALUES ('https://official-window-url.com')")
-        url_id = self.conn.execute("SELECT id FROM race_official_urls WHERE url = 'https://official-window-url.com'").fetchone()["id"]
+        self.conn.execute("INSERT INTO race_official_webpages (url) VALUES ('https://official-window-url.com')")
+        url_id = self.conn.execute("SELECT id FROM race_official_webpages WHERE url = 'https://official-window-url.com'").fetchone()["id"]
         
         self.conn.execute("""
-            INSERT INTO race_registration_windows (event_id, window_type, description, open_date, close_date, official_url_id)
+            INSERT INTO race_registration_windows (event_id, window_type, description, open_date, close_date, official_webpage_id)
             VALUES (?, 'standard', 'Standard Registration', '2027-01-01', '2027-09-01', ?)
         """, (event_id, url_id))
         

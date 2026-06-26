@@ -30,11 +30,11 @@ class TestConfigDistance(unittest.TestCase):
         cursor.execute("INSERT OR IGNORE INTO loc_countries (name, region_name) VALUES ('Japan', 'Asia')")
         cursor.execute("INSERT INTO loc_locations (city, country_name) VALUES ('Tokyo', 'Japan')")
         loc_id = cursor.execute("SELECT id FROM loc_locations WHERE city = 'Tokyo'").fetchone()["id"]
-        cursor.execute("INSERT INTO race_official_urls (url) VALUES ('https://tokyohalf.example.com')")
-        url_id = cursor.execute("SELECT id FROM race_official_urls WHERE url = 'https://tokyohalf.example.com'").fetchone()["id"]
+        cursor.execute("INSERT INTO race_official_websites (url) VALUES ('https://tokyohalf.example.com')")
+        url_id = cursor.execute("SELECT id FROM race_official_websites WHERE url = 'https://tokyohalf.example.com'").fetchone()["id"]
         
         cursor.execute(
-            "INSERT INTO race_races (id, name, location_id, official_url_id) VALUES ('tokyo-half', 'Tokyo Half', ?, ?)",
+            "INSERT INTO race_races (id, name, location_id, official_website_id) VALUES ('tokyo-half', 'Tokyo Half', ?, ?)",
             (loc_id, url_id)
         )
         cursor.execute("INSERT INTO race_offerings (race_id, distance) VALUES ('tokyo-half', 'half-marathon')")
@@ -118,7 +118,7 @@ class TestConfigDistance(unittest.TestCase):
             state_province="IL",
             country="United States",
             region="North America",
-            official_url="https://chicagomarathon2026.example.com",
+            official_url="https://chicagomarathon2026.example.com/register",
             registration_url=None,
             distance="marathon",
             event_date="2026-10-11",
@@ -135,21 +135,31 @@ class TestConfigDistance(unittest.TestCase):
         self.assertIsNotNone(previous)
         key = ("chicago-marathon", "marathon", 2026)
         self.assertIn(key, previous)
-        self.assertEqual(previous[key].official_url, "https://chicagomarathon2026.example.com")
+        self.assertEqual(previous[key].official_url, "https://chicagomarathon2026.example.com/register")
         
-        # 4. Connect to database and directly query race_events to check if official_url_id is set
+        # 4. Connect to database and directly query tables to check URLs
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
-        # Check event's official_url_id joins to our new URL
-        row = cursor.execute("""
-            SELECT e.official_url_id, ou.url
+        # Check event's official_webpage_id joins to our new webpage URL
+        row_ev = cursor.execute("""
+            SELECT e.official_webpage_id, ou.url
             FROM race_events e
-            JOIN race_official_urls ou ON e.official_url_id = ou.id
+            JOIN race_official_webpages ou ON e.official_webpage_id = ou.id
         """).fetchone()
-        self.assertIsNotNone(row)
-        self.assertEqual(row["url"], "https://chicagomarathon2026.example.com")
+        self.assertIsNotNone(row_ev)
+        self.assertEqual(row_ev["url"], "https://chicagomarathon2026.example.com/register")
+        
+        # Check race's official_website_id joins to our parsed website domain URL
+        row_race = cursor.execute("""
+            SELECT r.official_website_id, ou.url
+            FROM race_races r
+            JOIN race_official_websites ou ON r.official_website_id = ou.id
+            WHERE r.id = 'chicago-marathon'
+        """).fetchone()
+        self.assertIsNotNone(row_race)
+        self.assertEqual(row_race["url"], "https://chicagomarathon2026.example.com")
         
         conn.close()
 

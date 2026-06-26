@@ -231,9 +231,9 @@ class LoadPreviousOutputTest(unittest.TestCase):
             cursor.execute("INSERT INTO loc_countries (name, region_name) VALUES ('Country', 'Region')")
             cursor.execute("INSERT INTO loc_locations (city, country_name) VALUES ('City', 'Country')")
             location_id = cursor.execute("SELECT id FROM loc_locations").fetchone()["id"]
-            cursor.execute("INSERT INTO race_official_urls (url) VALUES ('https://example.com')")
-            url_id = cursor.execute("SELECT id FROM race_official_urls WHERE url = 'https://example.com'").fetchone()["id"]
-            cursor.execute("INSERT INTO race_races (id, name, location_id, official_url_id) VALUES ('test', 'Test', ?, ?)", (location_id, url_id))
+            cursor.execute("INSERT INTO race_official_websites (url) VALUES ('https://example.com')")
+            url_id = cursor.execute("SELECT id FROM race_official_websites WHERE url = 'https://example.com'").fetchone()["id"]
+            cursor.execute("INSERT INTO race_races (id, name, location_id, official_website_id) VALUES ('test', 'Test', ?, ?)", (location_id, url_id))
             cursor.execute("INSERT INTO race_offerings (race_id, distance) VALUES ('test', 'marathon')")
             offering_id = cursor.execute("SELECT id FROM race_offerings WHERE race_id = 'test' AND distance = 'marathon'").fetchone()["id"]
             cursor.execute("INSERT INTO race_events (race_offering_id, event_date, status) VALUES (?, '2026-06-01', 'active')", (offering_id,))
@@ -256,10 +256,10 @@ class LoadPreviousOutputTest(unittest.TestCase):
             )
             
             # Insert official url and link to registration window
-            cursor.execute("INSERT INTO race_official_urls (url) VALUES ('https://official-window.com')")
-            window_url_id = cursor.execute("SELECT id FROM race_official_urls WHERE url = 'https://official-window.com'").fetchone()["id"]
+            cursor.execute("INSERT INTO race_official_webpages (url) VALUES ('https://official-window.com')")
+            window_url_id = cursor.execute("SELECT id FROM race_official_webpages WHERE url = 'https://official-window.com'").fetchone()["id"]
             cursor.execute("""
-                INSERT INTO race_registration_windows (event_id, window_type, description, open_date, close_date, official_url_id)
+                INSERT INTO race_registration_windows (event_id, window_type, description, open_date, close_date, official_webpage_id)
                 VALUES (?, 'standard', 'Standard Entry', '2026-01-01', '2026-02-01', ?)
             """, (event_id, window_url_id))
             
@@ -384,6 +384,38 @@ class NeedsRefreshTest(unittest.TestCase):
             extracted_at=old
         )
         self.assertTrue(self._needs_refresh(r))
+
+
+class MainInterruptionTest(unittest.TestCase):
+    @patch("marathon_tracker.update.load_races")
+    @patch("marathon_tracker.update.load_previous_output")
+    @patch("marathon_tracker.update.save_race_results")
+    @patch("marathon_tracker.update.write_outputs")
+    @patch("marathon_tracker.update.check_url")
+    @patch("marathon_tracker.update.fetch_text")
+    def test_main_saves_on_interrupt(self, mock_fetch, mock_check, mock_write, mock_save, mock_load_prev, mock_load_races):
+        from marathon_tracker.models import Race, RaceResult
+        mock_load_races.return_value = [
+            Race("test-race", "Test Race", "City", "Country", "Region", "https://test.com/path", "marathon")
+        ]
+        # Force a refresh by setting event_date to soon/missing milestones/stale
+        mock_load_prev.return_value = {
+            ("test-race", "marathon", 2026): RaceResult(
+                id="test-race", name="Test Race", city="City", country="Country", region="Region",
+                official_url="https://test.com/path", event_date="2026-10-10", status="active",
+                extracted_at="2020-01-01T00:00:00+00:00"
+            )
+        }
+        
+        mock_check.return_value = (True, None)
+        mock_fetch.side_effect = KeyboardInterrupt()
+        
+        from marathon_tracker.update import main
+        with self.assertRaises(KeyboardInterrupt):
+            main(["--db", "fake.db", "--docs-dir", "fake-docs"])
+            
+        mock_save.assert_called_once()
+        mock_write.assert_called_once()
 
 
 if __name__ == "__main__":

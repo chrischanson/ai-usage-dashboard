@@ -694,3 +694,121 @@ python3 -m marathon_tracker.update --no-network --db docs/marathons.db --docs-di
 # Verify rendered output is valid markdown
 head -20 research/marathon_tracker/docs/marathons.md
 ```
+
+---
+
+## Recent Changes (2026-06-26 session)
+
+### Schema: Separated `official_websites` and `official_webpages`
+
+Previously, a single `race_official_urls` table stored all URLs. This was ambiguous — races have a general homepage (e.g. `https://www.londonmarathon.com`) but events have a specific subpage (e.g. `https://www.londonmarathon.com/2026/enter`).
+
+The schema was refactored into two tables:
+
+| Table | Purpose |
+|---|---|
+| `race_official_websites` | The general homepage domain for a race (linked to `race_races`) |
+| `race_official_webpages` | A specific subpage URL for an event or registration window (linked to `race_events` and `race_registration_windows`) |
+
+`race_races` now has an `official_website_id` FK into `race_official_websites`.
+`race_events` and `race_registration_windows` have an `official_webpage_id` FK into `race_official_webpages`.
+
+Migrations are handled automatically by `init_db()` in `db.py`.
+
+---
+
+### Feature: LLM-based URL Resolution
+
+When a race has no `official_url`, the pipeline now automatically calls the LLM to resolve it. Two resolution functions were added to `llm.py`:
+
+- **`resolve_official_url(race_name)`** — asks the LLM for the general homepage URL of a race (used in Phase A).
+- **`resolve_event_webpage(race_name, year)`** — asks the LLM for a specific event subpage URL, such as a registration or runner information page (used in Phase C when only a generic homepage is available).
+
+Both functions respect the `LLM_MODE` environment variable (see below).
+
+---
+
+### Feature: Plan Mode (`--plan`)
+
+A `--plan` flag was added to `update.py`. When set, the script outputs what it *would* do without making any network requests or database changes:
+
+```
+=== MARATHON TRACKER UPDATE PLAN ===
+Races loaded: 105 curated, 0 discovered, 105 total
+
+[URL Resolutions]
+  - Would resolve official URL for: <race name> (<distance>)
+
+[Planned Refreshes]
+  - Would refresh: <race name> (<distance>) (<date>)
+    Reason: <reason>
+
+[Carried Over]
+  - <N> events would be carried over without modifications.
+====================================
+```
+
+Usage:
+```bash
+./research/marathon_tracker/run_update.sh --plan
+```
+
+---
+
+### Feature: Post-run Summary Output
+
+After each update run, the pipeline now prints a summary of all refreshed races:
+
+```
+=== MARATHON TRACKER UPDATE SUMMARY ===
+- [REFRESHED] London Marathon (marathon)
+  Event Date:   2027-04-27
+  Official URL: https://www.londonmarathon.com/2027
+  Registration Windows:
+    * Ballot: 2026-05-01 to 2026-06-01
+  Confidence:   high
+  Notes:        ...
+=======================================
+```
+
+---
+
+### Feature: Quota-safe Early Exit
+
+If the LLM returns a 429 (rate limit / quota exceeded) error during a run, the pipeline:
+1. Prints an error message to stderr.
+2. Breaks out of the refresh loop immediately.
+3. Saves all results processed so far to the database (in the `finally` block).
+
+This avoids discarding work already done when the quota runs out mid-run.
+
+---
+
+### Feature: LLM Mode Selection (`--llm-mode`)
+
+A `--llm-mode` CLI argument was added to `update.py`, allowing explicit control over which LLM tool is used. The mode is exported as `LLM_MODE` in the environment so all LLM functions in `llm.py` respect it.
+
+| Mode | Behavior |
+|---|---|
+| `auto` (default) | Try `LLM_API_KEY` first, then `agy` CLI, then `opencode` CLI |
+| `api` | Use the OpenAI-compatible HTTP API only (requires `LLM_API_KEY`) |
+| `agy` | Use the `agy` CLI only (`agy --print <prompt>`) |
+| `opencode` | Use the `opencode` CLI only (`opencode run <prompt>`) |
+
+All three LLM functions respect `LLM_MODE`:
+- `extract_with_llm` — page text extraction
+- `resolve_official_url` — homepage URL resolution
+- `resolve_event_webpage` — specific event/registration subpage resolution
+
+Usage:
+```bash
+./research/marathon_tracker/run_update.sh --llm-mode opencode
+./research/marathon_tracker/run_update.sh --llm-mode agy
+./research/marathon_tracker/run_update.sh --llm-mode api
+```
+
+All options are visible via:
+```bash
+./research/marathon_tracker/run_update.sh --help
+```
+

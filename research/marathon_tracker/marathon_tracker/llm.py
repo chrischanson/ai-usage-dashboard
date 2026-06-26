@@ -54,8 +54,9 @@ def _parse_json_content(text: str) -> dict[str, object] | None:
 
 
 def extract_with_llm(race_name: str, page_text: str) -> dict[str, object] | None:
+    mode = os.environ.get("LLM_MODE", "auto")
     api_key = os.environ.get("LLM_API_KEY")
-    if api_key:
+    if api_key and (mode == "api" or mode == "auto"):
         api_base = os.environ.get("LLM_API_BASE", "https://api.openai.com/v1").rstrip("/")
         model = os.environ.get("LLM_MODEL", "gpt-4.1-mini")
         timeout = int(os.environ.get("LLM_TIMEOUT_SECONDS", "45"))
@@ -94,7 +95,7 @@ def extract_with_llm(race_name: str, page_text: str) -> dict[str, object] | None
                 "raw_evidence": [],
             }
 
-    # If no API key, check for local CLI tools (agy, opencode)
+    # Check for local CLI tools (agy, opencode)
     import shutil
     import subprocess
 
@@ -102,7 +103,7 @@ def extract_with_llm(race_name: str, page_text: str) -> dict[str, object] | None
     prompt = f"{SYSTEM_PROMPT}\n\nRace: {race_name}\n\nOfficial page text:\n{content}"
 
     agy_path = shutil.which("agy")
-    if agy_path:
+    if agy_path and (mode == "agy" or (mode == "auto" and not api_key)):
         try:
             result = subprocess.run(
                 ["agy", "--print", prompt],
@@ -126,7 +127,7 @@ def extract_with_llm(race_name: str, page_text: str) -> dict[str, object] | None
             }
 
     opencode_path = shutil.which("opencode")
-    if opencode_path:
+    if opencode_path and (mode == "opencode" or (mode == "auto" and not api_key and not agy_path)):
         try:
             result = subprocess.run(
                 ["opencode", "run", prompt],
@@ -163,8 +164,9 @@ def resolve_official_url(race_name: str) -> str | None:
     )
     
     # First try API key if configured
+    mode = os.environ.get("LLM_MODE", "auto")
     api_key = os.environ.get("LLM_API_KEY")
-    if api_key:
+    if api_key and (mode == "api" or mode == "auto"):
         api_base = os.environ.get("LLM_API_BASE", "https://api.openai.com/v1").rstrip("/")
         model = os.environ.get("LLM_MODEL", "gpt-4.1-mini")
         timeout = int(os.environ.get("LLM_TIMEOUT_SECONDS", "45"))
@@ -200,7 +202,7 @@ def resolve_official_url(race_name: str) -> str | None:
     import shutil
     import subprocess
     agy_path = shutil.which("agy")
-    if agy_path:
+    if agy_path and (mode == "agy" or (mode == "auto" and not api_key)):
         try:
             result = subprocess.run(
                 ["agy", "--print", prompt],
@@ -219,7 +221,99 @@ def resolve_official_url(race_name: str) -> str | None:
 
     # Fallback to local opencode CLI
     opencode_path = shutil.which("opencode")
-    if opencode_path:
+    if opencode_path and (mode == "opencode" or (mode == "auto" and not api_key and not agy_path)):
+        try:
+            result = subprocess.run(
+                ["opencode", "run", prompt],
+                capture_output=True,
+                text=True,
+                timeout=45
+            )
+            if result.returncode == 0:
+                text = result.stdout.strip()
+                text = text.replace("`", "").strip()
+                match = re.search(r"https?://[^\s`\"']+", text)
+                if match:
+                    return match.group(0)
+        except Exception:
+            pass
+
+    return None
+
+
+def resolve_event_webpage(race_name: str, year: int | None) -> str | None:
+    """
+    Asks the LLM for the specific official webpage URL (e.g., registration page, runner information,
+    or event details subpage) for the given race and year.
+    """
+    import re
+    year_str = f" {year}" if year else ""
+    prompt = (
+        f"What is the specific official webpage URL (e.g., registration page, runner information, "
+        f"or event details subpage) for the{year_str} edition of the marathon/half-marathon race named '{race_name}'? "
+        "Return ONLY the clean URL (e.g., https://www.example.com/marathon-2026 or https://www.example.com/register). "
+        "Do not return a generic home page domain (like https://www.example.com) unless that is the only page. "
+        "Do not include any other text, markdown formatting, or explainers."
+    )
+    
+    # First try API key if configured
+    mode = os.environ.get("LLM_MODE", "auto")
+    api_key = os.environ.get("LLM_API_KEY")
+    if api_key and (mode == "api" or mode == "auto"):
+        api_base = os.environ.get("LLM_API_BASE", "https://api.openai.com/v1").rstrip("/")
+        model = os.environ.get("LLM_MODEL", "gpt-4.1-mini")
+        timeout = int(os.environ.get("LLM_TIMEOUT_SECONDS", "45"))
+        body = {
+            "model": model,
+            "temperature": 0,
+            "messages": [
+                {"role": "user", "content": prompt}
+            ],
+        }
+        request = urllib.request.Request(
+            f"{api_base}/chat/completions",
+            data=json.dumps(body).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                raw = json.loads(response.read().decode("utf-8"))
+            text = raw.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+            text = text.replace("`", "").strip()
+            match = re.search(r"https?://[^\s`\"']+", text)
+            if match:
+                return match.group(0)
+        except Exception:
+            pass
+
+    # Fallback to local agy CLI
+    import shutil
+    import subprocess
+    agy_path = shutil.which("agy")
+    if agy_path and (mode == "agy" or (mode == "auto" and not api_key)):
+        try:
+            result = subprocess.run(
+                ["agy", "--print", prompt],
+                capture_output=True,
+                text=True,
+                timeout=45
+            )
+            if result.returncode == 0:
+                text = result.stdout.strip()
+                text = text.replace("`", "").strip()
+                match = re.search(r"https?://[^\s`\"']+", text)
+                if match:
+                    return match.group(0)
+        except Exception:
+            pass
+
+    # Fallback to local opencode CLI
+    opencode_path = shutil.which("opencode")
+    if opencode_path and (mode == "opencode" or (mode == "auto" and not api_key and not agy_path)):
         try:
             result = subprocess.run(
                 ["opencode", "run", prompt],
