@@ -1,5 +1,52 @@
 # 📝 World Cup 2026 Prediction Changelog — 2026-06-25
 
+## Iteration 10 - 2026-06-26T02:55:00Z
+**Model Used:** opencode: deepseek-v4-flash-free
+**Next Interval:** 60 minutes
+**Tokens:** [injected post-execution by orchestrator]
+
+**Tokens:** 33099 input + 1786 output = 34885 total
+**Tokens:** 0 input + 0 output = 0 total
+### Eligible Matches
+- Curaçao vs. Côte d'Ivoire: complete
+- Ecuador vs. Germany: complete
+- Japan vs. Sweden: complete
+- Tunisia vs. Netherlands: complete
+- Türkiye vs. USA: live_post_halftime (HT: 2-1 TUR)
+- Paraguay vs. Australia: live_post_halftime (HT: 0-0)
+
+### Changes
+- TUR-USA: No prediction change (USA WIN / Low). WHT applied: HT 2-1 Türkiye CONTRADICTS prediction. Structural cause exists (extreme USA rotation underestimated). Not flipped — maintained for FT verification. **CRITICAL CORRECTION from Iteration 9:** Sofascore "confirmed" Türkiye lineup was inaccurate. Actual XI (FotMob): Çakir; Çelik(C), Bardakci, Kabak, Elmali; Kökçü, Özcan; Aydin, Güler, Yildiz; Yilmaz. **Calhanoglu did NOT start** — he was on the bench. Sporting News reports were correct. This makes Türkiye's 2-1 half even more structurally significant.
+- PAR-AUS: No prediction change. WHT applied: HT 0-0 CONFIRMS DRAW prediction. Frozen at Low.
+- All 4 earlier matches: complete (no changes needed).
+
+### Search Queries Executed
+- TUR-USA: `USA Turkey World Cup 2026 live score match events halftime 02:00`, `Turkiye USA fotmob live score match stats`, `Turkey USA halftime 2-1 Guler Kokcu goals match stats`
+- PAR-AUS: `Paraguay Australia World Cup 2026 live score match events halftime`, `Paraguay Australia 0-0 halftime World Cup 2026 stats shots`
+
+### New Evidence
+- TUR-USA: [official] [FotMob] HT 2-1. Goals: Trusty 3', Güler 10', Kökçü 31'. xG TUR 1.30 - USA 0.52. Türkiye dominant despite lower possession.
+- TUR-USA: [official] [FotMob — CORRECTED lineup] Türkiye XI: Çakir; Çelik(C), Bardakci, Kabak, Elmali; Kökçü, Özcan; Aydin, Güler, Yildiz; Yilmaz. Calhanoglu on bench. Sofascore data in Iteration 9 was incorrect.
+- TUR-USA: [strong] [BBC Sport 2026-06-26] "Turkey 2-1 USA" — confirms HT score. "With their 63rd shot, Turkey have scored!"
+- TUR-USA: [strong] [BBC Sport] "USA's Trusty scored second fastest goal in USMNT World Cup history."
+- PAR-AUS: [official] [FotMob] HT 0-0. xG PAR 0.00 - AUS 0.14. Shots 0-4. The most defensive half of the day.
+- PAR-AUS: [strong] [FOX Sports] HT stats: PAR 39% possession, 0 shots, 0 xG. AUS 4 shots, 2 SOT, 0.28 xG.
+- PAR-AUS: [strong] [BBC Sport] "A Jackson Irvine shot is the only action of note in San Francisco."
+
+### Open Questions Resolved
+- TUR-USA HT score: Confirmed 2-1 Türkiye via multiple sources. USA rotation was the key structural factor.
+- TUR-USA Türkiye lineup: **CORRECTED** — Calhanoglu did NOT start. Sofascore projection was incorrect. Actual lineup was younger/less experienced than reported.
+- PAR-AUS HT score: Confirmed 0-0. Draw prediction frozen.
+- PAR-AUS first-half play: Extremely low-event. Confirms defensive stalemate prediction.
+
+### New Questions Raised
+- TUR-USA: Was the Sofascore "confirmed lineup" data actually a projection? Should FotMob be the single source of truth for lineups going forward?
+- TUR-USA: At FT, does the USA WIN prediction need flipping if Türkiye holds? How should the WHT handle cases where the structural cause (rotation) was anticipated but the magnitude was grossly underestimated?
+- PAR-AUS: Can the second half produce any goals, or is this a 0-0 stalemate to the finish?
+
+### Next Interval Reason
+- Wrote 60 minutes to prediction_interval.txt because both matches are live_post_halftime approaching FT (~03:35 UTC). 60 min from 02:55 lands at ~03:55 UTC — 20 min after estimated FT, providing a sufficient buffer for stoppage-time goals and multi-source FT verification. Both matches are Low confidence, so Medium-Confidence Match Coverage Rule does not apply.
+
 ## Iteration 9 - 2026-06-26T01:15:32Z
 **Model Used:** opencode: deepseek-v4-flash-free
 **Next Interval:** 100 minutes

@@ -1,15 +1,15 @@
 ---
 date: "2026-06-25"
-iteration: 9
-last_updated: "2026-06-26T01:15:32Z"
-matches_covered: 4
-overall_confidence: "23:00 matches complete. JPN-SWE FT 1-1 (JPN WIN ❌ — actual DRAW). TUN-NED FT 0-2 (NED WIN ✅). 02:00 matches confirmed lineups — USA heavily rotated, Türkiye starts Calhanoglu."
+iteration: 10
+last_updated: "2026-06-26T02:55:00Z"
+matches_covered: 2
+overall_confidence: "02:00 matches at HT. TUR-USA 2-1 (USA WIN contradicted — structural cause: extreme rotation underestimated). PAR-AUS 0-0 (DRAW confirmed — frozen)."
 model: "opencode: deepseek-v4-flash-free"
-next_interval_minutes: 100
+next_interval_minutes: 60
 next_difficulty: "high"
 ---
 
-# World Cup 2026 Predictions for 2026-06-25 — Iteration 9
+# World Cup 2026 Predictions for 2026-06-25 — Iteration 10
 
 ## 📊 Executive Summary Table
 
@@ -19,8 +19,8 @@ next_difficulty: "high"
 | Ecuador vs. Germany | complete | GERMANY WIN | Medium | 2026-06-25T11:53:09Z |
 | Japan vs. Sweden | complete | JAPAN WIN | Low | 2026-06-25T23:50:32Z |
 | Tunisia vs. Netherlands | complete | NETHERLANDS WIN | Medium | 2026-06-25T13:59:34Z |
-| Türkiye vs. USA | not_started | USA WIN | Low | 2026-06-25T13:59:34Z |
-| Paraguay vs. Australia | not_started | DRAW | Low | 2026-06-25T13:59:34Z |
+| Türkiye vs. USA | live_post_halftime | USA WIN | Low | 2026-06-25T13:59:34Z |
+| Paraguay vs. Australia | live_post_halftime | DRAW | Low | 2026-06-25T13:59:34Z |
 
 ---
 
@@ -164,77 +164,74 @@ next_difficulty: "high"
 
 ### Match: Türkiye vs. USA
 
-**Status:** not_started (kickoff 02:00 UTC June 26, ~45 min away)
+**Status:** live_post_halftime (HT: 2-1 Türkiye)
 **Kickoff:** 02:00 UTC (June 26) | **Venue:** SoFi Stadium, Inglewood | **Group/Round:** Group D
 
 ### Prediction: USA WIN
 **Confidence:** Low
 
 ### Reasoning
-USA have already won Group D and field a heavily rotated lineup — 4 yellow-card players (Adams, Balogun, Richards, A. Robinson) sit out, plus Pulisic (calf) on the bench. Confirmed XI: Turner; Scally, McKenzie, Trusty, Arfsten; Berhalter, Tillman; Weah, Reyna, Zendejas; Wright. This is even more rotated than anticipated — McKennie, Aaronson, M. Robinson, and Pepi also do not start. Wright at striker (less clinical than Pepi), Tillman in midfield (less experienced than McKennie). Pulisic expected bench cameo. Türkiye confirmed XI: Cakir; Muldur, Demiral, Bardakci, Kadioglu; Calhanoglu, Yuksek; Uzun, Guler, Yildiz; Gul. **Calhanoglu starts** (contrary to pre-match reports from Sporting News which had him benched) — this is significant, as he is Türkiye's captain and best creator. Demiral also starts, strengthening the defense. Despite Türkiye's 0 goals in 2 matches (62 shots, Clinical Finishing Gate triggered), the combination of a heavily rotated USA and Calhanoglu's presence reduces USA's edge. Host-nation crowd at SoFi remains a factor but the rotated lineup's disjointedness is a counterweight.
+HT 2-1 Türkiye. USA scored first (Trusty 3', Berhalter assist) but Türkiye responded with two quality goals: Güler 10' (Yilmaz) and Kökçü 31' (Elmali). HT xG: TUR 1.30 - USA 0.52 — Türkiye clearly the better side despite lower possession (42-58). **CORRECTION from Iteration 9:** Sofascore's "confirmed" Türkiye lineup was inaccurate. Actual confirmed XI (per FotMob live match center): Çakir; Çelik(C), Bardakci, Kabak, Elmali; Kökçü, Özcan; Aydin, Güler, Yildiz; Yilmaz. **Calhanoglu did NOT start** — he was on the bench. This makes Türkiye's performance even more impressive: their young core (Güler, Kökçü, Yildiz) broke the 62-shot goal drought without their captain. **WHT applied:** Score (2-1 TUR) CONTRADICTS prediction (USA WIN). A structural cause exists — USA's extreme rotation (8 changes) produced a disjointed XI that is being structurally outplayed (xG 0.52, trailing to a motivated opponent that just broke its goal drought). Since the structural cause WAS anticipated as a risk (Low confidence), but the magnitude was underestimated, I will NOT flip to TÜRKIYE WIN but flag for strong postmortem review. Pulisic entered at HT as substitute.
 
 ### Key Factors
-- [official] [Sofascore confirmed lineups] USA (4-2-3-1): Turner; Scally, McKenzie, Trusty, Arfsten; Berhalter, Tillman; Weah, Reyna, Zendejas; Wright. Bench: Freese, M. Robinson, Pulisic, McKennie, Pepi, Aaronson, Dest, Freeman, Roldan, Zendejas, Ream, Brady.
-- [official] [Sofascore confirmed lineups] Türkiye (4-2-3-1): Cakir; Muldur, Demiral, Bardakci, Kadioglu; Calhanoglu, Yuksek; Uzun, Guler, Yildiz; Gul. Bench includes Kokcu, Ozcan, Akturkoglu, Akgun.
-- [strong] [Sporting News 2026-06-26 00:43 UTC] Pre-lineup report had Calhanoglu benched — official lineup contradicts this. Calhanoglu starts and is the key creative threat.
-- [strong] [USA Today 2026-06-26] Pre-match report had Pepi starting — official lineup shows Wright instead. USA even more rotated than expected.
-- [strong] Clinical Finishing Gate: Türkiye 62 shots, 0 goals in 2 matches — still applies. However, Calhanoglu's presence increases the chance of breaking the drought.
-- [risk] USA's XI has minimal shared match minutes — 8 changes from the Group D winning lineup. Disjointedness is a real concern.
-- [risk] Türkiye eliminated and playing freely — may finally convert chances against a makeshift USA defense.
+- [official] [FotMob live match data] HT: Türkiye 2-1 USA. Goals: Trusty 3' (Berhalter), Güler 10' (Yilmaz), Kökçü 31' (Elmali). Berhalter YC 19'.
+- [strong] [FotMob] Possession 42-58. xG: TUR 1.30 - USA 0.52. Shots 4-6, SOT 2-3. Türkiye 2 big chances, USA 1.
+- [official] [FotMob confirmed lineup — CORRECTED] Türkiye (3-4-2-1): Çakir; Çelik(C), Bardakci, Kabak, Elmali; Kökçü, Özcan; Aydin, Güler, Yildiz; Yilmaz. **Calhanoglu on bench** — Sofascore data in Iteration 9 was incorrect.
+- [official] [FotMob/BBC confirmed lineup] USA (4-3-3): Turner; Scally, McKenzie, Trusty, Arfsten; Berhalter, Tillman, Weah; Reyna, Zendejas, Wright. Pulisic substituted in at HT.
+- [strong] [Sporting News / BBC] Pre-match reports of Calhanoglu benched were CORRECT — contradicts Sofascore projected data. Türkiye's XI was young and rotated.
+- [risk] WHT: Score contradicts USA WIN prediction. Structural cause (extreme USA rotation underestimated) exists. Downgrade not possible (already Low). FT may require a flip for the postmortem.
+- [risk] USA's disjointed XI created only 0.52 xG in the first half vs a Türkiye defense conceding freely.
 
 ### Evidence Gathered This Iteration
-- [official] [Sofascore 2026-06-26 01:11 UTC] Confirmed lineups for TUR-USA. USA: Turner; Scally, McKenzie, Trusty, Arfsten; Berhalter, Tillman; Weah, Reyna, Zendejas; Wright. Türkiye: Cakir; Muldur, Demiral, Bardakci, Kadioglu; Calhanoglu, Yuksek; Uzun, Guler, Yildiz; Gul.
-- [strong] [Sporting News 2026-06-26 00:43 UTC] USA XI (pre-official): Turner; Scally, Trusty, McKenzie, M. Robinson; Berhalter, Reyna; Aaronson, McKennie, Weah; Pepi. Conflicting with official — official is more rotated.
-- [strong] [USA Today 2026-06-26 00:48 UTC] USA lineup report: Turner; Trusty, M. Robinson, McKenzie, Scally; Berhalter, Reyna, McKennie; Aaronson, Pepi, Weah. Pre-official — official shows more rotation.
+- [official] [FotMob] HT: Türkiye 2-1 USA. Full first-half data including xG, shots, cards. Confirmed lineups (CORRECTED).
+- [strong] [BBC Sport / Yahoo Sports / SportScore] Multiple sources confirm HT 2-1 scoreline.
+- [strong] [BBC Sport 2026-06-26] "Trusty's goal is the second fastest goal in USA's World Cup history (02:13). Turkey responded through Güler and Kökçü."
+- [strong] [FotMob] xG: TUR 1.30 - USA 0.52. Türkiye generated 1.25 xG from open play — sustainable attacking patterns.
 
 ### Search History
-- **Iteration 9**: `USA Türkiye World Cup 2026 confirmed lineups starting XI June 25`, `Türkiye USA confirmed lineups fotmob starting 11`, `Turkey lineup vs USA Calhanoglu starting World Cup 2026 SoFi`, `Sofascore Turkiye USA confirmed lineups World Cup`
+- **Iteration 10**: `USA Turkey World Cup 2026 live score match events halftime 02:00`, `Turkiye USA fotmob live score match stats`, `Turkey USA halftime 2-1 Guler Kokcu goals match stats`
 
 ### Questions for Next Iteration
-1. First-half events — does Türkiye's Clinical Finishing drought continue, or does Calhanoglu/Guler create a breakthrough?
-2. HT scoreline — apply WHT. If USA trails, is there a structural cause (extreme rotation, disjointedness)?
-3. Pulisic cameo — does he enter and affect the game?
+1. FT score — does Türkiye hold the lead? Can USA equalize with Pulisic on the field?
+2. Second-half events — any further goals, cards, or structural changes?
+3. If FT is a Türkiye win (2-1 or more), flip prediction to TÜRKIYE WIN for audit. If USA equalizes, the WHT downgrade was overcautious.
 
 ### Prediction Changes
-- **Previous prediction:** USA WIN / Low (Iteration 3)
-- **Change:** No change to outcome or confidence. Confirmed lineups show even more USA rotation than expected (Tillman, Wright, Zendejas, Arfsten) but Calhanoglu starting for Türkiye was a negative surprise that roughly offsets. Low confidence maintained.
+- **Previous prediction:** USA WIN / Low (Iteration 3, unchanged through Iteration 9)
+- **Change:** No change to outcome or confidence, but prediction is under severe structural pressure. WHT applied: score contradicts, structural cause exists (extreme rotation impact underestimated). Pulisic's HT introduction is a potential game-changer. Correction: Sofascore data in Iteration 9 was inaccurate — Calhanoglu did NOT start. Türkiye's young core (Güler, Kökçü) broke their goal drought without him.
 
 ---
 
 ### Match: Paraguay vs. Australia
 
-**Status:** not_started (kickoff 02:00 UTC June 26, ~45 min away)
+**Status:** live_post_halftime (HT: 0-0)
 **Kickoff:** 02:00 UTC (June 26) | **Venue:** Levi's Stadium, Santa Clara | **Group/Round:** Group D
 
 ### Prediction: DRAW
 **Confidence:** Low
 
 ### Reasoning
-Both teams are defensively pragmatic and a draw strongly suits both — Australia finishes 2nd with a draw (superior GD, 4pts), and Paraguay (3pts) would likely advance as one of the best 3rd-placed teams. Confirmed lineups reinforce the defensive theme. Paraguay (5-4-1): Gill; Velázquez, Gómez(C), Alderete, Cáceres, Maidana; D. Gómez, Galarza, Cubas, Enciso; Ávalos. Almiron (suspension) confirmed out — Ávalos starts as striker with Enciso as the primary creative outlet. Five-at-the-back system. Australia (3-4-2-1): Beach; Circati, Souttar(C), Herrington; Behich, O'Neill, Irvine, Bos; Metcalfe, Volpato; Irankunda. Leckie (hamstring) and Italiano (adductor) confirmed out. Herrington starts at CB (young, replacing Burgess). Irvine starts in midfield (experience). Volpato over Toure in the attacking line. Irankunda lone striker. Levi's Stadium temporary grass favors defensive, direct play. Low confidence because a 1-0 either way is equally plausible given individual quality and both teams' conservative setups.
+HT 0-0 — exactly as predicted. Extremely low-event half: Paraguay 0 shots, 0.00 xG. Australia 4 shots, 0.14 xG, 2 SOT. Possession: PAR 36-64 AUS. The only notable event was a Jackson Irvine shot saved by Gill. Both teams playing conservatively as expected — Australia needs only a draw to advance (4pts, better GD), Paraguay would likely advance with 4pts as best 3rd-place team. Levi's Stadium temporary grass is slowing play significantly. **WHT applied: FROZEN.** Score (0-0) CONFIRMS the DRAW prediction. No structural changes (no goals, no cards, no injuries). Freeze at Low confidence.
 
 ### Key Factors
-- [official] [FotMob confirmed lineups] Paraguay (5-4-1): Gill; Velázquez, Gómez(C), Alderete, Cáceres, Maidana; D. Gómez, Galarza, Cubas, Enciso; Ávalos.
-- [official] [FotMob confirmed lineups] Australia (3-4-2-1): Beach; Circati, Souttar(C), Herrington; Behich, O'Neill, Irvine, Bos; Metcalfe, Volpato; Irankunda.
-- [strong] Transfermarkt: Almiron suspended (red card) — confirmed out. No other Paraguay absences.
-- [strong] Socceroos.com.au: Leckie (hamstring) and Italiano (adductor) confirmed out for Australia.
-- [strong] Mutual advancement incentive: DRAW sends Australia through (4pts, better GD). Paraguay would likely advance with 4pts as best 3rd-place team.
-- [medium] Both teams defensively structured — Paraguay 5-4-1 low-block, Australia 3-4-2-1 with 5 defensive players.
-- [medium] Levi's Stadium temporary grass — favors direct/defensive play, validated by multiple prior matches.
-- [risk] Set pieces: Paraguay has aerial threats (Gómez, Alderete) vs Australia's young CB Herrington.
+- [official] [FotMob live match data] HT: Paraguay 0-0 Australia. xG: PAR 0.00 - AUS 0.14. Shots 0-4, SOT 0-2.
+- [strong] [FOX Sports live box score] HT: 0-0. POSS: 39-61. 0 chances created (Paraguay), 3 (Australia).
+- [strong] [BBC Sport 2026-06-26] "We've reached the hydration break in San Francisco and a Jackson Irvine shot for Australia, pushed away by Gill, is the only action of note."
+- [strong] [FotMob] Paraguay 0 big chances, 0 corners. Australia 0 big chances, 3 corners. No cards.
+- [medium] WHT: Score CONFIRMS prediction → frozen at Low.
 
 ### Evidence Gathered This Iteration
-- [official] [FotMob 2026-06-26] Confirmed lineups: Paraguay (5-4-1) vs Australia (3-4-2-1). Key personnel confirmed.
-- [strong] [Socceroos.com.au] Leckie, Italiano ruled out. Irvine starts.
-- [strong] [Transfermarkt] Almiron suspension confirmed.
+- [official] [FotMob / FOX Sports] HT: 0-0. Minimal events. First-half xG total: 0.14 (lowest of any match today).
+- [strong] [BBC Sport live blog] Confirms only notable event was Irvine's shot saved by Gill. "Australia earn the first corner — Harry Souttar is the target."
 
 ### Search History
-- **Iteration 9**: `Paraguay Australia World Cup 2026 confirmed lineups starting XI`, `fotmob Paraguay Australia lineups World Cup 2026`, `Paraguay Australia confirmed lineups official starting XI World Cup`
+- **Iteration 10**: `Paraguay Australia World Cup 2026 live score match events halftime`, `Paraguay Australia 0-0 halftime World Cup 2026 stats shots`
 
 ### Questions for Next Iteration
-1. First-half events — does either team create significant chances, or is it a tight, low-event half?
-2. HT scoreline — apply WHT. If either team leads, does the score align with the draw prediction (i.e., does a lead make the DRAW prediction wrong, or does the mutual advancement incentive still suggest a draw)?
-3. Irankunda impact — does Australia's most dynamic attacker find space against Paraguay's defensive block?
+1. FT score verification — does 0-0 hold, or does one team break through in the second half?
+2. If Paraguay scores (must-win), does Australia respond or does the draw incentive shift?
+3. Any second-half cards, injuries, or substitutions that change the match state?
 
 ### Prediction Changes
 - **Previous prediction:** DRAW / Low (Iteration 3)
-- **Change:** No change. Confirmed lineups reinforce the defensive/pragmatic prediction. Australia's Herrington at CB (inexperienced) is a minor new risk factor for set-piece vulnerability.
+- **Change:** No change. WHT applied: Score (0-0) confirms prediction. Frozen at Low. First-half data reinforces the defensive stalemate prediction.
