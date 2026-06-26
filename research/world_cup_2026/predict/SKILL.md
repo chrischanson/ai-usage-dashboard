@@ -79,6 +79,8 @@ These heuristics have been validated by prior match results and postmortems. App
 
 21. **Lineup Source Reliability (New 2026-06-25)**: FotMob live match center should be the single source of truth for confirmed starting XIs. Sofascore and other aggregators may display projected lineups as "confirmed." If a lineup source conflict arises, prefer FotMob. This is the third source reliability finding (following Khel Now for Ivory Coast on June 14 and 20). When searching for lineups, explicitly prefer queries that return FotMob or official team/federation announcement pages.
 
+22. **Bielsa-System Defensive Fragility (New 2026-06-21, Uruguay-specific)**: Under Marcelo Bielsa's man-marking, high-pressing defensive system, individual defensive errors are more frequent because players are frequently isolated in one-on-one situations after the press is bypassed. Uruguay has now dropped points from a winning position (June 21 vs Cape Verde) due to individual defensive errors in set-piece situations. When predicting matches involving Bielsa-coached teams, apply a modest confidence discount—especially for HT-frozen predictions where Uruguay holds a lead—because a single individual error can erase that lead against a set-piece-capable opponent. This is a system-level risk (not a one-off), and it applies regardless of the quality of the individual defenders available.
+
 Do not update accuracy tables during this skill. That belongs to the postmortem skill.
 
 Finally, read `{PREDICTIONS_PATH}` if it exists. Extract:
@@ -92,6 +94,16 @@ Finally, read `{PREDICTIONS_PATH}` if it exists. Extract:
 Set the new iteration number to the previous iteration plus one. If this is the first prediction file for the day, start at iteration 1.
 
 ## Step 2: Research Plan
+
+### Mandatory Pre-Match Checks (run before any searches)
+
+Before choosing searches, perform these two checks for every eligible match and document the results:
+
+**A. Draw-Sufficiency Check**: Determine each team's current group-stage points. If the favored team needs only 1 point to advance AND the opponent is winless or must-win, flag this as a Draw-Sufficiency situation. Apply Heuristic #19 (one-notch confidence downgrade) in Step 4. This check is mandatory — do not skip it for any group-stage match.
+
+**B. Finishing Deficiency Pre-Screen**: For each team being considered as a predicted winner, check if they have prior tournament matches. If yes, look up their goals-vs-shots and goals-vs-xG ratios immediately. Document the ratios now so the Clinical Finishing Gate (Heuristic #8, Important Rule #13) can be applied efficiently in Step 4 without needing a separate research query.
+
+---
 
 For each eligible match, choose targeted searches in this order:
 
@@ -311,7 +323,25 @@ Adjust for information rate and token efficiency:
 
 The file content of `{INTERVAL_PATH}` must be exactly one integer between 60 and 180.
 
-2. Predict the complexity/difficulty of the questions for the next iteration:
+### Iteration Budget and Start-Time Guidance
+
+Token efficiency requires limiting the total number of iterations per matchday and starting the run at the right time. Postmortems have shown that early-start, low-value iterations account for 65-70% of total token burn with zero prediction changes.
+
+**Recommended start time:** Do NOT begin the prediction loop more than ~5 hours before the first match kickoff. For a 20:00 UTC kickoff slot, begin at ~15:00 UTC (not 09:00 UTC). This eliminates 3-4 low-value pre-lineup iterations that produce no prediction changes.
+
+**Iteration budget per matchday (3 match time-slots):**
+- Target: **≤7 total iterations**. Suggested allocation:
+  1. **Initial predictions** — pre-match analysis for all matches (~5h before first kickoff)
+  2. **Pre-lineup evidence** — injury, press, venue for upcoming match slot (~2h before kickoff)
+  3. **Lineup verification** — official XI confirmation (45-60min before kickoff of slot 1)
+  4. **WHT slot 1** — HT assessment and freeze/downgrade decision
+  5. **FT slot 1 + lineup slot 2** — results + injury/press for next slot
+  6. **WHT slot 2 + lineup slot 3** — HT + next lineup verification
+  7. **FT slot 2 + WHT/FT slot 3** — final results verification
+- If there are only 1-2 match time-slots, cap at **≤5 total iterations**.
+- If the iteration produces zero prediction or confidence changes AND no match is within 90 minutes of kickoff or halftime, do NOT schedule a follow-up iteration below 180 minutes.
+
+3. Predict the complexity/difficulty of the questions for the next iteration:
    - If the next questions are predicted to be hard (e.g., they require deep tactical interpretation, complex analysis of conflicting reports, or resolving late lineup updates close to kickoff), set the `next_difficulty` key in the `{PREDICTIONS_PATH}` frontmatter to `high`.
    - If the questions are very straightforward (e.g., just verifying a stable/unchanged lineup or monitoring a stable live match with no key changes expected), set the `next_difficulty` key to `low` to conserve tokens by running a cheaper model.
    - Otherwise, set the `next_difficulty` key to `medium`.
@@ -328,6 +358,7 @@ The file content of `{INTERVAL_PATH}` must be exactly one integer between 60 and
    - **If live score CONFIRMS the prediction** (e.g., predicted TEAM A WIN and Team A is leading): Freeze the prediction — keep gathering live evidence for audit but do not change the outcome or confidence.
    - **If live score CONTRADICTS the prediction** (e.g., predicted TEAM A WIN but Team A is trailing or drawing against a much weaker opponent): Do NOT automatically flip the prediction. Instead, weigh the live score against the pre-match analytical foundation. Only change the prediction if the live evidence reveals a *structural* reason the pre-match analysis was wrong (e.g., a red card, a key injury, or a fundamental tactical mismatch not anticipated). A temporary scoreline alone is insufficient to override a well-founded analytical prediction.
    - **CRITICAL**: Do NOT freeze a prediction that is actively *contradicted* by the halftime score AND where no structural reason for the contradiction has been found. A freeze should only occur when the live score *confirms* the prediction. If the score contradicts the prediction and no structural cause is identified, mark the confidence as Low and flag it for postmortem review — do not silently freeze an incorrect prediction.
+   - **Personnel Quality Assessment (New 2026-06-21)**: When evaluating whether a team trailing at HT is "structurally incapable of scoring" (justifying a flip) vs. "playing poorly" (justifying a downgrade but not a flip), you MUST explicitly evaluate the team's individual finishing quality, not just team-level xG. A team with elite individual finishers (e.g., Salah, Mbappe, Haaland) can overcome sub-0.10 xG at HT through second-half converting of individually-created chances. The distinction is: team-level xG reflects chance quality, but elite individuals manufacture goals that models underestimate. Only flip a prediction if the team lacks the finishing personnel to realistically overturn the scoreline — not just because first-half xG was poor. Validated by NZ-EGY (2026-06-21): Egypt trailed 1-0 at HT with 0.04 xG but Salah/Marmoush/Trezeguet scored 3 second-half goals to win 3-1.
    - **Goal Sustainability Assessment (New 2026-06-24)**: When the underdog's goals come from low-probability sources (own goal, deflection, long-range strike), treat the HT scoreline as LESS structurally significant than the pre-match analytical foundation. An underdog with goals from non-sustainable patterns (OG + long range) is not the same as an underdog with structural attacking success (sustained pressure, repeated quality chances). When underdog goals are deemed unsustainable AND the favorite has dominant xG, the HT score alone should NOT justify a confidence downgrade. Validated by MAR-HAI 2026-06-24: Haiti's 2 goals (OG Bounou 10', Isidor long-range 43') were both low-probability events — Morocco had 2.15 xG in the first half alone. The system correctly froze the prediction at Medium despite the 2-2 HT scoreline.
    - From halftime until estimated full time, keep gathering concise live evidence for audit and postmortem context.
 8. **Use the dynamic interval every run.** The loop frequency is part of the prediction system, not an afterthought.
@@ -339,3 +370,4 @@ The file content of `{INTERVAL_PATH}` must be exactly one integer between 60 and
 14. **Single-player absence rule for host nations.** When a host nation is missing even their most important offensive player, do not downgrade to DRAW if the opponent is a purely defensive, low-transition team with minimal scoring capability. The host-nation effect, crowd pressure, and squad depth gap are stronger predictors than the missing player. Evaluate the opponent's goal-scoring capability — not just the favorite's offensive loss.
 15. **Dead rubber rotation depth rule.** In dead rubbers where both teams rotate heavily, the team with greater squad depth (bench quality, not just XI quality) has the advantage. Heavily rotated lineups from shallow squads (e.g., Czechia without Schick/Soucek) are substantially weaker than heavily rotated lineups from deep squads (e.g., Mexico without Ochoa/Jimenez/Gimenez). When evaluating a dead rubber with confirmed heavy rotation on both sides, explicitly compare bench depth — not just rotated XI quality. Validated by CZE-MEX 2026-06-24: Mexico's second XI defeated Czechia's second XI 3-0.
 
+16. **Maximum iterations per matchday.** Do not exceed 7 iterations for a 3-slot matchday or 5 iterations for a 1-2 slot matchday. If the current iteration count is approaching the cap AND the remaining matches are not yet live, increase the interval aggressively (toward 180 minutes) to preserve capacity for HT and FT assessments. High-value iterations (lineup verification, WHT, result verification) must never be sacrificed for low-value early-research iterations.
