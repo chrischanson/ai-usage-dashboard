@@ -35,6 +35,49 @@ KEYWORD_MAP = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Hallucination guard helpers
+# ---------------------------------------------------------------------------
+
+# Words in LLM notes that indicate fabricated/mock output.
+_SUSPICIOUS_NOTE_WORDS: tuple[str, ...] = (
+    "mock",
+    "sample",
+    "example",
+    "placeholder",
+    "hallucinated",
+    "fictional",
+    "fake",
+    "dummy",
+    "test data",
+    "hypothetical",
+)
+
+# Minimum plausible span (days) for a registration window.
+# Real marathons never open and close registration in fewer than 7 days.
+_MIN_WINDOW_DAYS = 7
+
+
+def _is_suspicious_note(notes: str | None) -> bool:
+    """Return True if the LLM notes contain language suggesting fabricated data."""
+    if not notes:
+        return False
+    lower = notes.lower()
+    return any(word in lower for word in _SUSPICIOUS_NOTE_WORDS)
+
+
+def _is_window_too_short(open_date: str | None, close_date: str | None) -> bool:
+    """Return True if the registration window spans fewer than _MIN_WINDOW_DAYS days."""
+    if not open_date or not close_date:
+        return False
+    try:
+        op = datetime.fromisoformat(open_date).date()
+        cl = datetime.fromisoformat(close_date).date()
+        return (cl - op).days < _MIN_WINDOW_DAYS
+    except (ValueError, TypeError):
+        return False
+
+
 def extract_dates(race: Race, page_text: str | None, source_url: str | None = None) -> RaceResult:
     result = RaceResult.from_race(race)
     if not page_text:
@@ -69,6 +112,23 @@ def apply_extraction(
     replace_existing: bool,
     source_url: str | None = None
 ) -> None:
+    # ------------------------------------------------------------------
+    # Hallucination guard: check the LLM notes first.
+    # If they contain suspicious language, downgrade confidence to "low"
+    # and skip writing the event_date and registration windows entirely.
+    # ------------------------------------------------------------------
+    notes = extraction.get("notes")
+    notes_str = str(notes) if notes else None
+    hallucination_detected = _is_suspicious_note(notes_str)
+
+    if hallucination_detected:
+        # Still record the notes so a human can audit, but force low confidence.
+        if notes_str and (replace_existing or not result.notes):
+            result.notes = f"[HALLUCINATION GUARD] {notes_str}"
+        result.confidence = "low"
+        # Do not write event_date or registration_windows from this extraction.
+        return
+
     # 1. Extract event_date
     value = extraction.get("event_date")
     normalized_event = normalize_date(value) if isinstance(value, str) else None
@@ -86,6 +146,9 @@ def apply_extraction(
                 op = normalize_date(w.get("open_date"))
                 cl = normalize_date(w.get("close_date"))
                 if op or cl:
+                    # Reject windows that are unrealistically short.
+                    if _is_window_too_short(op, cl):
+                        continue
                     windows.append(RegistrationWindow(
                         window_type=str(w_type),
                         open_date=op,
@@ -100,9 +163,8 @@ def apply_extraction(
     confidence = extraction.get("confidence")
     if replace_existing or result.confidence == "unknown":
         result.confidence = str(confidence) if confidence in {"high", "medium", "low", "unknown"} else "unknown"
-    notes = extraction.get("notes")
-    if notes and (replace_existing or not result.notes):
-        result.notes = str(notes)
+    if notes_str and (replace_existing or not result.notes):
+        result.notes = notes_str
     evidence = extraction.get("raw_evidence")
     if isinstance(evidence, list):
         result.raw_evidence = [str(item)[:300] for item in evidence[:5]]

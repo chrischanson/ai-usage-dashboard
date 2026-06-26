@@ -36,6 +36,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--llm-mode", choices=["api", "agy", "opencode", "auto"], default="auto",
         help="LLM execution mode. 'auto' selects LLM_API_KEY, then agy CLI, then opencode CLI.",
     )
+    parser.add_argument(
+        "--reset-db", action="store_true",
+        help=(
+            "Delete the existing database before running, starting from a clean state. "
+            "WARNING: all previously extracted race data will be permanently lost. "
+            "A backup is saved alongside the original file before deletion."
+        ),
+    )
     return parser
 
 
@@ -107,11 +115,58 @@ def _needs_refresh(result: RaceResult) -> bool:
     return _get_refresh_reason(result) is not None
 
 
+def _flag_duplicate_event_dates(
+    results: list[RaceResult],
+    threshold: int = 3,
+) -> list[str]:
+    """Detect and neutralise suspicious duplicate event_dates across unrelated races.
+
+    If `threshold` or more *distinct* results share the same event_date, it is
+    almost certainly a hallucination artifact.  All such results have their
+    confidence downgraded to 'low' and their event_date cleared.  Returns the
+    list of flagged date strings (empty if nothing was flagged).
+    """
+    from collections import defaultdict
+    date_to_results: dict[str, list[RaceResult]] = defaultdict(list)
+    for r in results:
+        if r.event_date and r.extraction_method not in ("seed",):
+            date_to_results[r.event_date].append(r)
+
+    flagged_dates: list[str] = []
+    for date_str, group in date_to_results.items():
+        if len(group) >= threshold:
+            flagged_dates.append(date_str)
+            for r in group:
+                r.event_date = None
+                r.confidence = "low"
+                r.notes = (
+                    f"[DUPLICATE DATE GUARD] event_date '{date_str}' was shared by "
+                    f"{len(group)} unrelated races — likely a hallucination. "
+                    "Date cleared; please re-extract from the official page."
+                )
+    return flagged_dates
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     os.environ["LLM_MODE"] = args.llm_mode
     no_network = args.no_network or False
     today = _now()
+
+    # ── Optional: Reset DB ───────────────────────────────────────────
+    if getattr(args, "reset_db", False):
+        db_path: Path = args.db
+        if db_path.exists():
+            backup = db_path.with_suffix(".db.bak_reset")
+            import shutil
+            shutil.copy2(db_path, backup)
+            db_path.unlink()
+            print(
+                f"reset-db: deleted '{db_path}' (backup saved to '{backup}').",
+                file=sys.stderr,
+            )
+        else:
+            print(f"reset-db: '{db_path}' does not exist yet; starting fresh.", file=sys.stderr)
 
     # ── Phase A: Load state + Discover ──────────────────────────────
     previous = load_previous_output(args.db)
@@ -384,6 +439,15 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"  Notes:        {r.notes}")
                 print()
             print("=======================================\n")
+
+        # ── Post-Phase-C: Duplicate-date validation ──────────────────────
+        flagged = _flag_duplicate_event_dates(results)
+        if flagged:
+            print(
+                f"warning: duplicate-date guard flagged {len(flagged)} date(s) shared across "
+                f"3+ races: {flagged}. Confidence downgraded to 'low' for affected events.",
+                file=sys.stderr,
+            )
 
         save_race_results(results)
         write_outputs(results, args.docs_dir)
