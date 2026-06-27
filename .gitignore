@@ -30,4 +30,9 @@ research/marathon_tracker/config/races.json
 .agy_conversation_id
 .opencode_session_id
 
+# Log files
+error.log
+dashboard.log
+*.log
+
 
