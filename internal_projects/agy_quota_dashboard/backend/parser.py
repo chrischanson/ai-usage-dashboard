@@ -74,7 +74,7 @@ def parse_report_content(content):
 def fetch_and_parse():
     try:
         # Run opencode stats --models to get the report
-        result = subprocess.run(['opencode', 'stats', '--models'], capture_output=True, text=True)
+        result = subprocess.run(['opencode', 'stats', '--models'], capture_output=True, text=True, timeout=30)
         return parse_report_content(result.stdout)
     except Exception as e:
         print("Failed to run opencode stats:", e)

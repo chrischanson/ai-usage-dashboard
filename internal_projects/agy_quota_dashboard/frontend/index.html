@@ -3,63 +3,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AGY Quota Dashboard</title>
+    <title>Model Usage Dashboard</title>
+    <meta name="description" content="Live model usage and quota dashboard for Antigravity, OpenCode, and Codex">
     <link rel="stylesheet" href="index.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="chart.js"></script>
+    <script src="hammer.js"></script>
+    <script src="chartjs-plugin-zoom.js"></script>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>AGY Quota Dashboard</h1>
-            <div class="status-indicator">
-                <span class="dot"></span> Live
+            <h1>Model Usage Dashboard</h1>
+            <div class="header-right">
+                <div class="time-range-buttons">
+                    <button class="range-btn" data-range="1h">1h</button>
+                    <button class="range-btn" data-range="6h">6h</button>
+                    <button class="range-btn" data-range="1d">1d</button>
+                    <button class="range-btn" data-range="1w">1w</button>
+                    <button class="range-btn" data-range="1m">1m</button>
+                    <button class="range-btn" data-range="3m">3m</button>
+                    <button class="range-btn active" data-range="all">All</button>
+                </div>
+                <div class="status-indicator">
+                    <span class="dot"></span> Live
+                </div>
             </div>
         </header>
 
-        <main>
-            <section class="overview-cards">
-                <div class="card glass">
-                    <h3>Total Sessions</h3>
-                    <p id="total-sessions">--</p>
-                </div>
-                <div class="card glass">
-                    <h3>Total Messages</h3>
-                    <p id="total-messages">--</p>
-                </div>
-                <div class="card glass">
-                    <h3>Total Cost</h3>
-                    <p id="total-cost">--</p>
-                </div>
-                <div class="card glass">
-                    <h3>Input Tokens</h3>
-                    <p id="input-tokens">--</p>
-                </div>
-                <div class="card glass">
-                    <h3>Output Tokens</h3>
-                    <p id="output-tokens">--</p>
-                </div>
-            </section>
+        <!-- Source Tabs -->
+        <div class="tabs" id="source-tabs">
+            <button class="tab active" data-source="combined" id="tab-combined">
+                All
+            </button>
+            <button class="tab" data-source="agy" id="tab-agy">
+                Antigravity (agy)
+            </button>
+            <button class="tab" data-source="opencode" id="tab-opencode">
+                OpenCode
+            </button>
+            <button class="tab" data-source="codex" id="tab-codex">
+                Codex (OpenAI)
+            </button>
+        </div>
 
+        <main>
+            <!-- Overview + Quota Row -->
+            <div class="stats-row">
+                <div class="stats-overview">
+                    <h2 class="section-title">Overview <span id="time-range-label" class="section-subtitle"></span></h2>
+                    <div class="overview-cards">
+                        <div class="card glass">
+                            <h3>Sessions / Messages</h3>
+                            <div class="card-row">
+                                <span id="total-sessions">--</span>
+                                <span class="card-sep">/</span>
+                                <span id="total-messages">--</span>
+                            </div>
+                        </div>
+                        <div class="card glass">
+                            <h3>Cache Reads</h3>
+                            <p id="cache-reads">--</p>
+                        </div>
+                        <div class="card glass">
+                            <h3>Input Tokens</h3>
+                            <p id="input-tokens">--</p>
+                        </div>
+                        <div class="card glass">
+                            <h3>Output Tokens</h3>
+                            <p id="output-tokens">--</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="stats-quota">
+                    <h2 class="section-title" id="quota-title">Quota Limits</h2>
+                    <div id="quota-cards" class="quota-cards">
+                        <p class="loading-msg">Loading quota...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts -->
             <section class="charts-section">
                 <div class="chart-container glass">
-                    <h2>Historical Usage (Tokens)</h2>
+                    <div class="chart-header">
+                        <h2>Historical Token Usage</h2>
+                        <div class="mode-toggle">
+                            <button class="mode-btn active" data-mode="total">Total</button>
+                            <button class="mode-btn" data-mode="rate">Rate</button>
+                        </div>
+                    </div>
+                    <p class="chart-tip">Use scroll wheel to zoom, click and drag to pan. Double-click to reset zoom.</p>
                     <canvas id="historyChart"></canvas>
                 </div>
                 <div class="chart-container glass">
-                    <h2>Model Usage Distribution</h2>
+                    <h2>Model Distribution</h2>
                     <canvas id="modelChart"></canvas>
                 </div>
             </section>
 
+            <!-- Model Breakdown -->
             <section class="models-list">
-                <h2>Active Models</h2>
+                <h2>Models</h2>
                 <div id="models-container" class="glass-container">
-                    <!-- Model items will be inserted here -->
+                    <p class="loading-msg">Loading...</p>
                 </div>
             </section>
         </main>
+
+        <footer class="footer">
+            <span id="last-updated">Last updated: --</span>
+        </footer>
     </div>
+
     <script src="app.js"></script>
 </body>
 </html>
