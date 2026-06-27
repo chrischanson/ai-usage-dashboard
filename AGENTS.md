@@ -9,6 +9,7 @@ This repository contains multiple research and development projects:
 - **`research/marathon_tracker/`**: Tools for tracking marathon deadlines, using LLM-based data extraction.
 - **`public_projects/video-compressor/`**: Video compression utilities (built with Bazel).
 - **`internal_projects/hello_world/`**: Bazel-based hello world.
+- **`internal_projects/agy_quota_dashboard/`**: Full-stack AGY Quota Dashboard monitoring AGY usage/quota, OpenCode stats, and Codex CLI usage with per-source tab views.
 - **`skills/`**: Structured agent skills library.
 
 ---
@@ -47,6 +48,58 @@ To execute all Bazel builds and tests in the repository:
 ```bash
 bazel test //...
 ```
+
+### AGY Quota Dashboard Verifier
+To run the dashboard verifier (114 checks covering server, HTML, JS, CSS, APIs):
+```bash
+PYTHONPATH=backend python3 verify.py
+```
+
+---
+
+## AGY Quota Dashboard — Requirements
+
+### Data Sources
+- **AGY (Antigravity)**: Quota from Cloud Code API (`loadCodeAssist` response `paidTier.name`). Usage from local conversation DBs.
+- **OpenCode**: Cost/tokens from `opencode stats --models` subprocess. Usage from `parser.py`.
+- **Codex (OpenAI)**: Rate limits from `logs_2.sqlite` websocket events (`codex.rate_limits`). Plan type from JWT in `auth.json`. Billing API as optional cost source.
+
+### API Endpoints
+| Endpoint | Method | Returns |
+|---|---|---|
+| `/api/usage/latest` | GET | Combined usage for all sources |
+| `/api/usage/{source}/latest` | GET | Per-source usage (agy/opencode/codex) |
+| `/api/usage/{source}/history` | GET | Per-source history series |
+| `/api/quota/latest` | GET | Combined quota with plan labels |
+| `/api/quota/{source}/latest` | GET | Per-source quota |
+| `/api/usage/latest?deltas=true` | GET | Model deltas for Rate mode |
+
+### Frontend Layout
+- **Header**: Title "Model Usage Dashboard" + time range buttons + Live pill in one row. No subtitle.
+- **Tabs**: All (combined), AGY, OpenCode, Codex (OpenAI). Tab label is "All", not "Combined (All)".
+- **Overview + Quota**: Side-by-side in `.stats-row` flex container.
+- **Overview Cards**: 2×2 grid. Row 1: Sessions/Messages (same row, same size, separated by `/`) | Cache Reads. Row 2: Input Tokens | Output Tokens.
+- **History Chart**: Stacked area (Total mode) or individual lines (Rate mode).
+- **Model Distribution**: Donut chart. Title adapts to mode.
+- **Mode Toggle**: Total/Rate. Affects history chart + model chart + overview cards.
+- **Time Range**: 1h/6h/1d/1w/1m/3m/all. Affects entire page (overview + history chart). Relative to data's latest timestamp, not `Date.now()`.
+
+### Quota Display
+- **AGY**: Model groups with limit bars. Plan badge dynamic from API (`paidTier.name`).
+- **OpenCode**: Total cost display.
+- **Codex**: Monthly limit % bar + plan badge only. No cost display (unhelpful). Plan from JWT (`chatgpt_plan_type`).
+
+### Security
+- All user/API-sourced strings escaped via `escapeHtml()` before `innerHTML` injection.
+- No secrets or keys logged or exposed.
+
+### Server
+- Start via: `start-stop-daemon --background --make-pidfile --pidfile /tmp/dashboard.pid --chdir ... --start --exec /tmp/venv/bin/python3 -- -m uvicorn backend.app:app --host 0.0.0.0 --port 8000`
+- Poll interval: 10 minutes (600s).
+- Python venv at `/tmp/venv/bin/python3`.
+
+### Mobile Responsive
+- Breakpoint at 640px: container padding, header stacking, scrollable tabs, single-column layouts, 24-hour time labels.
 
 ---
 
