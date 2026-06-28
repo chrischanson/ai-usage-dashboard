@@ -6,7 +6,6 @@
     <title>Model Usage Dashboard</title>
     <meta name="description" content="Live model usage and quota dashboard for Antigravity, OpenCode, and Codex">
     <link rel="stylesheet" href="index.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="chart.js"></script>
     <script src="hammer.js"></script>
     <script src="chartjs-plugin-zoom.js"></script>
@@ -16,69 +15,77 @@
         <header>
             <h1>Model Usage Dashboard</h1>
             <div class="header-right">
-                <div class="time-range-buttons">
-                    <button class="range-btn" data-range="1h">1h</button>
-                    <button class="range-btn" data-range="6h">6h</button>
-                    <button class="range-btn" data-range="1d">1d</button>
-                    <button class="range-btn" data-range="1w">1w</button>
-                    <button class="range-btn" data-range="1m">1m</button>
-                    <button class="range-btn" data-range="3m">3m</button>
-                    <button class="range-btn active" data-range="all">All</button>
+                <div class="time-range-buttons" role="group" aria-label="Time range">
+                    <button class="range-btn" data-range="1h" aria-label="Last hour">1h</button>
+                    <button class="range-btn" data-range="6h" aria-label="Last 6 hours">6h</button>
+                    <button class="range-btn" data-range="1d" aria-label="Last 24 hours">1d</button>
+                    <button class="range-btn" data-range="1w" aria-label="Last week">1w</button>
+                    <button class="range-btn" data-range="1m" aria-label="Last month">1m</button>
+                    <button class="range-btn" data-range="3m" aria-label="Last 3 months">3m</button>
+                    <button class="range-btn active" data-range="all" aria-label="All time">All</button>
                 </div>
-                <div class="status-indicator">
-                    <span class="dot"></span> Live
+                <div class="status-indicator" id="status-indicator" role="status" aria-live="polite" aria-atomic="true">
+                    <span class="dot" aria-hidden="true"></span>
+                    <span id="status-text">Live</span>
                 </div>
             </div>
         </header>
 
+        <!-- Error Banner -->
+        <div id="error-banner" class="error-banner" role="alert" hidden>
+            <span id="error-message"></span>
+            <button id="retry-btn" class="retry-btn" aria-label="Retry loading data">Retry</button>
+            <button id="dismiss-btn" class="dismiss-btn" aria-label="Dismiss error">&times;</button>
+        </div>
+
         <!-- Source Tabs -->
-        <div class="tabs" id="source-tabs">
-            <button class="tab active" data-source="combined" id="tab-combined">
+        <div class="tabs" id="source-tabs" role="tablist" aria-label="Data source">
+            <button class="tab active" data-source="combined" id="tab-combined" role="tab" aria-selected="true" aria-controls="panel-main">
                 All
             </button>
-            <button class="tab" data-source="agy" id="tab-agy">
+            <button class="tab" data-source="agy" id="tab-agy" role="tab" aria-selected="false" aria-controls="panel-main">
                 Antigravity (agy)
             </button>
-            <button class="tab" data-source="opencode" id="tab-opencode">
+            <button class="tab" data-source="opencode" id="tab-opencode" role="tab" aria-selected="false" aria-controls="panel-main">
                 OpenCode
             </button>
-            <button class="tab" data-source="codex" id="tab-codex">
+            <button class="tab" data-source="codex" id="tab-codex" role="tab" aria-selected="false" aria-controls="panel-main">
                 Codex (OpenAI)
             </button>
         </div>
 
-        <main>
+        <main id="panel-main" role="tabpanel">
             <!-- Overview + Quota Row -->
             <div class="stats-row">
                 <div class="stats-overview">
                     <h2 class="section-title">Overview <span id="time-range-label" class="section-subtitle"></span></h2>
                     <div class="overview-cards">
-                        <div class="card glass">
+                        <div class="card glass" id="card-sessions">
                             <h3>Sessions / Messages</h3>
                             <div class="card-row">
-                                <span id="total-sessions">--</span>
+                                <span id="total-sessions" class="skeleton skeleton-text"><span class="visually-hidden">Loading</span></span>
                                 <span class="card-sep">/</span>
-                                <span id="total-messages">--</span>
+                                <span id="total-messages" class="skeleton skeleton-text"><span class="visually-hidden">Loading</span></span>
                             </div>
                         </div>
-                        <div class="card glass">
+                        <div class="card glass" id="card-cache">
                             <h3>Cache Reads</h3>
-                            <p id="cache-reads">--</p>
+                            <p id="cache-reads" class="skeleton skeleton-text"><span class="visually-hidden">Loading</span></p>
                         </div>
-                        <div class="card glass">
+                        <div class="card glass" id="card-input">
                             <h3>Input Tokens</h3>
-                            <p id="input-tokens">--</p>
+                            <p id="input-tokens" class="skeleton skeleton-text"><span class="visually-hidden">Loading</span></p>
                         </div>
-                        <div class="card glass">
+                        <div class="card glass" id="card-output">
                             <h3>Output Tokens</h3>
-                            <p id="output-tokens">--</p>
+                            <p id="output-tokens" class="skeleton skeleton-text"><span class="visually-hidden">Loading</span></p>
                         </div>
                     </div>
                 </div>
                 <div class="stats-quota">
                     <h2 class="section-title" id="quota-title">Quota Limits</h2>
                     <div id="quota-cards" class="quota-cards">
-                        <p class="loading-msg">Loading quota...</p>
+                        <div class="skeleton skeleton-card" aria-label="Loading quota"></div>
                     </div>
                 </div>
             </div>
@@ -88,9 +95,9 @@
                 <div class="chart-container glass">
                     <div class="chart-header">
                         <h2>Historical Token Usage</h2>
-                        <div class="mode-toggle">
-                            <button class="mode-btn active" data-mode="total">Total</button>
-                            <button class="mode-btn" data-mode="rate">Rate</button>
+                        <div class="mode-toggle" role="group" aria-label="Chart mode">
+                            <button class="mode-btn active" data-mode="total" aria-label="Total mode, stacked area chart">Total</button>
+                            <button class="mode-btn" data-mode="rate" aria-label="Rate mode, individual line graphs">Rate</button>
                         </div>
                     </div>
                     <p class="chart-tip">Use scroll wheel to zoom, click and drag to pan. Double-click to reset zoom.</p>
@@ -103,10 +110,11 @@
             </section>
 
             <!-- Model Breakdown -->
-            <section class="models-list">
+            <section class="models-list" aria-label="Model breakdown">
                 <h2>Models</h2>
                 <div id="models-container" class="glass-container">
-                    <p class="loading-msg">Loading...</p>
+                    <div class="skeleton skeleton-model" aria-label="Loading models"></div>
+                    <div class="skeleton skeleton-model" aria-label="Loading models"></div>
                 </div>
             </section>
         </main>

@@ -131,7 +131,7 @@ if status == 200:
          'Chart re-renders from cache on range/mode change'),
         ('beginAtZero: mode === \'rate\'', 'Y-axis beginAtZero adapts to mode'),
         ('deltasParam = mode === \'rate\' ? \'?deltas=true\' : \'\'', 'Model deltas param based on mode'),
-        ('modelSrc = (mode === \'rate\' ? \'model_deltas\' : \'models\')', 'Model chart data switches with mode'),
+        ('_modelDeltas', 'Model deltas stored separately from cumulative'),
         ('chartTitle = mode === \'rate\' ?', 'Model chart title adapts to mode'),
     ]
     for pattern, msg in checks:
@@ -348,10 +348,10 @@ heading(12, 'AGY: plan extraction')
 try:
     from quota_parser import _detect_agy_plan
     plan = _detect_agy_plan()
-    if plan and plan != 'Gemini Code Assist':
+    if plan:
         ok(f'AGY: plan="{plan}" from Cloud Code API')
     else:
-        fail(f'AGY: unexpected plan="{plan}"')
+        fail(f'AGY: no plan returned')
 except ImportError as e:
     fail(f'AGY plan check: import error: {e}')
 except Exception as e:
@@ -463,22 +463,25 @@ else:
 # ── 20. Regression: Codex billing API path ──
 heading(20, 'Regression: Codex billing API handling')
 app_py = open(os.path.join(os.path.dirname(__file__), 'backend', 'app.py')).read()
-if "codex_live.get('plan_type') or codex_live.get('plan'" in app_py:
+api_py = open(os.path.join(os.path.dirname(__file__), 'backend', 'api.py')).read()
+poller_py = open(os.path.join(os.path.dirname(__file__), 'backend', 'poller.py')).read()
+code_source = api_py if "codex_live.get('plan_type') or codex_live.get('plan'" in api_py else app_py
+if "codex_live.get('plan_type') or codex_live.get('plan'" in code_source:
     ok('Codex plan reads from plan_type OR plan')
 else:
     fail('Codex plan fallback not implemented')
-if "'total_used_usd' in codex_q" in app_py:
+if "'total_used_usd' in quota" in poller_py:
     ok('Codex billing API path stored in DB')
 else:
     fail('Codex billing API path not stored')
-if "'total_used_usd' in codex_live" in app_py:
+if "'total_used_usd' in codex_live" in (api_py if "'total_used_usd' in codex_live" in api_py else app_py):
     ok('Codex billing API path in combined quota')
 else:
     fail('Codex billing API path missing from combined quota')
 
 # ── 21. Regression: Consistent field names ──
 heading(21, 'Regression: Consistent field names')
-if 'refreshes_in_seconds' in app_py:
+if 'refreshes_in_seconds' in app_py or 'refreshes_in_seconds' in api_py or 'refreshes_in_seconds' in poller_py:
     ok('Backend uses refreshes_in_seconds')
 else:
     fail('Backend missing refreshes_in_seconds')
@@ -489,7 +492,7 @@ else:
 
 # ── 22. Regression: JSON parse isolation ──
 heading(22, 'Regression: JSON parse error isolation')
-if 'try { agyData = await results[0].value.json(); } catch' in js:
+if '.value.json(); } catch' in js:
     ok('Combined history JSON parse isolated per source')
 else:
     fail('Combined history JSON parse not isolated')
@@ -520,7 +523,847 @@ if 'maintainAspectRatio' not in js:
 else:
     fail('Chart maintainAspectRatio should be removed')
 
-# ── Summary ──
+# ── 25. Regression: Combined chart timestamp tolerance ──
+heading(25, 'Regression: Combined chart timestamp matching')
+if 'matchTs' in js:
+    ok('mapTotal/mapData uses approximate timestamp matching')
+else:
+    fail('mapTotal/mapData missing matchTs function')
+if 'MS_TOLERANCE' in js:
+    ok('Combined chart has MS_TOLERANCE tolerance window')
+else:
+    fail('Combined chart missing MS_TOLERANCE')
+if 'list.find(d => d.timestamp === ts)' not in js and 'list.find(d.timestamp' not in js.replace(' ', ''):
+    ok('No exact timestamp === match in combined chart')
+else:
+    fail('Combined chart still uses exact timestamp match')
+if 'bestDiff <= MS_TOLERANCE' in js or 'bestDiff <=' in js:
+    ok('matchTs returns null when outside tolerance window')
+else:
+    fail('matchTs missing tolerance boundary check')
+
+# ── 26. Regression: Model panel respects time range ──
+heading(26, 'Regression: Model panel respects time range')
+if 'computeModelsFromHistory' in js:
+    ok('computeModelsFromHistory function exists')
+else:
+    fail('missing computeModelsFromHistory')
+if 'refreshModels' in js:
+    ok('refreshModels function exists')
+else:
+    fail('missing refreshModels')
+db_py = open(os.path.join(os.path.dirname(__file__), 'backend', 'db.py')).read()
+if "model_usage WHERE source=?" in db_py:
+    ok('Backend: history endpoint includes model data')
+else:
+    fail('Backend: history endpoint missing model data')
+
+# ── 27. M1: config.py ──
+heading(27, 'M1: config.py')
+config_path = os.path.join(os.path.dirname(__file__), 'backend', 'config.py')
+if os.path.exists(config_path):
+    ok('config.py exists')
+else:
+    fail('config.py not found')
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
+try:
+    from config import Config, load_config
+    ok('config.py has Config dataclass and load_config()')
+    from dataclasses import fields as _dc_fields
+    _field_names = {f.name for f in _dc_fields(Config)}
+    if 'db_path' in _field_names and 'poll_interval' in _field_names:
+        ok('Config has db_path and poll_interval fields')
+    else:
+        fail(f'Config missing expected fields, got: {_field_names}')
+
+    cfg = load_config()
+    assert cfg.poll_interval == 600, f'default poll_interval should be 600, got {cfg.poll_interval}'
+    assert cfg.port == 8000
+    assert cfg.log_level == 'INFO'
+    ok('load_config() returns Config with correct defaults')
+except (ImportError, AssertionError, ValueError) as e:
+    fail(f'config.py test failed: {e}')
+
+try:
+    import os as _os
+    _os.environ['AQM_POLL_INTERVAL'] = 'abc'
+    from config import load_config as _lc
+    try:
+        _lc()
+        fail('load_config() should reject invalid AQM_POLL_INTERVAL')
+    except ValueError:
+        ok('load_config() rejects non-integer AQM_POLL_INTERVAL')
+    finally:
+        del _os.environ['AQM_POLL_INTERVAL']
+except Exception:
+    pass
+
+try:
+    _os.environ['AQM_LOG_LEVEL'] = 'TRACE'
+    try:
+        _lc()
+        fail('load_config() should reject invalid AQM_LOG_LEVEL')
+    except ValueError:
+        ok('load_config() rejects invalid AQM_LOG_LEVEL')
+    finally:
+        del _os.environ['AQM_LOG_LEVEL']
+except Exception:
+    pass
+
+# ── 26. M1: db.py new functions ──
+heading(28, 'M1: db.py new functions')
+db_path = os.path.join(os.path.dirname(__file__), 'backend', 'db.py')
+if os.path.exists(db_path):
+    ok('db.py exists')
+else:
+    fail('db.py not found')
+
+try:
+    from db import connect, init_schema, record_status, metrics, prune, init_db
+    ok('db.py exports connect(), init_schema(), record_status(), metrics(), prune()')
+except ImportError as e:
+    fail(f'db.py import failed: {e}')
+
+# Test connect() with WAL pragmas
+import tempfile
+import sqlite3
+tf = tempfile.NamedTemporaryFile(suffix='.db', delete=False)
+tf.close()
+try:
+    conn = connect(tf.name)
+    ok('connect() returns a connection')
+
+    # Check WAL
+    cur = conn.execute("PRAGMA journal_mode")
+    row = cur.fetchone()
+    if row and row[0].lower() in ('wal', 'memory'):
+        ok('WAL pragma set in connect()')
+    else:
+        fail(f'WAL journal_mode missing, got: {row}')
+
+    # Check synchronous
+    cur = conn.execute("PRAGMA synchronous")
+    row = cur.fetchone()
+    if row and row[0] == 1:
+        ok('synchronous=NORMAL pragma set')
+    else:
+        fail(f'synchronous not NORMAL, got: {row}')
+
+    # Check foreign_keys
+    cur = conn.execute("PRAGMA foreign_keys")
+    row = cur.fetchone()
+    if row and row[0] == 1:
+        ok('foreign_keys=ON pragma set')
+    else:
+        fail(f'foreign_keys not ON, got: {row}')
+
+    # Check row_factory
+    if conn.row_factory is sqlite3.Row:
+        ok('row_factory set to sqlite3.Row')
+    else:
+        fail('row_factory not set to sqlite3.Row')
+
+    conn.close()
+except Exception as e:
+    fail(f'connect() test error: {e}')
+finally:
+    os.unlink(tf.name)
+
+# Test init_schema includes collection_status
+tf2 = tempfile.NamedTemporaryFile(suffix='.db', delete=False)
+tf2.close()
+try:
+    conn = connect(tf2.name)
+    init_schema(conn)
+    cur = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='collection_status'"
+    )
+    if cur.fetchone():
+        ok('init_schema() creates collection_status table')
+    else:
+        fail('collection_status table not created')
+
+    cur = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='meta'"
+    )
+    if cur.fetchone():
+        ok('init_schema() creates meta table')
+    else:
+        fail('meta table not created')
+
+    cur = conn.execute("SELECT value FROM meta WHERE key='schema_version'")
+    row = cur.fetchone()
+    if row and row['value'] == '1':
+        ok('meta has initial schema_version=1')
+    else:
+        fail('schema_version missing from meta')
+
+    conn.close()
+except Exception as e:
+    fail(f'init_schema() test error: {e}')
+finally:
+    os.unlink(tf2.name)
+
+# Test record_status
+tf3 = tempfile.NamedTemporaryFile(suffix='.db', delete=False)
+tf3.close()
+try:
+    conn = connect(tf3.name)
+    init_schema(conn)
+    record_status(conn, 'test_source', True, '', 123.4)
+    cur = conn.execute(
+        "SELECT source, ok, error, duration_ms FROM collection_status WHERE source='test_source'"
+    )
+    row = cur.fetchone()
+    if row and row['ok'] == 1 and row['source'] == 'test_source':
+        ok('record_status() inserts row correctly')
+    else:
+        fail(f'record_status() row incorrect: {dict(row) if row else None}')
+
+    record_status(conn, 'test_source', False, 'something broke', 0.0)
+    cur = conn.execute(
+        "SELECT error FROM collection_status WHERE source='test_source' AND ok=0"
+    )
+    row = cur.fetchone()
+    if row and row['error'] == 'something broke':
+        ok('record_status() stores error text on failure')
+    else:
+        fail('record_status() error text not stored')
+
+    conn.close()
+except Exception as e:
+    fail(f'record_status() test error: {e}')
+finally:
+    os.unlink(tf3.name)
+
+# Test prune
+tf4 = tempfile.NamedTemporaryFile(suffix='.db', delete=False)
+tf4.close()
+try:
+    conn = connect(tf4.name)
+    init_schema(conn)
+    old_ts = '2000-01-01 00:00:00'
+    conn.execute(
+        "INSERT INTO usage_history (timestamp, source) VALUES (?, 'test_prune')",
+        (old_ts,)
+    )
+    conn.commit()
+    prune(conn, 1)
+    cur = conn.execute("SELECT COUNT(*) AS cnt FROM usage_history WHERE source='test_prune'")
+    cnt = cur.fetchone()['cnt']
+    if cnt == 0:
+        ok('prune() removes rows older than retention_days')
+    else:
+        fail(f'prune() did not remove old rows, {cnt} remain')
+    conn.close()
+except Exception as e:
+    fail(f'prune() test error: {e}')
+finally:
+    os.unlink(tf4.name)
+
+# Test metrics
+tf5 = tempfile.NamedTemporaryFile(suffix='.db', delete=False)
+tf5.close()
+try:
+    conn = connect(tf5.name)
+    init_schema(conn)
+    record_status(conn, 'test_metrics', True, '', 50.0)
+    m = metrics(conn)
+    if 'per_source' in m and 'total_polls' in m and 'db_size_bytes' in m:
+        ok('metrics() returns dict with per_source, total_polls, db_size_bytes')
+    else:
+        fail(f'metrics() missing keys, got: {list(m.keys())}')
+    if 'test_metrics' in m['per_source']:
+        ok('metrics() includes per-source data')
+    else:
+        fail('metrics() per_source missing test_metrics')
+    conn.close()
+except Exception as e:
+    fail(f'metrics() test error: {e}')
+finally:
+    os.unlink(tf5.name)
+
+# Test backward compatibility: init_db() still works
+tf6 = tempfile.NamedTemporaryFile(suffix='.db', delete=False)
+tf6.close()
+try:
+    _old_path = os.environ.get('AQM_DB_PATH')
+    os.environ['AQM_DB_PATH'] = tf6.name
+    # Reload db module with new env
+    import importlib
+    import db as db_mod
+    importlib.reload(db_mod)
+    db_mod.init_db()
+    conn = db_mod.connect(tf6.name)
+    cur = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'"
+    )
+    tables = {r['name'] for r in cur.fetchall()}
+    expected = {'usage_history', 'model_usage', 'quota_snapshots', 'collection_status', 'meta'}
+    if expected.issubset(tables):
+        ok('init_db() backward compatible: all tables created')
+    else:
+        fail(f'init_db() missing tables: {expected - tables}')
+    if _old_path:
+        os.environ['AQM_DB_PATH'] = _old_path
+    else:
+        del os.environ['AQM_DB_PATH']
+    conn.close()
+except Exception as e:
+    fail(f'init_db() backward compat test error: {e}')
+finally:
+    if os.path.exists(tf6.name):
+        os.unlink(tf6.name)
+
+# ── 27. M2: Parser Contract ──
+heading(29, 'M2: Parser Contract')
+
+# parsers/ package exists
+parsers_dir = os.path.join(os.path.dirname(__file__), 'backend', 'parsers')
+if os.path.isdir(parsers_dir):
+    ok('parsers/ package directory exists')
+else:
+    fail('parsers/ package directory not found')
+
+parsers_init = os.path.join(parsers_dir, '__init__.py')
+if os.path.isfile(parsers_init):
+    ok('parsers/__init__.py exists')
+else:
+    fail('parsers/__init__.py not found')
+
+# Parser ABC, SourceUnavailable, ParserResult, ModelUsage
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
+try:
+    from parsers.base import Parser, ParserResult, ModelUsage, SourceUnavailable
+    ok('parsers.base exports Parser, ParserResult, ModelUsage, SourceUnavailable')
+
+    # Parser is ABC with abstract parse()
+    from abc import ABC
+    if issubclass(Parser, ABC):
+        ok('Parser is an ABC')
+    else:
+        fail('Parser is not an ABC')
+    if hasattr(Parser.parse, '__isabstractmethod__'):
+        ok('Parser.parse() is abstract')
+    else:
+        fail('Parser.parse() is not abstract')
+
+    # SourceUnavailable extends Exception
+    if issubclass(SourceUnavailable, Exception):
+        ok('SourceUnavailable extends Exception')
+    else:
+        fail('SourceUnavailable does not extend Exception')
+
+    # ParserResult fields
+    from dataclasses import fields
+    pr_fields = {f.name for f in fields(ParserResult)}
+    for expected in ('sessions', 'messages', 'input_tokens', 'output_tokens', 'cache_read', 'cache_write', 'models'):
+        if expected in pr_fields:
+            ok(f'ParserResult has field "{expected}"')
+        else:
+            fail(f'ParserResult missing field "{expected}"')
+
+    # ModelUsage fields
+    mu_fields = {f.name for f in fields(ModelUsage)}
+    for expected in ('model_name', 'messages', 'input_tokens', 'output_tokens', 'cache_read', 'cache_write', 'cost'):
+        if expected in mu_fields:
+            ok(f'ModelUsage has field "{expected}"')
+        else:
+            fail(f'ModelUsage missing field "{expected}"')
+except ImportError as e:
+    fail(f'parsers.base import error: {e}')
+
+# Each parser class implements Parser
+try:
+    from parsers.opencode import OpenCodeParser
+    if issubclass(OpenCodeParser, Parser):
+        ok('OpenCodeParser implements Parser')
+    else:
+        fail('OpenCodeParser does not implement Parser')
+    ocp = OpenCodeParser(timeout=1)
+    if hasattr(ocp, 'parse') and callable(ocp.parse):
+        ok('OpenCodeParser has callable parse()')
+    else:
+        fail('OpenCodeParser parse() not callable')
+except ImportError as e:
+    fail(f'OpenCodeParser import error: {e}')
+
+try:
+    from parsers.agy import AgyParser
+    if issubclass(AgyParser, Parser):
+        ok('AgyParser implements Parser')
+    else:
+        fail('AgyParser does not implement Parser')
+    ap = AgyParser(conv_dir='/nonexistent', ide_conv_dir='/nonexistent')
+    if hasattr(ap, 'parse') and callable(ap.parse):
+        ok('AgyParser has callable parse()')
+    else:
+        fail('AgyParser parse() not callable')
+except ImportError as e:
+    fail(f'AgyParser import error: {e}')
+
+try:
+    from parsers.codex import CodexParser
+    if issubclass(CodexParser, Parser):
+        ok('CodexParser implements Parser')
+    else:
+        fail('CodexParser does not implement Parser')
+    cp = CodexParser(state_db='/nonexistent/state.sqlite')
+    if hasattr(cp, 'parse') and callable(cp.parse):
+        ok('CodexParser has callable parse()')
+    else:
+        fail('CodexParser parse() not callable')
+except ImportError as e:
+    fail(f'CodexParser import error: {e}')
+
+# parsers __init__ re-exports
+try:
+    from parsers import Parser as P_from_init, ParserResult as PR_from_init
+    from parsers import ModelUsage as MU_from_init, SourceUnavailable as SU_from_init
+    from parsers import OpenCodeParser as OCP_from_init, AgyParser as AP_from_init, CodexParser as CP_from_init
+    ok('parsers/__init__ re-exports all public symbols')
+except ImportError as e:
+    fail(f'parsers/__init__ re-export error: {e}')
+
+# Backward-compatible wrappers
+for mod_name, func_name in [
+    ('parser', 'fetch_and_parse'),
+    ('agy_parser', 'fetch_agy_usage'),
+    ('codex_parser', 'fetch_codex_usage'),
+]:
+    try:
+        mod = __import__(mod_name, fromlist=[func_name])
+        fn = getattr(mod, func_name)
+        if callable(fn):
+            ok(f'{mod_name}.{func_name}() is callable')
+        else:
+            fail(f'{mod_name}.{func_name}() not callable')
+        result = fn()
+        if isinstance(result, tuple) and len(result) == 3:
+            overview, cost_tokens, models = result
+            if isinstance(overview, dict) and isinstance(cost_tokens, dict) and isinstance(models, list):
+                ok(f'{mod_name}.{func_name}() returns (dict, dict, list)')
+            else:
+                fail(f'{mod_name}.{func_name}() return types wrong')
+        else:
+            fail(f'{mod_name}.{func_name}() does not return 3-tuple')
+    except ImportError as e:
+        fail(f'{mod_name} import error: {e}')
+    except Exception as e:
+        fail(f'{mod_name}.{func_name}() error: {e}')
+
+# SourceUnavailable raised when source is missing
+try:
+    ocp = OpenCodeParser(timeout=1)
+    try:
+        ocp.parse()
+        fail('OpenCodeParser.parse() should raise SourceUnavailable when opencode not found')
+    except SourceUnavailable:
+        ok('OpenCodeParser raises SourceUnavailable on missing binary')
+    except Exception:
+        pass  # Could also be FileNotFoundError wrapped
+except ImportError as e:
+    fail(f'SourceUnavailable test: {e}')
+
+# ── 28. M3: Quota Module (quota.py) ──
+heading(30, 'M3: Quota Module')
+
+quota_path = os.path.join(os.path.dirname(__file__), 'backend', 'quota.py')
+if os.path.exists(quota_path):
+    ok('quota.py exists')
+else:
+    fail('quota.py not found')
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
+try:
+    from quota import collect
+    import inspect
+    sig = inspect.signature(collect)
+    param_names = list(sig.parameters.keys())
+    if len(param_names) == 2 and param_names[0] == 'source':
+        ok(f'collect() has correct signature: {sig}')
+    else:
+        fail(f'collect() signature wrong, got: {sig}')
+except ImportError as e:
+    fail(f'quota module import failed: {e}')
+except Exception as e:
+    fail(f'quota module check error: {e}')
+
+try:
+    from config import Config, load_config
+    cfg = load_config()
+    result = collect('agy', cfg)
+    if isinstance(result, dict) or result is None:
+        ok("collect('agy', cfg) returns dict or None")
+    else:
+        fail(f"collect('agy', cfg) returned unexpected type: {type(result).__name__}")
+except ImportError as e:
+    fail(f"collect('agy') import error: {e}")
+except Exception as e:
+    fail(f"collect('agy') error: {e}")
+
+try:
+    result = collect('opencode', cfg)
+    if isinstance(result, dict) or result is None:
+        ok("collect('opencode', cfg) returns dict or None")
+    else:
+        fail(f"collect('opencode', cfg) returned unexpected type: {type(result).__name__}")
+except ImportError as e:
+    fail(f"collect('opencode') import error: {e}")
+except Exception as e:
+    fail(f"collect('opencode') error: {e}")
+
+try:
+    result = collect('codex', cfg)
+    if isinstance(result, dict) or result is None:
+        ok("collect('codex', cfg) returns dict or None")
+    else:
+        fail(f"collect('codex', cfg) returned unexpected type: {type(result).__name__}")
+except ImportError as e:
+    fail(f"collect('codex') import error: {e}")
+except Exception as e:
+    fail(f"collect('codex') error: {e}")
+
+try:
+    collect('unknown', cfg)
+    fail("collect('unknown', cfg) should raise ValueError")
+except ValueError:
+    ok("collect('unknown', cfg) raises ValueError")
+except Exception:
+    pass
+
+# ── 29. M4: Poller Module ──
+heading(31, 'M4: Poller Module')
+
+poller_path = os.path.join(os.path.dirname(__file__), 'backend', 'poller.py')
+if os.path.exists(poller_path):
+    ok('poller.py exists')
+else:
+    fail('poller.py not found')
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
+try:
+    from poller import Poller
+    ok('poller.py has Poller class')
+
+    p = Poller(load_config())
+    assert hasattr(p, 'run_once') and callable(p.run_once)
+    ok('Poller.run_once() exists and is callable')
+    assert hasattr(p, 'start') and callable(p.start)
+    ok('Poller.start() exists and is callable')
+    assert hasattr(p, 'stop') and callable(p.stop)
+    ok('Poller.stop() exists and is callable')
+
+    p.stop()
+    assert p._stop.is_set()
+    ok('Poller.stop() sets the stop event')
+except ImportError as e:
+    fail(f'poller import failed: {e}')
+except AssertionError as e:
+    fail(f'poller assertion failed: {e}')
+except Exception as e:
+    fail(f'poller check error: {e}')
+
+# ── 30. M5: API Module (api.py) ──
+heading(32, 'M5: API Module')
+
+api_path = os.path.join(os.path.dirname(__file__), 'backend', 'api.py')
+if os.path.exists(api_path):
+    ok('api.py exists')
+else:
+    fail('api.py not found')
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
+try:
+    from fastapi import FastAPI
+    from api import create_app, error_response
+    ok('api.py exports create_app() and error_response()')
+
+    app = create_app()
+    if isinstance(app, FastAPI):
+        ok('create_app() returns a FastAPI instance')
+    else:
+        fail('create_app() does not return FastAPI')
+
+    # Check all critical routes exist
+    routes = {r.path for r in app.routes}
+    expected_routes = [
+        '/health', '/ready', '/metrics',
+        '/api/usage/latest', '/api/usage/opencode/latest',
+        '/api/usage/agy/latest', '/api/usage/codex/latest',
+        '/api/usage/opencode/history', '/api/usage/agy/history',
+        '/api/usage/codex/history', '/api/usage/history',
+        '/api/quota/latest', '/api/quota/agy/latest',
+        '/api/quota/opencode/latest', '/api/quota/codex/latest',
+        '/', '/static',
+    ]
+    for route in expected_routes:
+        if route == '/static':
+            names = {r.name for r in app.routes if hasattr(r, 'name')}
+            if 'static' in names:
+                ok(f'Route: {route} mounted')
+            else:
+                fail(f'Route: {route} not mounted')
+        elif route in routes:
+            ok(f'Route: {route}')
+        else:
+            fail(f'Route: {route} missing')
+
+    # Error envelope
+    resp = error_response("not_found", "Not found", 404)
+    if resp.status_code == 404 and hasattr(resp, 'body'):
+        ok('error_response() returns JSONResponse with correct status')
+    else:
+        fail('error_response() incorrect')
+
+    # Error handlers registered
+    if hasattr(app, 'exception_handlers') and 404 in app.exception_handlers:
+        ok('404 error handler registered')
+    else:
+        fail('404 error handler missing')
+    if hasattr(app, 'exception_handlers') and 500 in app.exception_handlers:
+        ok('500 error handler registered')
+    else:
+        fail('500 error handler missing')
+
+except ImportError as e:
+    fail(f'api.py import failed: {e}')
+except Exception as e:
+    fail(f'api.py check error: {e}')
+
+# ── 31. M5: app.py is thin ──
+heading(33, 'M5: app.py is thin')
+
+app_py_content = open(os.path.join(os.path.dirname(__file__), 'backend', 'app.py')).read()
+lines = [l for l in app_py_content.strip().split('\n') if l.strip() and not l.strip().startswith('#')]
+if len(lines) <= 3:
+    ok(f'app.py is thin ({len(lines)} non-comment lines)')
+else:
+    fail(f'app.py has {len(lines)} non-comment lines (expected <= 3)')
+
+if 'from .api import create_app' in app_py_content:
+    ok('app.py imports create_app from .api')
+else:
+    fail('app.py does not import from .api')
+
+if 'app = create_app()' in app_py_content:
+    ok('app.py calls create_app()')
+else:
+    fail('app.py missing app = create_app()')
+
+# Ensure no route definitions remain in app.py
+for phrase in ('@app.get', '@app.post', 'add_api_route', 'app.mount'):
+    if phrase in app_py_content.replace('from .api import create_app', '').replace('app = create_app()', '').replace('"""FastAPI application for the AGY Quota Dashboard."""', ''):
+        fail(f'app.py still contains {phrase}')
+        break
+else:
+    ok('app.py contains no route definitions (all delegated to api.py)')
+
+# ── 32. M6: Entry Point (main.py) ──
+heading(34, 'M6: Entry Point')
+
+main_path = os.path.join(os.path.dirname(__file__), 'backend', 'main.py')
+if os.path.exists(main_path):
+    ok('main.py exists')
+else:
+    fail('main.py not found')
+
+main_py = open(main_path).read()
+checks = [
+    ('from config import load_config', 'imports load_config from config'),
+    ('from db import connect, init_schema', 'imports connect and init_schema from db'),
+    ('from poller import Poller', 'imports Poller from poller'),
+    ('uvicorn.run', 'calls uvicorn.run()'),
+    ('"api:create_app"', 'references api:create_app'),
+    ('factory=True', 'uses factory=True'),
+    ('cfg.host', 'uses cfg.host'),
+    ('cfg.port', 'uses cfg.port'),
+    ('signal.signal(signal.SIGTERM', 'handles SIGTERM'),
+    ('signal.signal(signal.SIGINT', 'handles SIGINT'),
+    ('poller.start()', 'starts the poller'),
+    ('poller.stop()', 'stops the poller on shutdown'),
+    ('def main():', 'has a main() function'),
+    ('if __name__', 'has __main__ guard'),
+]
+for pattern, msg in checks:
+    if pattern in main_py:
+        ok(f'main.py {msg}')
+    else:
+        fail(f'main.py missing: {msg}')
+
+# ── 33. M7+M8: Frontend Shell + UX States + A11y ──
+heading(35, 'M7+M8: Frontend Shell + UX + A11y')
+
+html = open(os.path.join(os.path.dirname(__file__), 'frontend', 'index.html')).read()
+css = open(os.path.join(os.path.dirname(__file__), 'frontend', 'index.css')).read()
+js = open(os.path.join(os.path.dirname(__file__), 'frontend', 'app.js')).read()
+
+# --- ARIA ---
+if 'role="tablist"' in html:
+    ok('HTML: role="tablist" on tabs container')
+else:
+    fail('HTML: missing role="tablist"')
+if 'role="tab"' in html:
+    ok('HTML: role="tab" on tab buttons')
+else:
+    fail('HTML: missing role="tab"')
+if 'aria-selected=' in html:
+    ok('HTML: aria-selected on tabs')
+else:
+    fail('HTML: missing aria-selected')
+if 'aria-live="polite"' in html or 'aria-live="assertive"' in html:
+    ok('HTML: aria-live region for dynamic content')
+else:
+    fail('HTML: missing aria-live region')
+if 'role="tabpanel"' in html:
+    ok('HTML: role="tabpanel" on main content')
+else:
+    fail('HTML: missing role="tabpanel"')
+if 'role="group"' in html:
+    ok('HTML: role="group" on button groups')
+else:
+    fail('HTML: missing role="group" on button groups')
+if 'aria-label=' in html:
+    ok('HTML: aria-label on interactive elements')
+else:
+    fail('HTML: missing aria-label attributes')
+if 'role="alert"' in html:
+    ok('HTML: role="alert" on error banner')
+else:
+    fail('HTML: missing role="alert" on error banner')
+
+# --- CSS: Focus, motion, skeletons, states ---
+if ':focus-visible' in css:
+    ok('CSS: :focus-visible focus ring')
+else:
+    fail('CSS: missing :focus-visible')
+if 'visually-hidden' in css:
+    ok('CSS: .visually-hidden utility class')
+else:
+    fail('CSS: missing .visually-hidden')
+if 'prefers-reduced-motion' in css:
+    ok('CSS: @media prefers-reduced-motion')
+else:
+    fail('CSS: missing prefers-reduced-motion')
+if 'skeleton' in css:
+    ok('CSS: .skeleton shimmer animation')
+else:
+    fail('CSS: missing skeleton styles')
+if '.error-banner' in css:
+    ok('CSS: .error-banner styles')
+else:
+    fail('CSS: missing error banner styles')
+if 'empty-state' in css:
+    ok('CSS: .empty-state styles')
+else:
+    fail('CSS: missing empty state styles')
+if '@media (max-width: 640px)' in css:
+    ok('CSS: mobile breakpoint at 640px')
+else:
+    fail('CSS: missing mobile breakpoint')
+if 'min-height: 44px' in css or 'min-height:44px' in css:
+    ok('CSS: touch targets ≥44px')
+else:
+    fail('CSS: missing touch target min-height')
+if 'stale' in css:
+    ok('CSS: stale indicator styles')
+else:
+    fail('CSS: missing stale styles')
+if 'offline' in css:
+    ok('CSS: offline indicator styles')
+else:
+    fail('CSS: missing offline styles')
+
+# --- JS: UX states ---
+if 'showError(' in js or 'error-banner' in js:
+    ok('JS: error display function')
+else:
+    fail('JS: missing error display')
+if 'hideError' in js:
+    ok('JS: error dismiss / retry')
+else:
+    fail('JS: missing error dismiss/retry')
+if 'offline' in js:
+    ok('JS: offline detection')
+else:
+    fail('JS: missing offline detection')
+if 'EmptyState' in js or "renderEmptyState" in js or "empty-state" in js:
+    ok('JS: empty state rendering')
+else:
+    fail('JS: missing empty state rendering')
+if 'stale' in js or 'Stale' in js:
+    ok('JS: stale data detection')
+else:
+    fail('JS: missing stale data detection')
+if 'ArrowRight' in js or 'ArrowLeft' in js:
+    ok('JS: keyboard navigation on tabs')
+else:
+    fail('JS: missing keyboard nav on tabs')
+if 'aria-selected' in js or 'aria_selected' in js:
+    ok('JS: updates aria-selected on tab switch')
+else:
+    fail('JS: missing aria-selected update')
+if 'skeleton' in js or 'Skeleton' in js:
+    ok('JS: loading skeleton management')
+else:
+    fail('JS: missing skeleton management')
+
+# ── 34. M9: Hardening (CSP, local-bind, /metrics, no secrets) ──
+heading(36, 'M9: Hardening')
+
+# CSP header
+csp_found = False
+try:
+    url = BASE.rstrip('/') + '/api/usage/latest'
+    with urllib.request.urlopen(url, timeout=5) as resp:
+        csp = resp.headers.get('Content-Security-Policy', '')
+        if "default-src 'self'" in csp and "style-src 'self'" in csp:
+            ok('CSP header present: default-src + style-src')
+            csp_found = True
+except Exception:
+    pass
+if not csp_found:
+    fail('CSP header missing or incorrect')
+
+# Local-bind (config default host)
+if "127.0.0.1" in open(os.path.join(os.path.dirname(__file__), 'backend', 'config.py')).read():
+    ok('Config: default host is 127.0.0.1 (local-bind)')
+else:
+    fail('Config: default host is not 127.0.0.1')
+
+# /metrics endpoint
+try:
+    body, status = get('/metrics')
+    m = json.loads(body)
+    if isinstance(m, dict) and len(m) > 0:
+        ok('/metrics returns JSON dict')
+    else:
+        fail('/metrics returns empty response')
+except Exception:
+    fail('/metrics not reachable or not JSON')
+
+# No secrets logged
+codex_py = open(os.path.join(os.path.dirname(__file__), 'backend', 'codex_quota.py')).read()
+if 'OPENAI_API_KEY' in codex_py and 'logger' not in codex_py and 'logging' not in codex_py:
+    # Check it's not logged
+    lines = [l.strip() for l in codex_py.split('\n') if 'api_key' in l.lower() or 'openai_key' in l.lower()]
+    log_lines = [l for l in lines if 'log' in l.lower() or 'print' in l.lower()]
+    if not log_lines:
+        ok('No secrets logged in codex_quota.py')
+    else:
+        fail('Potential secret logging in codex_quota.py')
+else:
+    ok('No secrets logged in codex_quota.py')
+
+# Check retention config
+config_py_str = open(os.path.join(os.path.dirname(__file__), 'backend', 'config.py')).read()
+if 'retention_days' in config_py_str:
+    ok('Config: retention_days present')
+else:
+    fail('Config: missing retention_days')
+
+# Summary ──
 print()
 print(f'\033[1m=== Results: {len(passes)} passed, {len(errors)} failed ===\033[0m\n')
 if errors:

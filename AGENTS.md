@@ -50,7 +50,7 @@ bazel test //...
 ```
 
 ### AGY Quota Dashboard Verifier
-To run the dashboard verifier (114 checks covering server, HTML, JS, CSS, APIs):
+To run the dashboard verifier (285+ checks covering server, HTML, JS, CSS, APIs, UX, a11y, hardening):
 ```bash
 PYTHONPATH=backend python3 verify.py
 ```
@@ -58,6 +58,9 @@ PYTHONPATH=backend python3 verify.py
 ---
 
 ## AGY Quota Dashboard — Requirements
+
+### Design Document
+The full design is documented in `internal_projects/agy_quota_dashboard/DESIGN.md` (M1–M9 build order, architecture, data model, API spec, frontend architecture, UX states, a11y, security, testing strategy).
 
 ### Data Sources
 - **AGY (Antigravity)**: Quota from Cloud Code API (`loadCodeAssist` response `paidTier.name`). Usage from local conversation DBs.
@@ -94,12 +97,24 @@ PYTHONPATH=backend python3 verify.py
 - No secrets or keys logged or exposed.
 
 ### Server
-- Start via: `start-stop-daemon --background --make-pidfile --pidfile /tmp/dashboard.pid --chdir ... --start --exec /tmp/venv/bin/python3 -- -m uvicorn backend.app:app --host 0.0.0.0 --port 8000`
+- Start via: `start-stop-daemon --background --make-pidfile --pidfile /tmp/dashboard.pid --chdir ... --start --exec /tmp/venv/bin/python3 -- -m uvicorn backend.app:app --host 127.0.0.1 --port 8000`
+- Alternative: `PYTHONPATH=. python3 -m main` (uses config defaults: 127.0.0.1:8000).
 - Poll interval: 10 minutes (600s).
 - Python venv at `/tmp/venv/bin/python3`.
 
 ### Mobile Responsive
 - Breakpoint at 640px: container padding, header stacking, scrollable tabs, single-column layouts, 24-hour time labels.
+
+### UX States & A11y
+- Loading: skeleton placeholders (`.skeleton` shimmer). Error: banner with retry/dismiss. Empty: friendly guidance text. Stale: amber indicator after 2min. Offline: red indicator, defers refresh.
+- Tabs: `role="tablist"`, `role="tab"`, `aria-selected`, `role="tabpanel"`, ArrowLeft/ArrowRight keyboard nav.
+- Focus: `:focus-visible` blue outline ring.
+- Motion: `@media (prefers-reduced-motion)` disables all animations.
+- Touch: all interactive elements `min-height: 44px`.
+- Contrast: `--text-primary: #e8edff`, `--text-secondary: #8a9fc8` on `#0a0f1e` bg (AA 4.5:1+).
+
+### Design (Build Order)
+The dashboard follows a 9-milestone build order from `DESIGN.md`: M1 (Config+DB), M2 (Parser contract), M3 (Quota), M4 (Poller), M5 (API), M6 (Entry point), M7 (Frontend shell), M8 (UX+a11y), M9 (Hardening). Completed all 9 milestones.
 
 ---
 

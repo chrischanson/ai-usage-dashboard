@@ -1,15 +1,24 @@
 import sqlite3
 import os
-from datetime import datetime
+import os.path
+from datetime import datetime, timedelta
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "agy_quota.db")
+DB_PATH = os.getenv('AQM_DB_PATH') or os.path.join(os.path.dirname(__file__), "agy_quota.db")
 
 
-def init_db():
-    conn = sqlite3.connect(DB_PATH)
+def connect(path: str) -> sqlite3.Connection:
+    conn = sqlite3.connect(path)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("PRAGMA busy_timeout=5000")
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_schema(conn: sqlite3.Connection) -> None:
     cursor = conn.cursor()
 
-    # usage_history tracks aggregate stats per source per poll
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS usage_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -29,7 +38,6 @@ def init_db():
         )
     ''')
 
-    # model_usage tracks per-model breakdown per poll
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS model_usage (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,7 +53,6 @@ def init_db():
         )
     ''')
 
-    # quota_snapshots stores per-model-group quota limits
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS quota_snapshots (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,18 +66,121 @@ def init_db():
             refreshes_in_seconds INTEGER
         )
     ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS collection_status (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            ok INTEGER NOT NULL,
+            error TEXT,
+            duration_ms REAL
+        )
+    ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS meta (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+    ''')
+
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_usage_history_source_ts
+        ON usage_history(source, timestamp)
+    ''')
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_model_usage_source_ts
+        ON model_usage(source, timestamp)
+    ''')
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_quota_snapshots_source_ts
+        ON quota_snapshots(source, timestamp)
+    ''')
     cursor.execute('''
         CREATE INDEX IF NOT EXISTS idx_quota_ts
         ON quota_snapshots(timestamp, model_group)
     ''')
 
+    cursor.execute(
+        "INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)",
+        ('schema_version', '1')
+    )
+
     # Migrate existing table if needed
     try:
         cursor.execute("ALTER TABLE quota_snapshots ADD COLUMN source TEXT DEFAULT 'agy'")
     except sqlite3.OperationalError:
-        pass  # Column already exists
+        pass
 
     conn.commit()
+
+
+def record_status(
+    conn: sqlite3.Connection,
+    source: str,
+    ok: bool,
+    error: str,
+    duration_ms: float,
+) -> None:
+    ts = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+    conn.execute(
+        "INSERT INTO collection_status (source, timestamp, ok, error, duration_ms) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (source, ts, 1 if ok else 0, error, duration_ms)
+    )
+    conn.commit()
+
+
+def metrics(conn: sqlite3.Connection) -> dict:
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT DISTINCT source FROM collection_status")
+    sources = [r['source'] for r in cursor.fetchall()]
+
+    per_source = {}
+    for src in sources:
+        cursor.execute(
+            "SELECT timestamp, ok, error, duration_ms FROM collection_status "
+            "WHERE source=? ORDER BY id DESC LIMIT 1",
+            (src,)
+        )
+        row = cursor.fetchone()
+        if row:
+            per_source[src] = {
+                'last_success_at': row['timestamp'] if row['ok'] else None,
+                'last_error': None if row['ok'] else row['error'],
+                'last_duration_ms': row['duration_ms'],
+            }
+
+    cursor.execute("SELECT COUNT(*) AS cnt FROM usage_history")
+    total_polls = cursor.fetchone()['cnt']
+
+    db_path = getattr(conn, 'db_path', None) or (
+        os.path.join(os.path.dirname(__file__), 'agy_quota.db')
+    )
+    try:
+        db_size_bytes = os.path.getsize(db_path)
+    except OSError:
+        db_size_bytes = 0
+
+    return {
+        'per_source': per_source,
+        'total_polls': total_polls,
+        'db_size_bytes': db_size_bytes,
+    }
+
+
+def prune(conn: sqlite3.Connection, retention_days: int) -> None:
+    cutoff = (datetime.utcnow() - timedelta(days=retention_days)).strftime('%Y-%m-%d %H:%M:%S')
+    for table in ('usage_history', 'model_usage', 'quota_snapshots', 'collection_status'):
+        conn.execute(f"DELETE FROM {table} WHERE timestamp < ?", (cutoff,))
+    conn.commit()
+
+
+def init_db():
+    conn = connect(DB_PATH)
+    init_schema(conn)
     conn.close()
 
 
@@ -186,6 +296,23 @@ def get_history_series(source='opencode', limit=100):
         (source, limit)
     )
     rows = [dict(r) for r in cursor.fetchall()]
+    # Attach models per entry
+    if rows:
+        timestamps = tuple(r['timestamp'] for r in rows)
+        placeholders = ','.join('?' for _ in timestamps)
+        cursor.execute(
+            f"SELECT * FROM model_usage WHERE source=? AND timestamp IN ({placeholders}) ORDER BY timestamp, input_tokens DESC",
+            (source, *timestamps)
+        )
+        model_rows = cursor.fetchall()
+        models_by_ts = {}
+        for m in model_rows:
+            ts = m['timestamp']
+            if ts not in models_by_ts:
+                models_by_ts[ts] = []
+            models_by_ts[ts].append(dict(m))
+        for r in rows:
+            r['models'] = models_by_ts.get(r['timestamp'], [])
     conn.close()
     return rows[::-1]
 

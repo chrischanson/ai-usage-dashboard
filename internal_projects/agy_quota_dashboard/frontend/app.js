@@ -6,9 +6,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let mode = 'total';
     let cachedHistory = null;
     let cachedLatestOverview = null;
+    let lastFetchTime = 0;
+    let offline = !navigator.onLine;
 
     if (typeof Chart !== 'undefined') {
-        Chart.defaults.color = '#6b7fa3';
+        Chart.defaults.color = '#8a9fc8';
         Chart.defaults.font.family = "'Inter', sans-serif";
     }
 
@@ -63,18 +65,119 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function setCard(id, val) {
         const el = document.getElementById(id);
-        if (el) el.textContent = val;
+        if (el) {
+            el.classList.remove('skeleton', 'skeleton-text');
+            el.textContent = val;
+        }
     }
+
+    function showLoadingSkeleton() {
+        document.querySelectorAll('.skeleton').forEach(el => {
+            el.style.display = '';
+        });
+    }
+
+    function hideAllSkeletons() {
+        document.querySelectorAll('.skeleton').forEach(el => {
+            el.style.display = 'none';
+        });
+    }
+
+    // --- Error banner ---
+    const errorBanner = document.getElementById('error-banner');
+    const errorMsg = document.getElementById('error-message');
+    const retryBtn = document.getElementById('retry-btn');
+    const dismissBtn = document.getElementById('dismiss-btn');
+
+    function showError(msg) {
+        if (!errorBanner || !errorMsg) return;
+        errorMsg.textContent = msg;
+        errorBanner.hidden = false;
+    }
+
+    function hideError() {
+        if (!errorBanner) return;
+        errorBanner.hidden = true;
+    }
+
+    if (retryBtn) {
+        retryBtn.addEventListener('click', () => {
+            hideError();
+            refresh();
+        });
+    }
+    if (dismissBtn) {
+        dismissBtn.addEventListener('click', () => {
+            hideError();
+        });
+    }
+
+    // --- Status indicator ---
+    const statusText = document.getElementById('status-text');
+    const statusDot = document.querySelector('.dot');
+    const statusIndicator = document.getElementById('status-indicator');
+
+    function setStatus(type, text) {
+        if (!statusText || !statusDot || !statusIndicator) return;
+        statusText.textContent = text || 'Live';
+        statusText.classList.remove('stale', 'offline');
+        statusDot.classList.remove('stale', 'offline');
+        statusIndicator.classList.remove('offline');
+        if (type === 'stale') {
+            statusText.classList.add('stale');
+            statusDot.classList.add('stale');
+        } else if (type === 'offline') {
+            statusText.classList.add('offline');
+            statusDot.classList.add('offline');
+            statusIndicator.classList.add('offline');
+        }
+    }
+
+    // --- Offline detection ---
+    window.addEventListener('online', () => {
+        offline = false;
+        setStatus('live', 'Live');
+        refresh();
+    });
+    window.addEventListener('offline', () => {
+        offline = true;
+        setStatus('offline', 'Offline');
+        showError('You are offline. Data will refresh when connection is restored.');
+    });
 
     // --- Tab switching ---
     document.querySelectorAll('.tab').forEach(btn => {
         btn.addEventListener('click', () => {
-            document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(b => {
+                b.classList.remove('active');
+                b.setAttribute('aria-selected', 'false');
+            });
             btn.classList.add('active');
+            btn.setAttribute('aria-selected', 'true');
+            btn.focus();
             currentSource = btn.dataset.source;
             cachedHistory = null;
             cachedLatestOverview = null;
+            hideError();
+            showLoadingSkeleton();
             refresh();
+        });
+        btn.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                const tabs = Array.from(document.querySelectorAll('.tab'));
+                const idx = tabs.indexOf(btn);
+                const next = tabs[(idx + 1) % tabs.length];
+                next.focus();
+                next.click();
+            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                const tabs = Array.from(document.querySelectorAll('.tab'));
+                const idx = tabs.indexOf(btn);
+                const prev = tabs[(idx - 1 + tabs.length) % tabs.length];
+                prev.focus();
+                prev.click();
+            }
         });
     });
 
@@ -93,13 +196,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 const overview = computeOverviewFromHistory(cachedHistory, timeRange);
                 if (overview) {
                     renderOverview(overview);
-                    document.getElementById('time-range-label').textContent =
-                        ' (' + timeRange.toUpperCase() + ')';
+                    const label = document.getElementById('time-range-label');
+                    if (label) label.textContent = ' (' + timeRange.toUpperCase() + ')';
                 } else if (cachedLatestOverview) {
                     renderOverview(cachedLatestOverview);
-                    document.getElementById('time-range-label').textContent = '';
+                    const label = document.getElementById('time-range-label');
+                    if (label) label.textContent = '';
                 }
                 renderHistoryChart(cachedHistory);
+                refreshModels();
             }
         });
     });
@@ -120,19 +225,25 @@ document.addEventListener('DOMContentLoaded', () => {
                     const overview = computeOverviewFromHistory(cachedHistory, timeRange);
                     if (overview) renderOverview(overview);
                 }
+                refreshModels();
             });
         });
     });
 
     // --- Fetch & render ---
     async function refresh() {
+        if (offline) return;
+        hideError();
         await Promise.all([fetchLatest(), fetchHistory(), fetchQuota()]);
         if (timeRange !== 'all' && cachedHistory) {
             const overview = computeOverviewFromHistory(cachedHistory, timeRange);
             if (overview) renderOverview(overview);
         }
+        refreshModels();
+        lastFetchTime = Date.now();
         document.getElementById('last-updated').textContent =
             'Last updated: ' + new Date().toLocaleTimeString();
+        hideAllSkeletons();
     }
 
     async function fetchLatest() {
@@ -141,11 +252,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const deltasParam = mode === 'rate' ? '?deltas=true' : '';
             if (currentSource === 'combined') {
                 const resp = await fetch('/api/usage/latest' + deltasParam);
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
                 const raw = await resp.json();
                 const agy = raw.agy || {};
                 const opencode = raw.opencode || {};
                 const codex = raw.codex || {};
-                
+
                 data = {
                     sessions: (agy.sessions || 0) + (opencode.sessions || 0) + (codex.sessions || 0),
                     messages: (agy.messages || 0) + (opencode.messages || 0) + (codex.messages || 0),
@@ -156,40 +268,41 @@ document.addEventListener('DOMContentLoaded', () => {
                     model_deltas: [],
                 };
 
-                const modelSrc = (mode === 'rate' ? 'model_deltas' : 'models');
-                const agyModels = (agy[modelSrc] || []).map(m => ({ ...m, source: 'agy' }));
-                const opencodeModels = (opencode[modelSrc] || []).map(m => ({ ...m, source: 'opencode' }));
-                const codexModels = (codex[modelSrc] || []).map(m => ({ ...m, source: 'codex' }));
-                data.models = [...agyModels, ...opencodeModels, ...codexModels].sort((a, b) => 
-                    ((b.input_tokens || 0) + (b.output_tokens || 0)) - ((a.input_tokens || 0) + (a.output_tokens || 0))
-                );
+                const agyModelsCumulative = (agy.models || []).map(function(m) { return Object.assign({}, m, { source: 'agy' }); });
+                const opencodeModelsCumulative = (opencode.models || []).map(function(m) { return Object.assign({}, m, { source: 'opencode' }); });
+                const codexModelsCumulative = (codex.models || []).map(function(m) { return Object.assign({}, m, { source: 'codex' }); });
+                data.models = [...agyModelsCumulative, ...opencodeModelsCumulative, ...codexModelsCumulative].sort(function(a, b) {
+                    return ((b.input_tokens || 0) + (b.output_tokens || 0)) - ((a.input_tokens || 0) + (a.output_tokens || 0));
+                });
+
+                const agyDeltas = (agy.model_deltas || []).map(function(m) { return Object.assign({}, m, { source: 'agy' }); });
+                const opencodeDeltas = (opencode.model_deltas || []).map(function(m) { return Object.assign({}, m, { source: 'opencode' }); });
+                const codexDeltas = (codex.model_deltas || []).map(function(m) { return Object.assign({}, m, { source: 'codex' }); });
+                data._modelDeltas = [...agyDeltas, ...opencodeDeltas, ...codexDeltas].sort(function(a, b) {
+                    return ((b.input_tokens || 0) + (b.output_tokens || 0)) - ((a.input_tokens || 0) + (a.output_tokens || 0));
+                });
             } else {
                 const resp = await fetch(`/api/usage/${currentSource}/latest` + deltasParam);
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
                 data = await resp.json();
-                const modelSrc = mode === 'rate' ? 'model_deltas' : 'models';
-                if (data[modelSrc]) {
-                    data.models = data[modelSrc];
-                }
+                data._modelDeltas = data.model_deltas || [];
+                data.models = data.models || [];
             }
 
             if (!data || Object.keys(data).length === 0) {
                 cachedLatestOverview = null;
-                setCard('total-sessions', '--');
-                setCard('total-messages', '--');
-                setCard('input-tokens', 'No data yet');
-                setCard('output-tokens', '--');
-                setCard('cache-reads', '--');
-                document.getElementById('models-container').innerHTML =
-                    '<p class="loading-msg">No data yet — polling every 10 min.</p>';
+                renderEmptyState('overview');
                 if (modelChartInstance) { modelChartInstance.destroy(); modelChartInstance = null; }
                 return;
             }
             cachedLatestOverview = data;
             renderOverview(data);
-            renderModels(data.models || []);
-            renderModelChart(data.models || []);
         } catch (e) {
             console.error('fetchLatest error:', e);
+            if (!cachedLatestOverview) {
+                renderEmptyState('overview');
+            }
+            showError('Failed to load latest usage data. ' + (e.message || ''));
         }
     }
 
@@ -203,24 +316,40 @@ document.addEventListener('DOMContentLoaded', () => {
                 ]);
                 let agyData = [], opencodeData = [], codexData = [];
                 if (results[0].status === 'fulfilled') {
-                    try { agyData = await results[0].value.json(); } catch (_) {}
+                    try { if (results[0].value.ok) agyData = await results[0].value.json(); } catch (_) {}
                 }
                 if (results[1].status === 'fulfilled') {
-                    try { opencodeData = await results[1].value.json(); } catch (_) {}
+                    try { if (results[1].value.ok) opencodeData = await results[1].value.json(); } catch (_) {}
                 }
                 if (results[2].status === 'fulfilled') {
-                    try { codexData = await results[2].value.json(); } catch (_) {}
+                    try { if (results[2].value.ok) codexData = await results[2].value.json(); } catch (_) {}
                 }
                 cachedHistory = { agy: agyData, opencode: opencodeData, codex: codexData };
                 renderHistoryChart(cachedHistory);
             } else {
                 const resp = await fetch(`/api/usage/${currentSource}/history`);
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
                 const data = await resp.json();
                 cachedHistory = (data && data.length > 0) ? data : [];
                 renderHistoryChart(cachedHistory);
             }
         } catch (e) {
             console.error('fetchHistory error:', e);
+        }
+    }
+
+    function renderEmptyState(target) {
+        if (target === 'overview') {
+            setCard('total-sessions', '--');
+            setCard('total-messages', '--');
+            setCard('input-tokens', 'No data yet');
+            setCard('output-tokens', '--');
+            setCard('cache-reads', '--');
+        } else if (target === 'models') {
+            const container = document.getElementById('models-container');
+            if (container) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128202;</div><p>No data yet &mdash; polling every 10 min.</p></div>';
+            }
         }
     }
 
@@ -234,14 +363,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderModels(models) {
         const container = document.getElementById('models-container');
-        if (!models.length) {
-            container.innerHTML = '<p class="loading-msg">No model data available.</p>';
+        if (!models || !models.length) {
+            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128202;</div><p>No model data available.</p></div>';
             return;
         }
         container.innerHTML = '';
         models.forEach(m => {
             const total = (m.input_tokens || 0) + (m.output_tokens || 0);
-            const badgeHtml = m.source ? `<span class="badge badge-${m.source}">${m.source}</span>` : '';
+            const badgeHtml = m.source ? `<span class="badge badge-${m.source}">${escapeHtml(m.source)}</span>` : '';
             const div = document.createElement('div');
             div.className = 'model-item';
             div.innerHTML = `
@@ -251,7 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="model-stats">
                     <div class="tokens">${formatNum(total)} tokens</div>
-                    <p>in ${formatNum(m.input_tokens)} · out ${formatNum(m.output_tokens)}</p>
+                    <p>in ${formatNum(m.input_tokens)} &middot; out ${formatNum(m.output_tokens)}</p>
                 </div>
             `;
             container.appendChild(div);
@@ -296,7 +425,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     title: {
                         display: true,
                         text: chartTitle,
-                        color: '#6b7fa3',
+                        color: '#8a9fc8',
                         font: { size: 10, weight: '600' },
                         padding: { bottom: 8 },
                     },
@@ -360,6 +489,74 @@ document.addEventListener('DOMContentLoaded', () => {
         return sourceDelta(history) || null;
     }
 
+    function computeModelsFromHistory(history, range) {
+        if (range === 'all' || !history) return null;
+        function sourceModels(data) {
+            if (!data || data.length < 2) return null;
+            const filtered = filterByTimeRange(data, range);
+            if (filtered.length < 2) return null;
+            const first = filtered[0];
+            const last = filtered[filtered.length - 1];
+            const firstModels = {};
+            (first.models || []).forEach(function(m) { firstModels[m.model_name] = m; });
+            const deltas = [];
+            (last.models || []).forEach(function(m) {
+                const prev = firstModels[m.model_name] || {};
+                const dm = {
+                    model_name: m.model_name,
+                    messages: Math.max(0, (m.messages || 0) - (prev.messages || 0)),
+                    input_tokens: Math.max(0, (m.input_tokens || 0) - (prev.input_tokens || 0)),
+                    output_tokens: Math.max(0, (m.output_tokens || 0) - (prev.output_tokens || 0)),
+                };
+                if (dm.messages > 0 || dm.input_tokens > 0 || dm.output_tokens > 0) {
+                    deltas.push(dm);
+                }
+            });
+            return deltas.length > 0 ? deltas : null;
+        }
+        if (currentSource === 'combined') {
+            const agy = sourceModels(history.agy);
+            const opencode = sourceModels(history.opencode);
+            const codex = sourceModels(history.codex);
+            const combined = [];
+            (agy || []).forEach(function(m) { combined.push(Object.assign({}, m, { source: 'agy' })); });
+            (opencode || []).forEach(function(m) { combined.push(Object.assign({}, m, { source: 'opencode' })); });
+            (codex || []).forEach(function(m) { combined.push(Object.assign({}, m, { source: 'codex' })); });
+            return combined.sort(function(a, b) {
+                return ((b.input_tokens || 0) + (b.output_tokens || 0)) - ((a.input_tokens || 0) + (a.output_tokens || 0));
+            });
+        }
+        return sourceModels(history) || [];
+    }
+
+    function refreshModels() {
+        if (timeRange === 'all') {
+            if (cachedLatestOverview) {
+                renderModels(cachedLatestOverview.models || []);
+                const chartModels = mode === 'rate' ? (cachedLatestOverview._modelDeltas || []) : (cachedLatestOverview.models || []);
+                renderModelChart(chartModels);
+            } else {
+                renderEmptyState('models');
+                if (modelChartInstance) { modelChartInstance.destroy(); modelChartInstance = null; }
+            }
+        } else if (cachedHistory) {
+            const isCombined = currentSource === 'combined';
+            const historyValid = isCombined
+                ? (typeof cachedHistory === 'object' && !Array.isArray(cachedHistory))
+                : Array.isArray(cachedHistory);
+            if (historyValid) {
+                const models = computeModelsFromHistory(cachedHistory, timeRange);
+                if (models && models.length > 0) {
+                    renderModels(models);
+                    renderModelChart(models);
+                } else {
+                    renderEmptyState('models');
+                    if (modelChartInstance) { modelChartInstance.destroy(); modelChartInstance = null; }
+                }
+            }
+        }
+    }
+
     function parseTs(ts) {
         if (!ts) return null;
         const d = new Date(ts.replace(' ', 'T') + 'Z');
@@ -385,7 +582,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let datasets = [];
         let labels = [];
         const isTotal = mode === 'total';
-        let unitLabel = isTotal ? 'Tokens' : 'Δ tokens';
+        let unitLabel = isTotal ? 'Tokens' : '\u0394 tokens';
 
         if (currentSource === 'combined') {
             let agy = filterByTimeRange(history.agy || [], timeRange);
@@ -400,16 +597,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
             labels = allTimes.map(formatLabel);
 
+            const MS_TOLERANCE = 30000;
+            const matchTs = (list, ts) => {
+                const t = parseTs(ts).getTime();
+                let best = null, bestDiff = Infinity;
+                for (const d of list) {
+                    const dt = parseTs(d.timestamp);
+                    if (!dt) continue;
+                    const diff = Math.abs(dt.getTime() - t);
+                    if (diff < bestDiff) {
+                        bestDiff = diff;
+                        best = d;
+                    }
+                }
+                return bestDiff <= MS_TOLERANCE ? best : null;
+            };
+
             const mapData = (list, key) => {
                 return allTimes.map(ts => {
-                    const found = list.find(d => d.timestamp === ts);
+                    const found = matchTs(list, ts);
                     return found ? found[key] : null;
                 });
             };
 
             if (isTotal) {
                 const mapTotal = (list) => allTimes.map(ts => {
-                    const found = list.find(d => d.timestamp === ts);
+                    const found = matchTs(list, ts);
                     return found ? (found.input_tokens || 0) + (found.output_tokens || 0) : null;
                 });
                 datasets = [
@@ -514,14 +727,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 series = computeRate(series, 'output_tokens');
                 datasets = [
                     {
-                        label: 'Δ Input',
+                        label: '\u0394 Input',
                         data: series.map(d => d.input_tokens),
                         borderColor: c.line,
                         backgroundColor: c.lineFill,
                         fill: true, tension: 0.4, pointRadius: 3,
                     },
                     {
-                        label: 'Δ Output',
+                        label: '\u0394 Output',
                         data: series.map(d => d.output_tokens),
                         borderColor: c.outLine,
                         backgroundColor: c.outFill,
@@ -544,7 +757,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         beginAtZero: mode === 'rate',
                         stacked: isTotal,
                         grid: { color: 'rgba(255,255,255,0.04)' },
-                        title: { display: true, text: unitLabel, color: '#6b7fa3', font: { size: 10 } },
+                        title: { display: true, text: unitLabel, color: '#8a9fc8', font: { size: 10 } },
                     },
                     x: {
                         stacked: isTotal,
@@ -579,12 +792,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 opencode: 'OpenCode CLI Spending',
                 codex: 'Codex (OpenAI) Usage Limits',
             };
-            document.getElementById('quota-title').textContent = titleMap[currentSource] || 'Quota Limits';
+            const titleEl = document.getElementById('quota-title');
+            if (titleEl) titleEl.textContent = titleMap[currentSource] || 'Quota Limits';
             const resp = await fetch(url);
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
             const data = await resp.json();
             renderQuota(data, currentSource);
         } catch (e) {
             console.error('fetchQuota error:', e);
+            const container = document.getElementById('quota-cards');
+            if (container) {
+                container.innerHTML = '<div class="empty-state"><p>Failed to load quota data.</p></div>';
+            }
         }
     }
 
@@ -595,11 +814,10 @@ document.addEventListener('DOMContentLoaded', () => {
         container.className = 'quota-cards source-' + source;
         container.innerHTML = '';
         if (!data || Object.keys(data).length === 0) {
-            container.innerHTML = '<p class="loading-msg">No quota data available.</p>';
+            container.innerHTML = '<div class="empty-state"><p>No quota data available.</p></div>';
             return;
         }
 
-        // data is always keyed by source: { 'agy': {...}, 'opencode': {...}, 'codex': {...} }
         for (const [src, quotaData] of Object.entries(data)) {
             if (!quotaData || Object.keys(quotaData).length === 0) continue;
 
@@ -617,7 +835,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     renderCodexQuota(container, rateLimit, plan);
                 }
             } else {
-                // AGY style quota (model groups with limits)
                 const agyPlan = quotaData._plan || 'Free';
                 for (const [group, limits] of Object.entries(quotaData)) {
                     if (group === '_plan') continue;
@@ -712,7 +929,7 @@ document.addEventListener('DOMContentLoaded', () => {
             card.innerHTML = `
                 <h3>Codex (OpenAI) <span class="badge badge-codex">${escapeHtml(planLabel)}</span></h3>
                 <div class="quota-limit">
-                    <p style="color: #6b7fa3; font-size: 0.85rem; margin: 0.5rem 0;">
+                    <p style="color: #8a9fc8; font-size: 0.85rem; margin: 0.5rem 0;">
                         Rate limit data will populate once Codex API calls are registered.
                     </p>
                 </div>
@@ -727,6 +944,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Initial load + auto-refresh every 60s ---
+    if (offline) {
+        setStatus('offline', 'Offline');
+    }
     refresh();
-    setInterval(refresh, 60_000);
+    setInterval(() => {
+        if (offline) return;
+        const elapsed = (Date.now() - lastFetchTime) / 1000;
+        if (elapsed > 120) {
+            setStatus('stale', 'Stale');
+        }
+        refresh();
+    }, 60_000);
 });
