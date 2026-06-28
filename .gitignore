@@ -35,4 +35,11 @@ error.log
 dashboard.log
 *.log
 
+# Virtual environments
+venv/
+
+# Runtime databases
+*.db
+internal_projects/agy_quota_dashboard/backend/agy_quota.db
+
 
