@@ -22,26 +22,26 @@ generated_at: "2026-06-27T22:09:04Z"
 
 Teams with prior predictions involving today's matchups:
 
-- **Argentina**: 2/2 correct. Predicted ARGENTINA WIN (High) vs Algeria (3-0 ✅), ARGENTINA WIN (Med) vs Austria (2-0 ✅). Defending champions already through.
-- **Algeria**: 1/1 correct. Predicted ALGERIA WIN (Med) vs Jordan (2-1 ✅). Clinical Finishing Gate applied with opponent-quality exception (Mahrez return, elite opponent).
-- **Austria**: 1/1 correct. Predicted AUSTRIA WIN (Med) vs Jordan (3-1 ✅).
+- **Argentina**: 2/2 correct. Predicted ARGENTINA WIN (High) vs Algeria (3-0), ARGENTINA WIN (Med) vs Austria (2-0). Defending champions already through to R32.
+- **Algeria**: 1/1 correct. Predicted ALGERIA WIN (Med) vs Jordan (2-1). Clinical Finishing Gate applied with opponent-quality exception.
+- **Austria**: 1/1 correct. Predicted AUSTRIA WIN (Med) vs Jordan (3-1).
 - **Jordan**: 0/2 as predicted loser. Lost 3-1 to Austria, 2-1 to Algeria. Debutant scored in both matches.
 
 Teams without prior predictions (system missed Matchdays 1-2 for Groups K/L):
-- **England**: 0-0 draw vs Ghana (June 23, missed). Draw-sufficiency risk noted — clinical finishing deficiency persistent (19 shots, 3 SOT, 0 goals). Temporary Grass Pitch validated at Gillette.
+- **England**: 0-0 draw vs Ghana (June 23). Clinical finishing persistent concern (19 shots, 3 SOT, 0 goals). Temporary Grass Pitch validated at Gillette.
 - **Panama**: Lost 0-1 to Croatia, 0-1 to Ghana. Already eliminated, 0 goals in tournament.
 - **Croatia**: Beat Panama 1-0, lost 4-2 to England.
 - **Ghana**: Beat Panama 1-0, drew 0-0 with England.
-- **Colombia**: 2/2 wins (3-1 vs UZB, 1-0 vs DRC). Already through to Round of 32.
+- **Colombia**: 2/2 wins (3-1 vs UZB, 1-0 vs DRC). Already through to R32.
 - **Portugal**: Drew 1-1 vs DRC, won 5-0 vs UZB.
 - **DR Congo**: Drew 1-1 vs POR, lost 1-0 vs COL.
 - **Uzbekistan**: Lost 3-1 vs COL, 5-0 vs POR. Debutants, already eliminated.
 
 Key lessons from tracker relevant to today:
-- **Draw-Sufficiency Confidence Discount**: England needs only 1pt to win Group L. If they play conservatively, this mirrors JPN-SWE (June 25) where a 1pt requirement produced conservative play. However, Panama is already eliminated with 0 goals — England's quality gap may override.
-- **Dead Rubber Motivation Asymmetry**: Algeria (must-win for progression) vs Austria (potentially already eliminated depending on JOR-ARG result). Panama vs England is a dead rubber for Panama. COL-POR is a group top-spot decider.
-- **Clinical Finishing Compliance Gate**: England's 0 goals from 19 shots vs Ghana (1.36 xG, 16% SOT rate) is a severe red flag for confidence.
-- **Temporary Grass Pitch**: MetLife (NY/NJ) has temporary grass — applies to Panama vs England. England's possession-heavy style with finishing deficiency on heavy grass is a known risk.
+- Draw-Sufficiency Confidence Discount: England needs 1pt to win Group L.
+- Dead Rubber Motivation Asymmetry: Algeria must-win, Austria needs draw vs potential elimination.
+- Clinical Finishing Compliance Gate: England's 19 shots/0 goals vs Ghana is a red flag.
+- Temporary Grass Pitch: MetLife (NY/NJ) has temporary grass. England's possession-heavy style on heavy grass is a known risk.
 
 ## Match Windows
 

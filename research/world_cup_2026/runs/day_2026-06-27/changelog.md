@@ -1,5 +1,40 @@
 # Changelog — 2026-06-27
 
+## Iteration 4 — 2026-06-28T02:21:01Z
+
+**Tokens:** 151677 input + 7725 output = 159402 total
+**Tokens:** 0 input + 0 output = 0 total (research cost accounted separately)
+**Model Used:** opencode: deepseek-v4-flash-free
+**Next Interval:** 60 minutes
+
+### Match Status Summary
+| Match | Status | Score | Prediction | Correct? |
+|:------|:-------|:------|:-----------|:---------|
+| COL-POR | COMPLETE | 0-0 | PORTUGAL WIN (Low) | No (within variance) |
+| DRC-UZB | COMPLETE | 3-1 DRC | DR CONGO WIN (Medium) | Yes |
+| ALG-AUT | live (20') | 0-0 | AUSTRIA WIN (Low) | TBD |
+| JOR-ARG | live (20') | 0-1 ARG | ARGENTINA WIN (Low) | Tracking |
+
+### Changes
+- COL-POR: Result verified (0-0). Prediction incorrect but within Low confidence variance. WHT freeze was correct protocol.
+- DRC-UZB: Result verified (3-1 DRC). Prediction correct. Iteration 3 postmortem concern (opponent-quality exception) was premature — DRC dominance produced goals. WHT correctly froze at 65' despite 0-1 deficit.
+- ALG-AUT: No change. First half 0-0, no structural events. Live-Monitoring Overreaction Rule active.
+- JOR-ARG: No change. ARG leads 1-0 (Lo Celso 19' free-kick). 82% possession. Prediction tracking correctly.
+
+### New Evidence
+- [strong] COL-POR 0-0 FT: Bleacher Report, Times Now confirm stalemate
+- [strong] DRC-UZB 3-1 FT: The Athletic, 101greatgoals confirm Wissa brace + Mayele goal
+- [strong] ALG-AUT 20' live: ESPN shows 0-0, 0.01 xG each, Arnautovic yellow card (11')
+- [strong] JOR-ARG 20' live: ESPN shows 0-1 (Lo Celso 19' free-kick), ARG 82% possession
+- [strong] Lo Celso free-kick: 0.10 xG shot → 0.65 xGOT — well-executed set piece
+
+### Postmortem Flags (Resolved)
+- DRC-UZB opponent-quality over-application: **Resolved** — prediction was correct. Lesson: sustained dominance (xG, possession) should override short-term WHT contradiction concerns for teams with pre-identified finishing deficiencies, as volume of chances eventually produces goals.
+- COL-POR Portugal attacking dependency: **Flagged for next iteration** — without Palhinha and Bernardo Silva, Portugal's build-up quality dropped, limiting Ronaldo and Fernandes.
+
+### Next Interval Reason
+- Wrote **60** minutes to `prediction_interval.txt` to land at ~03:21 UTC, catching Group J halftime WHT window (halftime ~02:45) plus early second half context (~36 min into second half). Tight but necessary to catch WHT application before FT (~03:40-03:50).
+
 ## Iteration 3 — 2026-06-28T00:58:02Z
 
 **Tokens:** 132877 input + 6282 output = 139159 total

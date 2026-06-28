@@ -1,15 +1,15 @@
 ---
 date: "2026-06-27"
-iteration: 3
-last_updated: "2026-06-28T00:58:02Z"
-matches_covered: 4
-overall_confidence: "Group K live but WHT-frozen (POR-COL 0-0, DRC-UZB 0-1); Group J lineups confirmed with rotated Argentina. Low overall."
+iteration: 4
+last_updated: "2026-06-28T02:21:01Z"
+matches_covered: 6
+overall_confidence: "Group K complete (0-0 draw, 3-1 DRC). Group J live: ALG-AUT 0-0 (20'), JOR-ARG 0-1 ARG (20'). Low overall."
 model: "opencode: deepseek-v4-flash-free"
-next_interval_minutes: 110
-next_difficulty: "high"
+next_interval_minutes: 60
+next_difficulty: "medium"
 ---
 
-# World Cup 2026 Predictions for 2026-06-27 — Iteration 3
+# World Cup 2026 Predictions for 2026-06-27 — Iteration 4
 
 ## Executive Summary Table
 
@@ -17,10 +17,10 @@ next_difficulty: "high"
 |:------|:-------|:-----------|:-----------|:-------------|
 | Panama vs England | COMPLETE (0-2) | Postmortem | — | 2026-06-27T23:15:06Z |
 | Croatia vs Ghana | COMPLETE (1-0) | Postmortem | — | 2026-06-27T23:15:06Z |
-| Colombia vs Portugal | live_post_halftime (67', 0-0) | PORTUGAL WIN (WHT frozen) | Low | 2026-06-27T23:15:06Z |
-| DR Congo vs Uzbekistan | live_post_halftime (65', 0-1 UZB) | DR CONGO WIN (WHT frozen — contradicted) | Medium | 2026-06-27T23:15:06Z |
-| Algeria vs Austria | not_started (02:00) | AUSTRIA WIN | Low | 2026-06-27T23:15:06Z |
-| Jordan vs Argentina | not_started (02:00) | ARGENTINA WIN | Low | 2026-06-27T23:15:06Z |
+| Colombia vs Portugal | COMPLETE (0-0) | PORTUGAL WIN (incorrect — within variance) | Low | 2026-06-28T02:21:01Z |
+| DR Congo vs Uzbekistan | COMPLETE (3-1 DRC) | DR CONGO WIN (correct) | Medium | 2026-06-28T02:21:01Z |
+| Algeria vs Austria | live (20', 0-0) | AUSTRIA WIN | Low | 2026-06-28T02:21:01Z |
+| Jordan vs Argentina | live (20', 0-1 ARG) | ARGENTINA WIN | Low | 2026-06-28T02:21:01Z |
 
 ---
 
@@ -28,127 +28,134 @@ next_difficulty: "high"
 
 ### Match: Colombia vs. Portugal (Group K)
 
-**Status:** live_post_halftime (67')
+**Status:** COMPLETE — **0-0 draw**
 **Kickoff:** 23:30 UTC | **Venue:** Hard Rock Stadium, Miami Gardens, FL
 
-### Prediction: PORTUGAL WIN (WHT Frozen)
-**Confidence:** Low (unchanged)
+### Prediction: PORTUGAL WIN (Low) — **Incorrect**
+**Confidence:** Low (unchanged — pre-match assessment included elevated draw risk)
+
+### Final Score: Colombia 0-0 Portugal
 
 ### Reasoning
-Match remains 0-0 at 67'. Colombia dominating territory (55% possession, 1.20 xG vs 0.63) but unable to convert chances — Luis Suárez shot wide at 65', Ríos side-footed wide at 62'. Portugal's makeshift defense (Veiga at CB) has held, but Portugal has created little (2 SOG, 0 big chances). The draw outcome is consistent with the "elevated draw risk" factored into the Low confidence prediction.
+The match ended goalless. Colombia dominated possession and chances (1.20 xG, 55% poss, 5 SOG) but could not break through Portugal's makeshift defense. Portugal created little (2 SOG, 0 big chances). The draw outcome was within the variance of the Low confidence prediction, which explicitly factored in "elevated draw risk" due to Portugal's defensive lineup changes (Veiga at CB, no Palhinha).
 
 ### Key Factors
-- [strong] COL 1.20 xG vs POR 0.63 xG: Colombia creating more but not finishing
-- [strong] 5-2 SOG in favor of Colombia despite lower quality on paper
-- [strong] Portugal's best chance: Ronaldo shot wide (60'), Fernandes header blocked (39')
-- [Risk] Neither team able to break the deadlock — draw looking increasingly likely
+- [strong] COL 1.20 xG vs POR 0.63 xG: Colombia the better side but lacking finishing touch
+- [strong] Final score 0-0: Neither team able to break deadlock
+- [strong] COL tops Group K (7pts), POR finishes second (5pts) on head-to-head tiebreaker
+- [postmortem] Portugal's attacking output was significantly below expectations — Ronaldo and Fernandes both quiet
 
-### WHT Assessment
-- Score (0-0) neither clearly confirms nor contradicts PORTUGAL WIN prediction
-- Prediction included "elevated draw risk" — current scoreline within expected range
-- No structural events (no red cards, no key injuries)
-- **Frozen for audit.** Final result to be verified at next iteration.
+### WHT Assessment (Retrospective)
+- Score was 0-0 at 67' — WHT correctly classified as "score consistent with elevated draw risk"
+- Correct protocol: frozen for audit (no structural events to force a flip)
+- Prediction was incorrect (predicted PORTUGAL WIN) but within acceptable Low confidence variance
+- **Flag for postmortem:** Portugal's attack (Ronaldo, Fernandes) was underestimated in its dependency on service — without Palhinha and Bernardo Silva, the build-up quality dropped significantly
 
 ### Search History
-- **Iteration 3**: ESPN live match centre (67'), Fox Sports match page
+- **Iteration 4**: Bleacher Report (final score 0-0), Times Now highlights, ESPN match page
 
 ---
 
 ### Match: DR Congo vs. Uzbekistan (Group K)
 
-**Status:** live_post_halftime (65')
+**Status:** COMPLETE — **DR Congo 3-1 Uzbekistan**
 **Kickoff:** 23:30 UTC | **Venue:** Mercedes-Benz Stadium, Atlanta, GA
 
-### Prediction: DR CONGO WIN (WHT Frozen — Contradicted)
-**Confidence:** Medium (unchanged, flagged for postmortem)
+### Prediction: DR CONGO WIN (Medium) — **Correct**
+**Confidence:** Medium (correct prediction)
+
+### Final Score: DR Congo 3-1 Uzbekistan
 
 ### Reasoning
-DR Congo trail 1-0 (Shomurodov 10') despite complete dominance (65% possession, 0.68 xG vs 0.20). DRC has created chances but Wissa has missed multiple presentable opportunities (header wide at 61', shot off target at 50', 29'). DRC's clinical finishing deficiency — pre-identified before the match — has materialized. UZB scored on their only SOT (Shomurodov 10' from 0.01 xG shot — low-probability goal).
+DR Congo came from behind to win 3-1. After trailing 1-0 at halftime (Shomurodov 10'), DRC equalized through Wissa (68'), took the lead through Mayele (78'), and sealed it with Wissa's second in stoppage time (90+'). The pre-identified finishing concern (1G in 2 matches) was real — DRC dominated but needed until 68' to score. However, the volume of chances created (10+ shots, 65% possession) was always likely to produce goals given enough time.
 
 ### Key Factors
-- [strong] DRC 0.68 xG vs UZB 0.20 xG: clear dominance
-- [strong] DRC 65% possession, 10 shots vs UZB 3 shots
-- [strong] Wissa (Newcastle) missed multiple chances — pattern consistent with 1G-in-2-matches finishing record
-- [Risk] UZB's goal from 0.01 xG shot — unsustainable but counts
-- [weak] Clinical Finishing Gate warning was documented but the Uzbekistan opponent-quality exception (conceded 8 goals) was the assumed override — that override has failed
+- [strong] DRC 0.68 xG in first half alone — dominance was sustained
+- [strong] Wissa 2 goals (68', 90+'), Mayele 1 goal (78')
+- [strong] Mbuku had a goal controversially disallowed for a foul review in first half
+- [strong] DRC qualifies for Round of 32 — will face England
+- [postmortem] The WHT contradiction flag at 65' (0-1) was procedurally correct — the score contradicted the prediction. However, the postmortem assessment that the "opponent-quality exception was too generous" was premature. DRC's finishing deficiency caused the deficit, but their sustained dominance always gave them a path to win.
 
-### WHT Assessment
-- Score (0-1 UZB) **contradicts** DR CONGO WIN prediction
-- Structural evaluation: DRC's finishing deficiency was pre-identified (1G in 2 prior matches, discounted from High to Medium). The failure is that the opponent-quality override was too generous — UZB's 8 GA included 5 vs Portugal in a game Portugal dominated completely
-- **No structural new evidence** — the same finishing concern that was flagged pre-match is the reason for the current deficit
-- **Frozen for postmortem review.** Prediction incorrect but WHT protocol correctly applied (not flipped). Flags: (1) Opponent-quality exception over-applied, (2) DRC finishing deficiency more severe than estimated.
+### WHT Assessment (Retrospective)
+- Score at 65' was 0-1 UZB — correctly flagged as **contradicted**
+- Correctly **frozen** (not flipped) — no structural new evidence; the same pre-identified factors (finishing concern) were causing the deficit
+- At FT, the prediction proved correct. Lesson: sustained dominance (xG, possession) matters more than short-term scoreline in WHT assessment
+- **Postmortem flags:** (1) Opponent-quality override concern — partially valid but did not prevent the win. (2) WHT contradiction flag procedure worked correctly.
 
 ### Search History
-- **Iteration 3**: ESPN live match centre (65'), myKhel live score
+- **Iteration 4**: The Athletic (3-1 final), 101greatgoals match report, ESPN final score
 
 ---
 
 ### Match: Algeria vs. Austria (Group J)
 
-**Status:** not_started (kickoff 02:00)
-**Lineups confirmed:** Both via official federation social media
+**Status:** live (20', 0-0)
+**Kickoff:** 02:00 UTC | **Venue:** Kansas City Stadium, Kansas City, MO
 
 ### Prediction: AUSTRIA WIN
 **Confidence:** Low (unchanged)
 
-### Key Factors
-- [official] AUT XI (4-2-3-1): Schlager; Posch, Lienhart, Alaba, Mwene; Seiwald, X. Schlager; Schmid, Laimer, Sabitzer; Arnautović
-- [official] ALG XI (4-3-3): Benbot; Belghali, Mandi, Bensebaini, Hadjam; Aouar, Bentaleb, Maza; Mahrez, Gouiri, Chaibi
-- [strong] ALG GK change: Benbot starts for Zidane (who was statistically one of the worst GKs in the group stage)
-- [strong] Lienhart starts at CB for AUT instead of Danso — minor downgrade
-- [strong] Laimer pushed to midfield (instead of Wanner) — more defensive balance, strengthens draw-sufficiency approach
-- [strong] Arnautović starts up front for AUT — physical hold-up play suits counter-attacking strategy
+### Live Status
+- **20th minute**: 0-0. Both teams pressing aggressively. Arnautovic yellow card (11'). Maza volley over (10'). 
+- xG: 0.01 each. Possession: ALG 64% - AUT 36%.
+- Neither team has created a clear chance yet — tight, cautious opening.
+- [notable] ESPN live commentary: "Argentina have taken the lead against Jordan thanks to a spectacular Giovani Lo Celso free-kick" — cross-match context noted.
 
-### Evidence Gathered This Iteration
-- [official] Austria lineup confirmed via @oefb1904 tweet with official graphic
-- [official] Algeria lineup confirmed via @LesVerts tweet
-- [strong] Both Khel Now articles confirm lineups with official social media embeds
-
-### Lineup Change Assessment
-- **AUT changes from predicted:** Lienhart (not Danso) at CB, Mwene (not Laimer) at LB, Laimer in midfield (not Wanner), Arnautović (not Gregoritsch) at ST. Net effect: slightly more conservative/defensive — strengthens draw-sufficiency approach.
-- **ALG changes from predicted:** Benbot (not Zidane) in goal, Hadjam (not Aït-Nouri) at LB, Aouar starts in midfield, Chaibi starts on left (not Hadj Moussa). Net effect: GK upgrade, rest roughly neutral.
+### Key Factors (Updated Live)
+- [strong] Arnautovic yellow card (11') — limits his physical approach, potential risk for second yellow
+- [strong] Algeria pressing well in opening 20 minutes — high energy approach
+- [strong] Both teams 0.01 xG — very low chance creation so far
+- [risk] The "Pact of Gijón" historical parallel noted by VAVEL — both teams could settle for a draw (especially AUT who needs only 1pt)
+- [risk] No structural events (red cards, key injuries) — Live-Monitoring Overreaction Rule applies
 
 ### Heuristic Checks
-- Draw-Sufficiency Discount (AUT needs 1pt): **Active.** Lineup changes (Laimer in midfield, not Wanner) reinforce conservative approach.
-- Clinical Finishing Gate: ALG 2G vs JOR (pass), AUT 3G vs JOR (pass). Both pass.
+- Draw-Sufficiency Discount (AUT needs 1pt): **Active.** Match state (0-0) consistent with cautious approach from both sides.
+- Clinical Finishing Gate: Both pass (no chances created yet).
 
 ### Prediction Changes
-- **Previous prediction:** AUSTRIA WIN (Low)
-- **Change:** No change — lineups confirm pre-match analysis. Austria's slightly more defensive setup reinforces the draw-sufficiency advantage. Arnautović provides better hold-up play for counter-attacks than Gregoritsch.
+- **No change.** First half, 0-0, no structural events. AUSTRIA WIN Low remains. Algeria has the better of possession but neither team has threatened.
+
+### WHT Assessment
+- Pre-halftime. No WHT application yet (requires halftime for Group J).
+- Live-Monitoring Overreaction Rule active: do not adjust based on scoreline or possession alone.
 
 ---
 
 ### Match: Jordan vs. Argentina (Group J)
 
-**Status:** not_started (kickoff 02:00)
-**Lineups confirmed:** USA Today reports official Scaloni announcement
+**Status:** live (20', 0-1 ARG)
+**Kickoff:** 02:00 UTC | **Venue:** AT&T Stadium, Arlington, TX
 
 ### Prediction: ARGENTINA WIN
 **Confidence:** Low (unchanged — Extreme Rotation Floor Rule active)
 
-### Key Factors
-- [official] USA Today confirmed via Scaloni: **Messi will NOT start** — on bench
-- [official] ARG XI (4-3-3): E. Martinez; G. Simeone, Otamendi, Senesi, Tagliafico; Lo Celso, Paredes, Palacios; Nico Paz, Alvarez, Nico Gonzalez
-- [strong] **7-8 changes** from first-choice XI: NO Messi, NO De Paul, NO Mac Allister, NO Romero, NO Molina, NO Lisandro Martínez, NO Di María, NO Lautaro Martínez
-- [strong] Extreme Rotation Floor Rule (6+ changes → Low cap) confirmed active
-- [strong] Paredes starts in midfield — first match minutes in tournament
-- [strong] Nico Paz starts — World Cup debut for the youngster
-- [risk] Giuliano Simeone listed as defender (wingback role) — unusual positioning
-- [risk] Messi expected to come off bench in second half
+### Live Status
+- **20th minute**: Argentina leads **1-0** — Lo Celso free-kick (19')
+- ARG dominant: 82% possession, 0.14 xG vs 0.00
+- Abu Taha yellow card (17') for foul on Lo Celso leading to the free-kick
+- Lo Celso goal: 0.10 xG shot → 0.65 xGOT — well-struck free-kick from just outside the box
+- Argentina XI: Martinez; Montiel, Otamendi, Senesi, Tagliafico; Simeone, Paredes, Lo Celso, Palacios; Alvarez, Martinez (note: Palacios started instead of Barco as earlier reported)
 
-### Evidence Gathered This Iteration
-- [official] USA Today: "Messi will not start" — confirmed by Scaloni in pre-match press conference
-- [strong] Full lineup published by USA Today with Scaloni quote about rotation plan
-- [strong] 101greatgoals (predicted lineup) matched the confirmed XI — confirms reliability of pre-match projections
+### Key Factors (Updated Live)
+- [strong] ARG 82% possession — complete control of the match
+- [strong] Lo Celso has been the focal point — goal, corner kicks, dangerous passes
+- [strong] Jordan yet to register a shot (0 SOG, 0 shots total)
+- [strong] Messi on bench — not expected unless needed
+- [risk] ARG has only 0.14 xG despite 82% possession — not creating high-quality chances from open play
+- [risk] Extreme Rotation cohort (Palacios, Simeone, Paz) still integrating — attacking patterns not as fluid as first-choice XI
 
 ### Heuristic Checks
-- **Dead Rubber Motivation Asymmetry:** ARG needs nothing. JOR eliminated but playing for pride.
-- **Extreme Rotation Floor Rule:** 7-8 changes confirmed → confidence capped at Low.
-- Elite depth exception considered: Even with Argentina's deep squad, changes of this magnitude (no Messi, no De Paul, no Mac Allister, no Romero) create significant cohesion risk.
+- Dead Rubber Motivation Asymmetry: **Active.** ARG needs nothing, JOR eliminated but playing for pride.
+- Extreme Rotation Floor Rule: **Active.** 7-8 changes confirmed. Low cap active.
+- Elite depth exception: Argentina's rotated XI still far superior to Jordan, as reflected in 82% possession and the early goal.
 
 ### Prediction Changes
-- **Previous prediction:** ARGENTINA WIN (Low)
-- **Change:** No change — rotation confirmed at expected level. Argentina's quality (Alvarez, Lo Celso, Palacios, E. Martinez) still far superior to Jordan.
+- **No change.** ARGENTINA WIN Low looking correct so far. The rotated squad has executed well — early goal from set piece, total control of possession.
+- Live-Monitoring Overreaction Rule active: first half goal is not a reason to upgrade confidence.
+
+### WHT Assessment
+- Pre-halftime. WHT to be applied at halftime assessment (~02:45 UTC).
+- Current score (0-1 ARG) consistent with prediction — no contradiction.
 
 ---
 
@@ -156,12 +163,14 @@ DR Congo trail 1-0 (Shomurodov 10') despite complete dominance (65% possession, 
 
 | Heuristic | Matches Applied | Effect |
 |:----------|:----------------|:-------|
-| Weighted Halftime Rule | COL-POR: frozen (score consistent). DRC-UZB: frozen (score contradicted, flagged for postmortem) | Both frozen. DRC-UZB flagged for finishing-deficiency postmortem. |
-| Draw-Sufficiency Discount | ALG-AUT (AUT needs 1pt) | Active. AUT lineup (Laimer MF, Arnautović ST) reinforces conservative approach. |
-| Dead Rubber Motivation Asymmetry | JOR-ARG (ARG already group winner) | Active. 7-8 changes confirmed. |
-| Extreme Rotation Floor Rule | JOR-ARG (7-8 changes confirmed) | Low cap active. |
-| Clinical Finishing Gate | COL-POR (pass: 0-0 consistent with tight match). DRC-UZB: pre-identified deficiency materialized (postmortem flag). ALG-AUT (pass). JOR-ARG (pass). | DRC-UZB: opponent-quality override was too generous — flagged. |
-| Makeshift Defense | COL-POR (POR: Veiga at CB) | Portugal's defense has held 0-0 despite COL dominance. |
+| Weighted Halftime Rule | COL-POR: frozen (score consistent). DRC-UZB: frozen (score contradicted at 65', but prediction correct at FT). ALG-AUT: pre-halftime. JOR-ARG: pre-halftime. | COL-POR: correct freeze. DRC-UZB: correct freeze despite contradiction — sustained dominance produced result. Both Group J pending halftime. |
+| Draw-Sufficiency Discount | ALG-AUT (AUT needs 1pt) | Active. Match 0-0 at 20' — cautious approach suggests draw is live possibility. |
+| Dead Rubber Motivation Asymmetry | JOR-ARG (ARG already group winner) | Active. ARG rotating heavily but still dominant. |
+| Extreme Rotation Floor Rule | JOR-ARG (7-8 changes confirmed) | Low cap active. ARG still leads 1-0 despite rotation. |
+| Clinical Finishing Gate | COL-POR: COL dominant but 0-0 (pass). DRC-UZB: pre-identified deficiency overcame by volume (pass). ALG-AUT: no chances (pass). JOR-ARG: ARG scored from set piece (pass). | All pass. DRC's finishing concern was real but volume overcame it — lesson for future assessments. |
+| Makeshift Defense | COL-POR (POR: Veiga at CB). Applied correctly. | Portugal's defense held for 0-0. Attack was the weak link. |
+| Live-Monitoring Overreaction Rule | ALG-AUT, JOR-ARG (first half) | Active. No changes during first half. |
+| Opponent-Quality Exception | DRC-UZB (over-applied — flagged in Iteration 3) | Retrospective: The exception was questionable but did not prevent the prediction from being correct. DRC won regardless. |
 
 ---
 
@@ -169,8 +178,8 @@ DR Congo trail 1-0 (Shomurodov 10') despite complete dominance (65% possession, 
 
 | Event | Expected Time (UTC) |
 |:------|:-------------------|
-| COL-POR / DRC-UZB final scores | Verified at next iteration |
-| ALG-AUT / JOR-ARG halftime | ~02:50 |
-| Next prediction interval | 02:48 (110 min from now) |
-| ALG-AUT / JOR-ARG full time | ~03:40 |
-| Postmortem | ~05:00 (Jun 28) |
+| ALG-AUT / JOR-ARG halftime | ~02:45-02:50 |
+| WHT application for Group J matches | Next iteration (~03:21) |
+| ALG-AUT / JOR-ARG full time | ~03:40-03:50 |
+| COL-POR = 0-0 draw: postmortem on Portugal attacking dependency | Next iteration |
+| DRC-UZB = 3-1 DRC: close out postmortem (prediction correct) | Next iteration |
