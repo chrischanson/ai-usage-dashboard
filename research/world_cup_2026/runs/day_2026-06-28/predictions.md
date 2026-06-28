@@ -153,7 +153,7 @@ Canada has the superior individual quality with Jonathan David (3 goals, 6 SOT i
 - **Draw-Sufficiency Check applied:** Knockout match — not applicable.
 - **Clinical Finishing Gate check applied:** Canada 13.6% conv., 1.14x efficiency — gate does not cap. South Africa 0.29x efficiency — systemic deficiency persists with Makgopa (0 goals) starting striker.
 - **Prediction:** CANADA WIN (Low) **unchanged**.
-- **Reasoning for confidence staying Low:** Lineup news is net neutral. Eustáquio starting and Bombito fit are positives. Larin benched is an unexpected negative — Oluwaseyi less proven finisher. Davies on bench (expected) maintains creative gap in starting XI. Mokoena return confirmed for RSA. Both teams still knockout debutants. Confidence could upgrade to Medium only if Canada dominates first half and leads at halftime (WHT).
+- **Reasoning for confidence staying Low:** Lineup news is net neutral. Eustáquio starting and Bombito fit are positives. Larin benched is an unexpected negative — Oluwaseyi less proven finisher. Davies on bench (expected) maintains creative gap in starting XI. Mokoena return confirmed for RSA. Both teams still knockout debutants.
 - **Prediction Changes for this iteration:** No change to prediction or confidence.
 - **Next iteration planning:** Iteration 6 of ~7 total for 1-slot matchday. Entering match-live phase (kickoff 19:00 UTC). Next high-value: **Weighted Halftime Rule** at ~19:50 UTC. Set interval to land at 19:50 UTC (108 min from 18:02 UTC) to apply WHT.
 - **Next interval:** 108 minutes to ~19:50 UTC for WHT application at halftime.

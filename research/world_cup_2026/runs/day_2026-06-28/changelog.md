@@ -1,5 +1,39 @@
 # 📝 World Cup 2026 Prediction Changelog — 2026-06-28
 
+## Iteration 6 - 2026-06-28T18:02:00Z
+**Model Used:** opencode: deepseek-v4-flash-free
+**Next Interval:** 108 minutes
+**Tokens:** [injected post-execution by orchestrator]
+
+**Tokens:** 126615 input + 6358 output = 132973 total
+### Eligible Matches
+- South Africa vs Canada: not_started (no change, kickoff 19:00 UTC, 58 min away)
+
+### Changes
+- South Africa vs Canada: No change. CANADA WIN (Low) unchanged. Official lineups confirmed — Eustáquio starts (passed fitness test), Davies on bench as expected, Larin benched (surprise), Bombito starts.
+
+### Search Queries Executed
+- South Africa vs Canada: `South Africa Canada official starting lineups World Cup 2026 Round 32 June 28 2026`
+- South Africa vs Canada: `Canada South Africa lineups confirmed XI FotMob World Cup June 28 2026`
+
+### New Evidence
+- South Africa vs Canada: [strong] Official XIs confirmed per The Standard / FotMob. Canada: Crépeau; Johnston, Cornelius, Bombito, Laryea; Eustáquio, Millar, Saliba; Buchanan, J. David, Oluwaseyi. South Africa: Williams; Mudau, Mbokazi, Okon, Modiba; Mokoena, Sithole; Maseko, Mofokeng, Appollis; Makgopa.
+- South Africa vs Canada: [strong] Eustáquio starts — passed late fitness test, Canada's midfield intact.
+- South Africa vs Canada: [medium] Larin benched — Oluwaseyi starts. Surprise lineup decision.
+- South Africa vs Canada: [medium] Bombito starting at CB (not De Fougerolles).
+
+### Open Questions Resolved
+- Official starting XIs — both teams confirmed. Davies on bench, Eustáquio starts, Larin benched, Mokoena starts.
+- Eustáquio fitness — passed late test, starting XI.
+
+### New Questions Raised
+- How does Oluwaseyi perform as starter vs experienced Larin?
+- Does Canada's starting XI (without Davies or Larin) create enough chances?
+- WHT application at halftime (~19:50 UTC).
+
+### Next Interval Reason
+- Wrote 108 minutes to `prediction_interval.txt` — lineup verification complete. Match kicks off in 58 min (19:00 UTC). Next high-value iteration is WHT application at halftime (~19:50 UTC). Interval set to 108 min (18:02 → 19:50 UTC).
+
 ## Iteration 5 - 2026-06-28T15:49:00Z
 **Model Used:** opencode: deepseek-v4-flash-free
 **Next Interval:** 131 minutes

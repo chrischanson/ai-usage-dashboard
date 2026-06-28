@@ -403,7 +403,7 @@ if [ -f "${SKILLS_RUNNER}" ]; then
     fi
     # Fallback: check if the agent wrote to the project's runs directory or printed a different path
     if [ ! -f "${DAY_DIR}/match_schedule.md" ]; then
-        PROJECT_RUN_DIR=$(echo "${OUTPUT}" | grep -E "written to.*match_schedule.md" | sed -n 's/.*written to [`'\''"]\([^`'\''"]*\).*/\1/p' | sed 's/\/match_schedule.md//')
+        PROJECT_RUN_DIR=$(echo "${OUTPUT}" | grep -i -E "written to.*match_schedule.md" | sed -n 's/.*written to [`'\''"]\([^`'\''"]*\).*/\1/p' | sed 's/\/match_schedule.md//' || true)
         if [ -n "${PROJECT_RUN_DIR}" ]; then
             if [ -d "${WORKSPACE_DIR}/${PROJECT_RUN_DIR}" ] && [ -f "${WORKSPACE_DIR}/${PROJECT_RUN_DIR}/match_schedule.md" ]; then
                 cp -f "${WORKSPACE_DIR}/${PROJECT_RUN_DIR}/match_schedule.md" "${DAY_DIR}/"
