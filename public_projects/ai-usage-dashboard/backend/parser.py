@@ -35,8 +35,5 @@ def _result_to_tuple(result: ParserResult) -> tuple:
 
 
 def fetch_and_parse():
-    try:
-        result = OpenCodeParser().parse()
-        return _result_to_tuple(result)
-    except Exception:
-        return {}, {}, []
+    result = OpenCodeParser().parse()
+    return _result_to_tuple(result)

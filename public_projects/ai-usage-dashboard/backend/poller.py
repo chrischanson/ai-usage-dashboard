@@ -50,7 +50,7 @@ class Poller:
             result = collector()
             if result:
                 overview, cost_tokens, models = result
-                if overview or cost_tokens:
+                if overview.get('Sessions', 0) or overview.get('Messages', 0):
                     insert_usage(overview, cost_tokens, models, source=source)
             record_status(conn, source, True, None, time.time() - start)
         except Exception as e:

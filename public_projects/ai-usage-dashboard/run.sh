@@ -13,16 +13,16 @@ fi
 # Activate virtual environment
 source ../venv/bin/activate
 
-# Install dependencies
-pip install -q -r ../requirements.txt
+# Install dependencies (suppress externally-managed-environment warning inside venv)
+pip install -q -r ../requirements.txt 2>&1 | grep -v "externally-managed" || true
 
 # Kill any existing process on port 8000
 echo "Cleaning up existing processes on port 8000..."
 pkill -f "uvicorn" 2>/dev/null || true
 sleep 1
 
-HOST="${AQM_HOST:-127.0.0.1}"
-PORT="${AQM_PORT:-8000}"
+HOST="${USAGE_HOST:-127.0.0.1}"
+PORT="${USAGE_PORT:-8000}"
 
 # Run via main entry point (handles poller + graceful shutdown)
 if [[ "$1" == "--background" || "$1" == "-b" ]]; then

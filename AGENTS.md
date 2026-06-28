@@ -9,7 +9,7 @@ This repository contains multiple research and development projects:
 - **`research/marathon_tracker/`**: Tools for tracking marathon deadlines, using LLM-based data extraction.
 - **`public_projects/video-compressor/`**: Video compression utilities (built with Bazel).
 - **`internal_projects/hello_world/`**: Bazel-based hello world.
-- **`internal_projects/agy_quota_dashboard/`**: Full-stack AGY Quota Dashboard monitoring AGY usage/quota, OpenCode stats, and Codex CLI usage with per-source tab views.
+- **`public_projects/ai-usage-dashboard/`**: Full-stack AI Usage Dashboard monitoring AGY usage/quota, OpenCode stats, and Codex CLI usage with per-source tab views.
 - **`skills/`**: Structured agent skills library.
 
 ---
@@ -49,18 +49,18 @@ To execute all Bazel builds and tests in the repository:
 bazel test //...
 ```
 
-### AGY Quota Dashboard Verifier
-To run the dashboard verifier (285+ checks covering server, HTML, JS, CSS, APIs, UX, a11y, hardening):
+### AI Usage Dashboard Verifier
+To run the dashboard verifier (290+ checks covering server, HTML, JS, CSS, APIs, UX, a11y, hardening):
 ```bash
 PYTHONPATH=backend python3 verify.py
 ```
 
 ---
 
-## AGY Quota Dashboard — Requirements
+## AI Usage Dashboard — Requirements
 
 ### Design Document
-The full design is documented in `internal_projects/agy_quota_dashboard/DESIGN.md` (M1–M9 build order, architecture, data model, API spec, frontend architecture, UX states, a11y, security, testing strategy).
+The full design is documented in `public_projects/ai-usage-dashboard/DESIGN.md` (M1–M9 build order, architecture, data model, API spec, frontend architecture, UX states, a11y, security, testing strategy).
 
 ### Data Sources
 - **AGY (Antigravity)**: Quota from Cloud Code API (`loadCodeAssist` response `paidTier.name`). Usage from local conversation DBs.
@@ -97,10 +97,11 @@ The full design is documented in `internal_projects/agy_quota_dashboard/DESIGN.m
 - No secrets or keys logged or exposed.
 
 ### Server
-- Start via: `start-stop-daemon --background --make-pidfile --pidfile /tmp/dashboard.pid --chdir ... --start --exec /tmp/venv/bin/python3 -- -m uvicorn backend.app:app --host 127.0.0.1 --port 8000`
-- Alternative: `PYTHONPATH=. python3 -m main` (uses config defaults: 127.0.0.1:8000).
+- Start via: `cd backend && PYTHONPATH=. python3 -m main` (handles poller + server).
+- Alternative: `bash run.sh` (creates venv, installs deps, starts).
+- Auto-start: `sudo bash install/install.sh /path/to/project [user]` (systemd) or the pre-installed init.d script.
+- Config env vars: `USAGE_HOST`, `USAGE_PORT`, `USAGE_DB_PATH`, etc. See README.
 - Poll interval: 10 minutes (600s).
-- Python venv at `/tmp/venv/bin/python3`.
 
 ### Mobile Responsive
 - Breakpoint at 640px: container padding, header stacking, scrollable tabs, single-column layouts, 24-hour time labels.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verifier for AGY Quota Dashboard changes.
+"""Verifier for AI Usage Dashboard changes.
 
 Run: PYTHONPATH=backend python3 verify.py URL
 Default URL: http://127.0.0.1:8000
@@ -525,10 +525,10 @@ else:
 
 # ── 25. Regression: Combined chart timestamp tolerance ──
 heading(25, 'Regression: Combined chart timestamp matching')
-if 'matchTs' in js:
-    ok('mapTotal/mapData uses approximate timestamp matching')
+if 'buildFilledLookup' in js:
+    ok('Combined chart uses forward-fill timestamp matching')
 else:
-    fail('mapTotal/mapData missing matchTs function')
+    fail('Combined chart missing buildFilledLookup function')
 if 'MS_TOLERANCE' in js:
     ok('Combined chart has MS_TOLERANCE tolerance window')
 else:
@@ -537,10 +537,10 @@ if 'list.find(d => d.timestamp === ts)' not in js and 'list.find(d.timestamp' no
     ok('No exact timestamp === match in combined chart')
 else:
     fail('Combined chart still uses exact timestamp match')
-if 'bestDiff <= MS_TOLERANCE' in js or 'bestDiff <=' in js:
-    ok('matchTs returns null when outside tolerance window')
+if 'Math.abs(lastTs.getTime() - t) <= MS_TOLERANCE' in js:
+    ok('buildFilledLookup returns null when outside tolerance window')
 else:
-    fail('matchTs missing tolerance boundary check')
+    fail('buildFilledLookup missing tolerance boundary check')
 
 # ── 26. Regression: Model panel respects time range ──
 heading(26, 'Regression: Model panel respects time range')
@@ -587,27 +587,27 @@ except (ImportError, AssertionError, ValueError) as e:
 
 try:
     import os as _os
-    _os.environ['AQM_POLL_INTERVAL'] = 'abc'
+    _os.environ['USAGE_POLL_INTERVAL'] = 'abc'
     from config import load_config as _lc
     try:
         _lc()
-        fail('load_config() should reject invalid AQM_POLL_INTERVAL')
+        fail('load_config() should reject invalid USAGE_POLL_INTERVAL')
     except ValueError:
-        ok('load_config() rejects non-integer AQM_POLL_INTERVAL')
+        ok('load_config() rejects non-integer USAGE_POLL_INTERVAL')
     finally:
-        del _os.environ['AQM_POLL_INTERVAL']
+        del _os.environ['USAGE_POLL_INTERVAL']
 except Exception:
     pass
 
 try:
-    _os.environ['AQM_LOG_LEVEL'] = 'TRACE'
+    _os.environ['USAGE_LOG_LEVEL'] = 'TRACE'
     try:
         _lc()
-        fail('load_config() should reject invalid AQM_LOG_LEVEL')
+        fail('load_config() should reject invalid USAGE_LOG_LEVEL')
     except ValueError:
-        ok('load_config() rejects invalid AQM_LOG_LEVEL')
+        ok('load_config() rejects invalid USAGE_LOG_LEVEL')
     finally:
-        del _os.environ['AQM_LOG_LEVEL']
+        del _os.environ['USAGE_LOG_LEVEL']
 except Exception:
     pass
 
@@ -788,8 +788,8 @@ finally:
 tf6 = tempfile.NamedTemporaryFile(suffix='.db', delete=False)
 tf6.close()
 try:
-    _old_path = os.environ.get('AQM_DB_PATH')
-    os.environ['AQM_DB_PATH'] = tf6.name
+    _old_path = os.environ.get('USAGE_DB_PATH')
+    os.environ['USAGE_DB_PATH'] = tf6.name
     # Reload db module with new env
     import importlib
     import db as db_mod
@@ -806,9 +806,9 @@ try:
     else:
         fail(f'init_db() missing tables: {expected - tables}')
     if _old_path:
-        os.environ['AQM_DB_PATH'] = _old_path
+        os.environ['USAGE_DB_PATH'] = _old_path
     else:
-        del os.environ['AQM_DB_PATH']
+        del os.environ['USAGE_DB_PATH']
     conn.close()
 except Exception as e:
     fail(f'init_db() backward compat test error: {e}')
@@ -1154,7 +1154,7 @@ else:
 
 # Ensure no route definitions remain in app.py
 for phrase in ('@app.get', '@app.post', 'add_api_route', 'app.mount'):
-    if phrase in app_py_content.replace('from .api import create_app', '').replace('app = create_app()', '').replace('"""FastAPI application for the AGY Quota Dashboard."""', ''):
+    if phrase in app_py_content.replace('from .api import create_app', '').replace('app = create_app()', '').replace('"""FastAPI application for the AI Usage Dashboard."""', ''):
         fail(f'app.py still contains {phrase}')
         break
 else:

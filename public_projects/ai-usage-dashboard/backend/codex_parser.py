@@ -35,8 +35,5 @@ def _result_to_tuple(result: ParserResult) -> tuple:
 
 
 def fetch_codex_usage():
-    try:
-        result = CodexParser().parse()
-        return _result_to_tuple(result)
-    except Exception:
-        return {}, {}, []
+    result = CodexParser().parse()
+    return _result_to_tuple(result)

@@ -1,19 +1,19 @@
 #! /bin/sh
 
 ### BEGIN INIT INFO
-# Provides:       agy-dashboard
+# Provides:       usage-dashboard
 # Required-Start: $remote_fs $syslog
 # Required-Stop:  $remote_fs $syslog
 # Default-Start:  2 3 4 5
 # Default-Stop:   0 1 6
-# Short-Description: AGY Quota Dashboard
+# Short-Description: AI Usage Dashboard
 ### END INIT INFO
 
 set -e
 
 PROJECT_DIR=PROJECT_DIR_PLACEHOLDER
 VENV_PYTHON="$PROJECT_DIR/venv/bin/python3"
-PIDFILE="/run/agy-dashboard.pid"
+PIDFILE="/run/usage-dashboard.pid"
 LOG="$PROJECT_DIR/dashboard.log"
 
 export PYTHONPATH="$PROJECT_DIR/backend"
@@ -26,8 +26,9 @@ umask 022
 
 case "$1" in
   start)
-    log_daemon_msg "Starting AGY Quota Dashboard" "agy-dashboard" || true
+    log_daemon_msg "Starting AI Usage Dashboard" "usage-dashboard" || true
     if start-stop-daemon --start --quiet --oknodo --background \
+      --chuid PROJECT_USER \
       --make-pidfile --pidfile "$PIDFILE" \
       --chdir "$PROJECT_DIR/backend" \
       --startas "$VENV_PYTHON" -- -m main \
@@ -38,7 +39,7 @@ case "$1" in
     fi
     ;;
   stop)
-    log_daemon_msg "Stopping AGY Quota Dashboard" "agy-dashboard" || true
+    log_daemon_msg "Stopping AI Usage Dashboard" "usage-dashboard" || true
     if start-stop-daemon --stop --quiet --oknodo --pidfile "$PIDFILE"; then
       log_end_msg 0 || true
     else
@@ -52,10 +53,10 @@ case "$1" in
     "$0" start
     ;;
   status)
-    status_of_proc -p "$PIDFILE" "$VENV_PYTHON" "agy-dashboard" && exit 0 || exit $?
+    status_of_proc -p "$PIDFILE" "$VENV_PYTHON" "usage-dashboard" && exit 0 || exit $?
     ;;
   *)
-    log_action_msg "Usage: /etc/init.d/agy-dashboard {start|stop|restart|status}" || true
+    log_action_msg "Usage: /etc/init.d/usage-dashboard {start|stop|restart|status}" || true
     exit 1
 esac
 

@@ -35,8 +35,5 @@ def _result_to_tuple(result: ParserResult) -> tuple:
 
 
 def fetch_agy_usage() -> tuple:
-    try:
-        result = AgyParser().parse()
-        return _result_to_tuple(result)
-    except Exception:
-        return {}, {}, []
+    result = AgyParser().parse()
+    return _result_to_tuple(result)
