@@ -1,5 +1,5 @@
 #!/bin/bash
-cd /home/dev/workspace/main/internal_projects/agy_quota_dashboard
+cd "$(dirname "$0")"
 source venv/bin/activate
 cd backend
 PYTHONPATH=. nohup python3 -m main > /tmp/dashboard.log 2>&1 &

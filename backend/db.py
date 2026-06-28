@@ -3,7 +3,7 @@ import os
 import os.path
 from datetime import datetime, timedelta
 
-DB_PATH = os.getenv('AQM_DB_PATH') or os.path.join(os.path.dirname(__file__), "agy_quota.db")
+DB_PATH = os.getenv('USAGE_DB_PATH') or os.path.join(os.path.dirname(__file__), "usage.db")
 
 
 def connect(path: str) -> sqlite3.Connection:
@@ -157,7 +157,7 @@ def metrics(conn: sqlite3.Connection) -> dict:
     total_polls = cursor.fetchone()['cnt']
 
     db_path = getattr(conn, 'db_path', None) or (
-        os.path.join(os.path.dirname(__file__), 'agy_quota.db')
+        os.path.join(os.path.dirname(__file__), 'usage.db')
     )
     try:
         db_size_bytes = os.path.getsize(db_path)

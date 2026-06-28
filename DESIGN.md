@@ -1,4 +1,4 @@
-# Agent Quota Monitor — Design Document
+# AI Usage Dashboard — Design Document
 
 ## Goal
 
@@ -50,7 +50,8 @@ as unavailable rather than crashing.
 
 | Endpoint | Method | Returns | Notes |
 |---|---|---|---|
-| `/api/usage/latest` | GET | Combined latest usage for all sources | `?deltas=true` adds model deltas for Rate mode |
+| `/api/usage/latest` | GET | Combined latest usage for all sources | Server-aggregated at latest `cycle_ts`; `?deltas=true` adds model deltas |
+| `/api/usage/history` | GET | Combined history across all sources | Server-aggregated per `cycle_ts`; optional `?range=` |
 | `/api/usage/{source}/latest` | GET | Per-source usage (`agy`/`opencode`/`codex`) | 404 on unknown source |
 | `/api/usage/{source}/history` | GET | Per-source history series | optional `?limit=` cap |
 | `/api/quota/latest` | GET | Combined quota with plan labels | live-enriched, falls back to last snapshot |
@@ -71,7 +72,7 @@ envelope otherwise (see *API Specification*).
 - **History Chart**: Stacked area (Total mode) or individual lines (Rate mode).
 - **Model Distribution**: Donut chart. Title adapts to mode.
 - **Mode Toggle**: Total/Rate. Affects history chart + model chart + overview cards.
-- **Time Range**: 1h/6h/1d/1w/1m/3m/all. Affects entire page. Relative to data's latest timestamp, not `Date.now()`.
+- **Time Range**: 1h/6h/1d/1w/1m/3m/all. Affects entire page. Relative to data's latest `cycle_ts`, not `Date.now()`.
 - **Model Details Panel**: Shows per-model token/session breakdown for the selected time range. When range is "all", shows cumulative totals from latest snapshot. When a specific range is selected, computes deltas between the earliest and latest history entries in that range.
 
 #### Quota Display
@@ -108,14 +109,15 @@ envelope otherwise (see *API Specification*).
 │              (overview, cost_tokens, models)                │
 │                       ▼                                     │
 │   poller.py (600s, sequential, per-source try/except)       │
+│     ├── cycle_ts = floor(now, interval) — shared by all     │
 │     ├── quota.py (live enrichment, fallback to snapshot)    │
 │     └── writes usage + status; prunes old rows              │
 │                       ▼                                     │
-│        db.py → agy_quota.db (WAL, idempotent schema)        │
+│        db.py → usage.db (WAL, idempotent schema)            │
 │     usage_history · model_usage · quota_snapshots ·         │
-│     collection_status · meta                                │
+│     collection_status · meta  (all keyed by cycle_ts)       │
 │                       ▲                                     │
-│        api.py (FastAPI: routes, errors, schemas, static)    │
+│   api.py (FastAPI: aggregates across sources by cycle_ts)   │
 │              /health · /ready · /metrics                    │
 ├───────────────────────┼────────────────────────────────────┤
 │                       ▼                                     │
@@ -126,18 +128,24 @@ envelope otherwise (see *API Specification*).
 
 ### Data Flow
 
-1. `poller.py` wakes every 600s (configurable).
+1. `poller.py` wakes every 600s (configurable). It computes
+   `cycle_ts = floor(now, poll_interval)` — the single timestamp all sources
+   in this cycle share.
 2. For each source **sequentially**, run its parser inside a `try/except`.
    Subprocess/network steps have timeouts; local SQLite reads rely on
-   `busy_timeout`. On success, write usage rows; on failure, write only a
-   `collection_status` row. One source never aborts the cycle.
+   `busy_timeout`. On success, write usage rows keyed by `(source, cycle_ts)`;
+   on failure, write only a `collection_status` row. `INSERT OR REPLACE` makes
+   each bucket idempotent. One source never aborts the cycle.
 3. `quota.py` performs live enrichment (AGY plan, Codex rate limits) with its
    own timeouts; on failure the API serves the last snapshot marked `stale`.
 4. `db.py` prunes rows older than the retention window once per cycle.
-5. `api.py` reads from the DB (re-running live enrichment for quota endpoints)
-   and returns the resource or a uniform error envelope.
+5. `api.py` reads from the DB. For the "All" view it aggregates across sources
+   at each `cycle_ts` (`SUM … GROUP BY cycle_ts`); per-source endpoints return
+   raw rows. Quota endpoints re-run live enrichment with snapshot fallback.
+   The frontend never aggregates across sources.
 6. The frontend fetches on load and every 60s, recomputes locally on
-   tab/range/mode changes, and shows loading/error/empty/stale states.
+   range/mode changes (no extra API calls), and shows loading/error/empty/
+   stale states.
 
 ## Backend Module Breakdown
 
@@ -147,14 +155,14 @@ unit test. A module may consume earlier ones only through the stated contract.
 | Module | Responsibility | Contract (signatures) | Verify (unit) |
 |---|---|---|---|
 | `config.py` | Load + validate config from env; configure JSON logging | `load_config() -> Config`; `setup_logging(level)` | Defaults, env override, invalid value rejected; log line is valid JSON |
-| `db.py` | Connection + pragmas + idempotent schema + CRUD + prune | `connect(path)`, `init_schema(conn)`, `insert_usage(conn, source, ts, overview, models)`, `latest_usage(conn, source?)`, `history(conn, source, limit)`, `insert_quota(conn, source, ts, rows)`, `latest_quota(conn, source)`, `record_status(conn, source, ok, err, ms)`, `metrics(conn)`, `prune(conn, days)` | Schema idempotent; pragmas applied (WAL, FK on); insert/read round-trips; prune removes only old rows |
+| `db.py` | Connection + pragmas + idempotent schema + CRUD + aggregation + prune | `connect(path)`, `init_schema(conn)`, `insert_usage(conn, source, cycle_ts, overview, models)`, `latest_usage(conn, source?, cycle_ts)`, `history(conn, source?, range)`, `insert_quota(conn, source, cycle_ts, rows)`, `latest_quota(conn, source)`, `record_status(conn, source, cycle_ts, ok, err, ms)`, `metrics(conn)`, `prune(conn, days)` | Schema idempotent; pragmas applied; `UNIQUE(source, cycle_ts)` enforced; insert/read round-trips; `latest_usage(None, ts)` aggregates across sources; prune removes only old rows |
 | `parsers/base.py` | Parser contract + shared types/helpers | `Parser.parse(cfg) -> (overview, cost_tokens, models)`; raises `SourceUnavailable` | Contract shape; helper unit tests |
 | `parsers/opencode.py` | OpenCode usage parser (subprocess) | implements `Parser` | Fixture stdout → expected tuple; missing binary → `SourceUnavailable` |
 | `parsers/agy.py` | AGY usage parser (local DB / protobuf bytes) | implements `Parser` | Fixture DB → expected tuple; missing files → `SourceUnavailable` |
 | `parsers/codex.py` | Codex usage parser (local DB) | implements `Parser` | Fixture DB → expected tuple; missing files → `SourceUnavailable` |
 | `quota.py` | Live quota enrichment + fallback | `collect(source, cfg) -> QuotaSnapshot \| None` | Mock RPC → snapshot; timeout → None (caller falls back) |
-| `poller.py` | One poll cycle + loop + thread lifecycle | `run_once(cfg, conn)`, `start(cfg)`, `stop()` | One failing source doesn't block others; statuses recorded; prune called |
-| `api.py` | FastAPI app: routes, error handlers, response schemas, static mount | `create_app(cfg) -> FastAPI` | Routes return correct shapes/codes; `/ready` 503 before first poll, 200 after; error envelope; static served |
+| `poller.py` | One poll cycle + loop + thread lifecycle | `run_once(cfg, conn)`, `start(cfg)`, `stop()` | Computes shared `cycle_ts`; one failing source doesn't block others; statuses recorded with `cycle_ts`; prune called |
+| `api.py` | FastAPI app: routes, error handlers, response schemas, static mount | `create_app(cfg) -> FastAPI` | Routes return correct shapes/codes; `/api/usage/latest` + `/api/usage/history` aggregate across sources by `cycle_ts`; `/ready` 503 before first poll, 200 after; error envelope; static served |
 | `main.py` | Entry point: init DB, start poller thread, run uvicorn, graceful shutdown | `main()` | Smoke: boots, `/health` 200, clean SIGTERM |
 
 **Parser contract**: every parser returns `(overview, cost_tokens, models)`
@@ -170,33 +178,43 @@ parser module and one registry line.
 
 ## Data Model
 
-Single SQLite file (`backend/agy_quota.db`). Pragmas set in `db.connect()`:
+Single SQLite file (`backend/usage.db`). Pragmas set in `db.connect()`:
 `journal_mode=WAL`, `synchronous=NORMAL`, `foreign_keys=ON`,
 `busy_timeout=5000`. Schema created idempotently with `CREATE TABLE IF NOT
 EXISTS`; a one-row `meta(schema_version)` table records the version. Changes
 are additive; a breaking change bumps the version and is documented as a
 manual step (no migration runner).
 
-- **usage_history**: one row per poll per source. `id`, `source`, `timestamp`,
-  `sessions`, `messages`, `input_tokens`, `output_tokens`, `cache_read`,
-  `cache_write`. Index `(source, timestamp)`.
-- **model_usage**: one row per model per poll, linked via `(timestamp,
-  source)`. `source`, `timestamp`, `model_name`, `messages`, `input_tokens`,
-  `output_tokens`, `cache_read`, `cache_write`, `cost`. Index `(source,
-  timestamp, model_name)`.
-- **quota_snapshots**: one row per model group per limit type per poll.
-  `source`, `timestamp`, `model_group`, `limit_type`, `used`, `total`,
-  `remaining_pct`, `refreshes_in_seconds`. Index `(source, timestamp)`.
-- **collection_status**: per-source health. `source`, `timestamp`, `ok`,
-  `error` (nullable), `duration_ms`. Drives `/ready`, `/metrics`, and the
-  frontend's per-source availability indicator.
+**Cycle timestamps** — at the start of each poll cycle the poller computes
+`cycle_ts = floor(now, poll_interval)`. Every source read in that cycle
+shares this one `cycle_ts`. This aligns data across sources so the "All" view
+is a trivial `SUM … GROUP BY cycle_ts` with no client-side alignment. A
+`UNIQUE(source, cycle_ts)` constraint on each table makes each bucket
+idempotent — a re-run of the same cycle replaces, not duplicates.
+
+- **usage_history**: one row per source per cycle. PK `(source, cycle_ts)`.
+  `source`, `cycle_ts`, `sessions`, `messages`, `input_tokens`,
+  `output_tokens`, `cache_read`, `cache_write`. Index `(cycle_ts)`.
+- **model_usage**: one row per model per source per cycle. `source`,
+  `cycle_ts`, `model_name`, `messages`, `input_tokens`, `output_tokens`,
+  `cache_read`, `cache_write`, `cost`. Unique `(source, cycle_ts, model_name)`.
+- **quota_snapshots**: one row per model group per limit type per cycle.
+  `source`, `cycle_ts`, `model_group`, `limit_type`, `used`, `total`,
+  `remaining_pct`, `refreshes_in_seconds`. Unique `(source, cycle_ts,
+  model_group, limit_type)`.
+- **collection_status**: per-source health per cycle. `source`, `cycle_ts`,
+  `ok`, `error` (nullable), `duration_ms`. Unique `(source, cycle_ts)`. Drives
+  `/ready`, `/metrics`, and the frontend's per-source availability indicator.
 - **meta**: `schema_version` and other small key/values.
 
 **Retention**: `db.prune(conn, retention_days)` runs once per poll cycle (a
-cheap `DELETE` by timestamp) to bound DB growth.
+cheap `DELETE WHERE cycle_ts < now - retention`) to bound DB growth.
 
 ## Poll Loop & Error Handling
 
+- **Shared cycle timestamp**: the poller computes `cycle_ts` once at the start
+  of each cycle and passes it to every source read. All rows written in that
+  cycle — usage, models, quota snapshots, status — share this `cycle_ts`.
 - **Per-source isolation**: each parser/collector call is wrapped in its own
   `try/except`. A failure writes a `collection_status` row and never aborts
   the cycle.
@@ -256,14 +274,14 @@ parser, no extra dependency):
 
 | Key | Default | Purpose |
 |---|---|---|
-| `AQM_DB_PATH` | `backend/agy_quota.db` | SQLite location |
-| `AQM_POLL_INTERVAL` | `600` | Seconds between polls |
-| `AQM_SUBPROCESS_TIMEOUT` | `20` | Timeout for CLI subprocess calls |
-| `AQM_NETWORK_TIMEOUT` | `10` | Timeout for quota/network calls |
-| `AQM_RETENTION_DAYS` | `90` | History pruning window |
-| `AQM_HOST` | `0.0.0.0` | Bind host (`127.0.0.1` to avoid LAN exposure) |
-| `AQM_PORT` | `8000` | Bind port |
-| `AQM_LOG_LEVEL` | `INFO` | Logging level |
+| `USAGE_DB_PATH` | `backend/usage.db` | SQLite location |
+| `USAGE_POLL_INTERVAL` | `600` | Seconds between polls |
+| `USAGE_SUBPROCESS_TIMEOUT` | `20` | Timeout for CLI subprocess calls |
+| `USAGE_NETWORK_TIMEOUT` | `10` | Timeout for quota/network calls |
+| `USAGE_RETENTION_DAYS` | `90` | History pruning window |
+| `USAGE_HOST` | `0.0.0.0` | Bind host (`127.0.0.1` to avoid LAN exposure) |
+| `USAGE_PORT` | `8000` | Bind port |
+| `USAGE_LOG_LEVEL` | `INFO` | Logging level |
 
 Invalid values fail fast on load with a clear message.
 
@@ -290,14 +308,17 @@ named, independently testable sections:
 Three independent state variables; changing one triggers a targeted recompute:
 
 ```
-source (tab)      → invalidates caches, full refresh (fetch)
+source (tab)      → invalidates caches, full refresh (combined or per-source)
 range (1h/6h/…)   → filters cached history, recomputes overview (no fetch)
 mode (total/rate) → toggles chart stack↔line + uses model_deltas (no fetch)
 ```
 
-`cachedHistory` and `cachedLatestOverview` are cleared on tab switch to prevent
-cross-source contamination. Range and mode changes are computed locally from
-cached data without extra API calls.
+The "All" tab fetches `/api/usage/history` and `/api/usage/latest` (server-
+aggregated). Per-source tabs fetch `/api/usage/{source}/history` and
+`/api/usage/{source}/latest`. The frontend never sums across sources — that
+is the API's job. `cachedHistory` and `cachedLatestOverview` are cleared on
+tab switch. Range and mode changes recompute locally from cached data without
+extra API calls.
 
 ### UX States (all required)
 
@@ -342,7 +363,7 @@ cached data without extra API calls.
 - **Python venv**: `/tmp/venv/bin/python3`.
 - **Graceful shutdown**: SIGTERM stops the poller thread (finishing any
   in-flight cycle), then uvicorn.
-- **Backup**: under WAL, copy with `sqlite3 agy_quota.db ".backup backup.db"`.
+- **Backup**: under WAL, copy with `sqlite3 usage.db ".backup backup.db"`.
 - **DB unreadable on boot**: log a clear error and exit non-zero (operator
   removes/recreates the file). No silent reinitialization.
 
@@ -383,13 +404,13 @@ depends only on the *contracts* of earlier modules.
 
 | # | Milestone | Modules | Acceptance Criteria | Verify |
 |---|---|---|---|---|
-| **M1** | Config + DB | `config.py`, `db.py` | Env overrides; invalid value fails fast; JSON logs; schema idempotent; pragmas applied; insert/read round-trips; prune removes only old rows | `unittest discover` (config, db) |
+| **M1** | Config + DB | `config.py`, `db.py` | Env overrides; invalid value fails fast; JSON logs; schema idempotent; pragmas applied; `UNIQUE(source, cycle_ts)` enforced; insert/read round-trips; `latest_usage(None, ts)` aggregates across sources; prune removes only old rows | `unittest discover` (config, db) |
 | **M2** | Parsers | `parsers/base.py`, `opencode.py`, `agy.py`, `codex.py` | Each parses its fixture to the expected tuple; missing files/commands raise `SourceUnavailable` (no crash) | `unittest` parser tests |
 | **M3** | Quota enrichment | `quota.py` | Mock RPC → snapshot; timeout → `None`; no secrets in output | `unittest` quota test |
 | **M4** | Poller | `poller.py` | One failing source doesn't block others; statuses recorded; prune called each cycle; clean stop | `unittest` poller test |
-| **M5** | API | `api.py` | `/health` 200; `/ready` 503 before first poll then 200; usage combined/per-source/history; `?deltas=true`; quota live + `stale` fallback; error envelope + codes | `unittest` api tests + `verify.py --group api server` |
+| **M5** | API | `api.py` | `/health` 200; `/ready` 503 before first poll then 200; `/api/usage/latest` + `/api/usage/history` server-aggregated by `cycle_ts`; per-source latest/history; `?deltas=true`; quota live + `stale` fallback; error envelope + codes | `unittest` api tests + `verify.py --group api server` |
 | **M6** | Entry point | `main.py` | Boots, starts poller thread, serves static, `/health` 200, clean SIGTERM | smoke test |
-| **M7** | Frontend shell + layout | `index.html`, `styles.css`, `app.js` | Header/tabs/overview/quota/charts render; tab switch clears caches; range & mode recompute without fetch; data-relative time range | `verify.py --group html css js` |
+| **M7** | Frontend shell + layout | `index.html`, `styles.css`, `app.js` | Header/tabs/overview/quota/charts render; "All" tab fetches combined endpoints (no client-side aggregation); tab switch clears caches; range & mode recompute without fetch; data-relative time range | `verify.py --group html css js` |
 | **M8** | UX states + responsive + a11y | `styles.css`, `app.js` | Loading/error/empty/stale/offline states; 640px layout; ≥44px targets; ARIA + keyboard; reduced-motion; AA contrast | `verify.py --group a11y regression` |
 | **M9** | Hardening + full verify | CSP, local-bind, `/metrics`, retention | CSP header present; `/metrics` fields; retention bounds DB; no secrets logged; all groups green; README updated | `verify.py` (all) |
 
@@ -419,18 +440,25 @@ downstream agents stay aligned.
    `current − previous` per model; the frontend switches between `models`
    (Total) and `model_deltas` (Rate).
 7. **Time range relative to data** — filtering uses the data's own latest
-   timestamp, not `Date.now()`, preventing empty charts from clock skew or
+   `cycle_ts`, not `Date.now()`, preventing empty charts from clock skew or
    paused collection.
-8. **Client-side filtering** — history is cached after one fetch; range and
-   mode changes recompute locally without extra API calls.
-9. **Lightweight by construction** — stdlib + FastAPI + uvicorn, Chart.js
-   vendored. No ORM, no migrations framework, no frontend framework. Single
-   process, single SQLite file with idempotent schema and per-cycle pruning.
-10. **Uniform parser contract** — the `(overview, cost_tokens, models)` tuple
+8. **Shared cycle timestamp + server-side aggregation** — all sources in a
+   poll cycle share one `cycle_ts` (interval-floored). The API aggregates
+   across sources for the "All" view (`SUM … GROUP BY cycle_ts`); the
+   frontend never sums across sources. This eliminates the client-side
+   timestamp alignment and cross-source aggregation that precise per-source
+   timestamps would require, and yields a cleanly bucketed time series.
+9. **Client-side range/mode filtering** — history is cached after one fetch;
+   range and mode changes recompute locally without extra API calls. The
+   "All" view is fetched pre-aggregated from the API.
+10. **Lightweight by construction** — stdlib + FastAPI + uvicorn, Chart.js
+    vendored. No ORM, no migrations framework, no frontend framework. Single
+    process, single SQLite file with idempotent schema and per-cycle pruning.
+11. **Uniform parser contract** — the `(overview, cost_tokens, models)` tuple
     plus `SourceUnavailable` is the single seam for adding sources.
-11. **Verification-first** — every backend module has a unit test; every
+12. **Verification-first** — every backend module has a unit test; every
     frontend concern maps to a named `verify.py` group, so an agent can
     implement, verify, and stop with confidence at each milestone.
-12. **UX and accessibility are requirements** — loading/error/empty/stale/
+13. **UX and accessibility are requirements** — loading/error/empty/stale/
     offline states, keyboard nav, ARIA, AA contrast (contrast computed in
     verify), reduced motion, and ≥44px touch targets are acceptance criteria.

@@ -597,52 +597,71 @@ document.addEventListener('DOMContentLoaded', () => {
 
             labels = allTimes.map(formatLabel);
 
+            // Forward-fill: for each unified timestamp, carry forward the last known
+            // value from each source so gaps don't cause dips in stacked charts.
             const MS_TOLERANCE = 30000;
-            const matchTs = (list, ts) => {
-                const t = parseTs(ts).getTime();
-                let best = null, bestDiff = Infinity;
-                for (const d of list) {
-                    const dt = parseTs(d.timestamp);
-                    if (!dt) continue;
-                    const diff = Math.abs(dt.getTime() - t);
-                    if (diff < bestDiff) {
-                        bestDiff = diff;
-                        best = d;
+            function buildFilledLookup(data) {
+                const lookup = new Map();
+                let lastEntry = null;
+                let dataIdx = 0;
+                for (const ts of allTimes) {
+                    const t = parseTs(ts).getTime();
+                    while (dataIdx < data.length) {
+                        const dt = parseTs(data[dataIdx].timestamp);
+                        if (!dt) { dataIdx++; continue; }
+                        if (dt.getTime() <= t) {
+                            lastEntry = data[dataIdx];
+                            dataIdx++;
+                        } else {
+                            break;
+                        }
+                    }
+                    // Only use if within tolerance of a real data point
+                    if (lastEntry) {
+                        const lastTs = parseTs(lastEntry.timestamp);
+                        if (lastTs && Math.abs(lastTs.getTime() - t) <= MS_TOLERANCE) {
+                            lookup.set(ts, lastEntry);
+                        }
                     }
                 }
-                return bestDiff <= MS_TOLERANCE ? best : null;
-            };
+                return lookup;
+            }
 
-            const mapData = (list, key) => {
+            const agyLookup = buildFilledLookup(agy);
+            const opencodeLookup = buildFilledLookup(opencode);
+            const codexLookup = buildFilledLookup(codex);
+
+            const mapFromLookup = (lookup, key) => {
                 return allTimes.map(ts => {
-                    const found = matchTs(list, ts);
-                    return found ? found[key] : null;
+                    const found = lookup.get(ts);
+                    return found ? found[key] : 0;
                 });
             };
+
+            const mapTotalFromLookup = (lookup) => allTimes.map(ts => {
+                const found = lookup.get(ts);
+                return found ? (found.input_tokens || 0) + (found.output_tokens || 0) : 0;
+            });
 
             if (isTotal) {
-                const mapTotal = (list) => allTimes.map(ts => {
-                    const found = matchTs(list, ts);
-                    return found ? (found.input_tokens || 0) + (found.output_tokens || 0) : null;
-                });
                 datasets = [
                     {
                         label: 'AGY',
-                        data: mapTotal(agy),
+                        data: mapTotalFromLookup(agyLookup),
                         borderColor: '#9b6dff',
                         backgroundColor: 'rgba(155, 109, 255, 0.18)',
                         fill: true, tension: 0.4, spanGaps: true, pointRadius: 2, stack: 'stack0',
                     },
                     {
                         label: 'OpenCode',
-                        data: mapTotal(opencode),
+                        data: mapTotalFromLookup(opencodeLookup),
                         borderColor: '#4f8aff',
                         backgroundColor: 'rgba(79, 138, 255, 0.18)',
                         fill: true, tension: 0.4, spanGaps: true, pointRadius: 2, stack: 'stack0',
                     },
                     {
                         label: 'Codex',
-                        data: mapTotal(codex),
+                        data: mapTotalFromLookup(codexLookup),
                         borderColor: '#10a37f',
                         backgroundColor: 'rgba(16, 163, 127, 0.18)',
                         fill: true, tension: 0.4, spanGaps: true, pointRadius: 2, stack: 'stack0',
@@ -655,45 +674,48 @@ document.addEventListener('DOMContentLoaded', () => {
                 opencode = computeRate(opencode, 'output_tokens');
                 codex = computeRate(codex, 'input_tokens');
                 codex = computeRate(codex, 'output_tokens');
+                const agyRateLookup = buildFilledLookup(agy);
+                const opencodeRateLookup = buildFilledLookup(opencode);
+                const codexRateLookup = buildFilledLookup(codex);
                 datasets = [
                     {
                         label: 'AGY Input',
-                        data: mapData(agy, 'input_tokens'),
+                        data: mapFromLookup(agyRateLookup, 'input_tokens'),
                         borderColor: '#9b6dff',
                         backgroundColor: 'rgba(155, 109, 255, 0.03)',
                         fill: true, tension: 0.4, spanGaps: true, pointRadius: 2,
                     },
                     {
                         label: 'AGY Output',
-                        data: mapData(agy, 'output_tokens'),
+                        data: mapFromLookup(agyRateLookup, 'output_tokens'),
                         borderColor: '#4f8aff',
                         backgroundColor: 'rgba(79, 138, 255, 0.02)',
                         fill: true, tension: 0.4, spanGaps: true, pointRadius: 2,
                     },
                     {
                         label: 'OpenCode Input',
-                        data: mapData(opencode, 'input_tokens'),
+                        data: mapFromLookup(opencodeRateLookup, 'input_tokens'),
                         borderColor: '#10c48a',
                         backgroundColor: 'rgba(16, 196, 138, 0.03)',
                         fill: true, tension: 0.4, spanGaps: true, pointRadius: 2,
                     },
                     {
                         label: 'OpenCode Output',
-                        data: mapData(opencode, 'output_tokens'),
+                        data: mapFromLookup(opencodeRateLookup, 'output_tokens'),
                         borderColor: '#f59e0b',
                         backgroundColor: 'rgba(245, 158, 11, 0.02)',
                         fill: true, tension: 0.4, spanGaps: true, pointRadius: 2,
                     },
                     {
                         label: 'Codex Input',
-                        data: mapData(codex, 'input_tokens'),
+                        data: mapFromLookup(codexRateLookup, 'input_tokens'),
                         borderColor: '#10a37f',
                         backgroundColor: 'rgba(16, 163, 127, 0.03)',
                         fill: true, tension: 0.4, spanGaps: true, pointRadius: 2,
                     },
                     {
                         label: 'Codex Output',
-                        data: mapData(codex, 'output_tokens'),
+                        data: mapFromLookup(codexRateLookup, 'output_tokens'),
                         borderColor: '#19c37d',
                         backgroundColor: 'rgba(25, 195, 125, 0.02)',
                         fill: true, tension: 0.4, spanGaps: true, pointRadius: 2,
@@ -788,7 +810,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             const titleMap = {
                 combined: 'Quota Limits',
-                agy: 'Antigravity Quota Limits',
+                agy: 'AGY Quota Limits',
                 opencode: 'OpenCode CLI Spending',
                 codex: 'Codex Usage Limits',
             };
@@ -840,7 +862,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (group === '_plan') continue;
                     const card = document.createElement('div');
                     card.className = 'quota-group';
-                    const groupLabel = group.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                    const groupLabel = group.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\bGpt\b/g, 'GPT');
                     let limitsHtml = '';
                     for (const [limitType, info] of Object.entries(limits)) {
                         const label = limitType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());

@@ -1,19 +1,19 @@
-# AGY Quota Dashboard systemd service
+# AI Usage Dashboard systemd service
 # Install via: sudo bash install/install.sh /absolute/path/to/project
 # Or manually: edit PROJECT_DIR and USER below, then:
-#   sudo cp install/agy-dashboard.service /etc/systemd/system/agy-dashboard.service
+#   sudo cp install/usage-dashboard.service /etc/systemd/system/usage-dashboard.service
 #   sudo systemctl daemon-reload
-#   sudo systemctl enable --now agy-dashboard
+#   sudo systemctl enable --now usage-dashboard
 
 [Unit]
-Description=AGY Quota Dashboard
+Description=AI Usage Dashboard
 Documentation=https://github.com/anomalyco/opencode
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-EnvironmentFile=-/etc/default/agy-dashboard
+EnvironmentFile=-/etc/default/usage-dashboard
 ExecStart=PROJECT_DIR/venv/bin/python3 -m main
 WorkingDirectory=PROJECT_DIR/backend
 Restart=on-failure

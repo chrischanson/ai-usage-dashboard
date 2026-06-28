@@ -1,4 +1,4 @@
-"""Entry point for the AGY Quota Dashboard."""
+"""Entry point for the AI Usage Dashboard."""
 import signal
 import sys
 import uvicorn

@@ -1,10 +1,8 @@
-import subprocess
-from .parser import parse_report_content
+from parser import fetch_and_parse
 
 def fetch_opencode_cost():
     try:
-        result = subprocess.run(['opencode', 'stats', '--models'], capture_output=True, text=True, timeout=10)
-        overview, cost_tokens, models = parse_report_content(result.stdout)
+        overview, cost_tokens, models = fetch_and_parse()
         total_cost = cost_tokens.get('Total Cost', 0.0)
         cost_by_model = {}
         for m in models:

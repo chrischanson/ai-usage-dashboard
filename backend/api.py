@@ -1,4 +1,4 @@
-"""FastAPI app factory for the AGY Quota Dashboard."""
+"""FastAPI app factory for the AI Usage Dashboard."""
 import os
 from fastapi import FastAPI, Query
 from fastapi.staticfiles import StaticFiles
@@ -9,6 +9,7 @@ from db import get_latest_usage, get_history_series, get_latest_quota, metrics
 from db import connect as _db_connect, DB_PATH, init_schema
 from quota_parser import fetch_agy_quota
 from codex_quota import fetch_codex_quota
+from opencode_quota import fetch_opencode_cost
 
 
 def error_response(code: str, message: str, status: int = 400):
@@ -79,10 +80,19 @@ def create_app() -> FastAPI:
     @app.get("/api/quota/latest")
     def api_quota_latest():
         result = get_latest_quota()
-        if 'agy' in result:
-            raw = fetch_agy_quota()
-            if raw and 'plan' in raw:
-                result['agy']['_plan'] = raw['plan']
+
+        if 'agy' not in result:
+            result['agy'] = {}
+        raw = fetch_agy_quota()
+        if raw and 'plan' in raw:
+            result['agy']['_plan'] = raw['plan']
+
+        if 'opencode' not in result:
+            result['opencode'] = {}
+        opencode_live = fetch_opencode_cost()
+        if opencode_live and 'error' not in opencode_live:
+            result['opencode']['_cost'] = opencode_live
+
         codex_live = fetch_codex_quota()
         if codex_live and 'error' not in codex_live:
             if 'codex' not in result:
@@ -121,7 +131,13 @@ def create_app() -> FastAPI:
 
     @app.get("/api/quota/opencode/latest")
     def api_quota_opencode_latest():
-        return get_latest_quota(source='opencode')
+        result = get_latest_quota(source='opencode')
+        if not result:
+            result = {'opencode': {}}
+        opencode_live = fetch_opencode_cost()
+        if opencode_live and 'error' not in opencode_live:
+            result['opencode']['_cost'] = opencode_live
+        return result
 
     @app.get("/api/quota/codex/latest")
     def api_quota_codex_latest():
