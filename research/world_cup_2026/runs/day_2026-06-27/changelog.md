@@ -1,5 +1,38 @@
 # Changelog — 2026-06-27
 
+## Iteration 5 — 2026-06-28T03:23:29Z
+
+**Tokens:** 117531 input + 3849 output = 121380 total
+**Model Used:** opencode: deepseek-v4-flash-free
+**Next Interval:** 60 minutes
+**Tokens:** 0 input + 0 output = 0 total (research cost accounted separately)
+
+### Eligible Matches
+- ALG-AUT: live_post_halftime (61', 2-2)
+- JOR-ARG: live_post_halftime (61', 2-1 ARG)
+
+### Changes
+- ALG-AUT: No change — WHT frozen (score 2-2 contradicts AUSTRIA WIN, but draw risk was already in Low confidence). Both teams scored twice, xG nearly equal (0.98 vs 1.03). Draw-Sufficiency Discount (AUT needs 1pt) active and consistent with scoreline.
+- JOR-ARG: No change — WHT frozen (score 2-1 ARG confirms prediction). ARG dominant (1.66 xG, 71% poss). Jordan scored quality goal (Al-Tamari 55') but ARG responded by introducing Messi.
+
+### Search Queries Executed
+- ALG-AUT: ESPN live match centre (61')
+- JOR-ARG: ESPN live match centre (61')
+
+### New Evidence
+- [strong] ALG-AUT 2-2 (61'): ESPN. Goals: Arnautovic 28', Belghali 45', Sabitzer 55', Mahrez 60'. xG nearly equal. Mahrez-Aouar combination dangerous.
+- [strong] JOR-ARG 2-1 (61'): ESPN. Goals: Lo Celso 19', Lautaro pen 31', Al-Tamari 55'. ARG 1.66 xG, 71% poss. Messi subbed on at 60'.
+
+### Open Questions Resolved
+- ALG-AUT match state at ~61': Very open, competitive match. Draw-Sufficiency Discount heuristic's pre-match concern is materializing — AUT may be satisfied with a draw.
+- JOR-ARG match state at ~61': ARG leading as predicted. Jordan goal shows quality but doesn't change structural advantage.
+
+### New Questions Raised
+- (none — final live assessment before FT verification)
+
+### Next Interval Reason
+- Wrote **60** minutes to `prediction_interval.txt` to land at ~04:23 UTC, ~30+ minutes after estimated FT of Group J matches, enabling thorough stoppage-time verification of both final scores. This will be the final iteration for the matchday (post-verification, no eligible matches remain).
+
 ## Iteration 4 — 2026-06-28T02:21:01Z
 
 **Tokens:** 151677 input + 7725 output = 159402 total
