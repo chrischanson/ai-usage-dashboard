@@ -10,9 +10,9 @@
 - **Dates:** June 11 – July 19, 2026
 - **Current Phase:** Group Stage
 - **Tracking Started:** 2026-06-13
-- **Total Matches Tracked:** 48
-- **Pre-Game Accuracy (Final Pre-Kickoff):** 64.3% (27/42)
-- **Half-Time Accuracy (Frozen/Live):** 62.2% (23/37)
+- **Total Matches Tracked:** 52
+- **Pre-Game Accuracy (Final Pre-Kickoff):** 63.0% (29/46)
+- **Half-Time Accuracy (Frozen/Live):** 61.0% (25/41)
 
 ---
 
@@ -22,19 +22,19 @@
 | Confidence | Correct | Total | Accuracy |
 |:-----------|:--------|:------|:---------|
 | High       | 4       | 5     | 80.0%    |
-| Medium     | 15      | 23    | 65.2%    |
-| Low        | 8       | 14    | 57.1%    |
+| Medium     | 16      | 24    | 66.7%    |
+| Low        | 9       | 17    | 52.9%    |
 
-*(Note: Germany vs. Curaçao was predicted as GERMANY WIN with High confidence pre-game, and USA vs. Australia was predicted as DRAW with Low confidence pre-game. This table shows pre-kickoff lineup-verified prediction performance. On 2026-06-20, Ecuador vs. Curaçao was the first High-confidence prediction failure — Ecuador's clinical finishing deficiency was identified but not properly enforced as a confidence cap. On 2026-06-21, SPAIN WIN (High) was correct, DRAW (Low) was correct, URUGUAY WIN (Medium) was incorrect (frozen at HT, lost 2-2 on set-piece goals), and EGYPT WIN (Medium) was correct (trailed 1-0 at HT but won 3-1, WHT downgraded to Low). On 2026-06-22, JOR-ALG (ALGERIA WIN Medium) was correct but the Clinical Finishing Gate was not properly enforced — a compliance violation documented in the postmortem.)*
+*(Note: Germany vs. Curaçao was predicted as GERMANY WIN with High confidence pre-game, and USA vs. Australia was predicted as DRAW with Low confidence pre-game. This table shows pre-kickoff lineup-verified prediction performance. On 2026-06-20, Ecuador vs. Curaçao was the first High-confidence prediction failure — Ecuador's clinical finishing deficiency was identified but not properly enforced as a confidence cap. On 2026-06-21, SPAIN WIN (High) was correct, DRAW (Low) was correct, URUGUAY WIN (Medium) was incorrect (frozen at HT, lost 2-2 on set-piece goals), and EGYPT WIN (Medium) was correct (trailed 1-0 at HT but won 3-1, WHT downgraded to Low). On 2026-06-22, JOR-ALG (ALGERIA WIN Medium) was correct but the Clinical Finishing Gate was not properly enforced — a compliance violation documented in the postmortem. On 2026-06-27, DRC-UZB (Medium) was correct, COL-POR (Low) was incorrect but within variance, ALG-AUT (Low) was incorrect (draw-sufficiency produced draw), and JOR-ARG (Low, downgraded from Medium on rotation) was correct.)*
 
 ### Half-Time (Frozen / Live-Monitoring)
 | Confidence | Correct | Total | Accuracy |
 |:-----------|:--------|:------|:---------|
 | High       | 2       | 3     | 66.7%    |
-| Medium     | 12      | 17    | 70.6%    |
-| Low        | 9       | 17    | 52.9%    |
+| Medium     | 13      | 18    | 72.2%    |
+| Low        | 10      | 20    | 50.0%    |
 
-*(Note: Under the Weighted Halftime Rule, in-play monitoring downgraded Germany vs. Curaçao to Low-confidence DRAW, and downgraded Saudi Arabia vs. Uruguay to Low-confidence URUGUAY WIN. On 2026-06-20, GER-CIV was correctly NOT frozen at HT, confidence was downgraded to Low (structural evidence approach), and the final outcome was correct. On 2026-06-21, WHT was applied to two matches: Uruguay-Cape Verde (correctly frozen at 2-1 Uruguay, final was 2-2 — prediction incorrect but protocol correctly applied) and NZ-Egypt (correctly downgraded to Low and NOT frozen, Egypt trailed 1-0 at HT but won 3-1 — prediction correct).)*
+*(Note: Under the Weighted Halftime Rule, in-play monitoring downgraded Germany vs. Curaçao to Low-confidence DRAW, and downgraded Saudi Arabia vs. Uruguay to Low-confidence URUGUAY WIN. On 2026-06-20, GER-CIV was correctly NOT frozen at HT, confidence was downgraded to Low (structural evidence approach), and the final outcome was correct. On 2026-06-21, WHT was applied to two matches: Uruguay-Cape Verde (correctly frozen at 2-1 Uruguay, final was 2-2 — prediction incorrect but protocol correctly applied) and NZ-Egypt (correctly downgraded to Low and NOT frozen, Egypt trailed 1-0 at HT but won 3-1 — prediction correct). On 2026-06-27, WHT was applied to 4 matches: COL-POR (frozen at 0-0, contradicted, ❌), DRC-UZB (frozen at 0-1 DRC trailing, correctly frozen, ✅), ALG-AUT (frozen at 2-2, contradicted, ❌), JOR-ARG (frozen at 2-1 ARG, confirmed, ✅).)*
 
 ---
 
@@ -42,7 +42,7 @@
 
 | Phase | Pre-Game Correct | Half-Time Correct | Total | Pre-Game Acc | Half-Time Acc |
 |:------|:-----------------|:------------------|:------|:-------------|:--------------|
-| Group Stage | 27 | 23 | 42 | 64.3% | 62.2% |
+| Group Stage | 29 | 25 | 46 | 63.0% | 61.0% |
 | Round of 32 | 0 | 0 | 0 | N/A | N/A |
 | Round of 16 | 0 | 0 | 0 | N/A | N/A |
 | Quarter-finals | 0 | 0 | 0 | N/A | N/A |
@@ -108,8 +108,12 @@
 | 2026-06-26 | Uruguay vs. Spain | N/A (complete) | N/A (complete) | SPAIN WIN 1-0 | N/A |
 | 2026-06-26 | Egypt vs. Iran | N/A (complete) | N/A (complete) | DRAW 1-1 | N/A |
 | 2026-06-26 | New Zealand vs. Belgium | N/A (complete) | N/A (complete) | BELGIUM WIN 5-1 | N/A |
+| 2026-06-27 | Colombia vs. Portugal | PORTUGAL WIN (Low) | PORTUGAL WIN (Low) (FROZEN, contradicted) | DRAW 0-0 | ❌ / ❌ |
+| 2026-06-27 | DR Congo vs. Uzbekistan | DR CONGO WIN (Medium) | DR CONGO WIN (Medium) (FROZEN, contradicted at 0-1) | DRC WIN 3-1 | ✅ / ✅ |
+| 2026-06-27 | Algeria vs. Austria | AUSTRIA WIN (Low) | AUSTRIA WIN (Low) (FROZEN, contradicted at 2-2) | DRAW 3-3 | ❌ / ❌ |
+| 2026-06-27 | Jordan vs. Argentina | ARGENTINA WIN (Low, downgraded from Medium) | ARGENTINA WIN (Low) (FROZEN, confirmed at 2-1) | ARG WIN 3-1 | ✅ / ✅ |
 
-*(Note: Germany vs. Curaçao pre-match prediction was GERMANY WIN with High confidence, which was correct. However, live-monitoring in-play adjusted the prediction to DRAW with Low confidence, which was frozen at halftime and recorded as incorrect for the Half-Time category. On 2026-06-20, GER-CIV HT was correctly NOT frozen — the prediction was downgraded to Low but kept as GERMANY WIN using the structural-evidence approach, and the final outcome validated this decision. On 2026-06-21, Uruguay-Cape Verde was correctly frozen at HT under WHT (2-1 Uruguay confirmed URUGUAY WIN), but set-piece defensive errors in the second half produced a 2-2 draw — the WHT protocol was correctly applied despite the incorrect outcome. NZ-Egypt was correctly NOT frozen (Egypt trailed 1-0 at HT), downgraded to Low, and validated by the final 3-1 win. On 2026-06-23, the system missed all 4 matches — prediction loop started after the matchday ended. On 2026-06-25, the system achieved 3/6 (50%) accuracy. Three misses: ECU-GER (Dead Rubber Motivation Asymmetry — Germany draw-sufficient, Ecuador must-win, 55k fans), JPN-SWE (Draw-Sufficiency — Japan needed 1pt, played conservatively), TUR-USA (Extreme Rotation — USA made 8 changes, struggled to 2-2 draw with winless Türkiye).)*
+*(Note: Germany vs. Curaçao pre-match prediction was GERMANY WIN with High confidence, which was correct. However, live-monitoring in-play adjusted the prediction to DRAW with Low confidence, which was frozen at halftime and recorded as incorrect for the Half-Time category. On 2026-06-20, GER-CIV HT was correctly NOT frozen — the prediction was downgraded to Low but kept as GERMANY WIN using the structural-evidence approach, and the final outcome validated this decision. On 2026-06-21, Uruguay-Cape Verde was correctly frozen at HT under WHT (2-1 Uruguay confirmed URUGUAY WIN), but set-piece defensive errors in the second half produced a 2-2 draw — the WHT protocol was correctly applied despite the incorrect outcome. NZ-Egypt was correctly NOT frozen (Egypt trailed 1-0 at HT), downgraded to Low, and validated by the final 3-1 win. On 2026-06-23, the system missed all 4 matches — prediction loop started after the matchday ended. On 2026-06-25, the system achieved 3/6 (50%) accuracy. Three misses: ECU-GER (Dead Rubber Motivation Asymmetry — Germany draw-sufficient, Ecuador must-win, 55k fans), JPN-SWE (Draw-Sufficiency — Japan needed 1pt, played conservatively), TUR-USA (Extreme Rotation — USA made 8 changes, struggled to 2-2 draw with winless Türkiye). On 2026-06-27, the system achieved 2/4 (50%) accuracy. DRC-UZB (Medium) and JOR-ARG (Low) were correctly predicted. COL-POR (Low) was a midfield dependency miss — Portugal without Palhinha and Bernardo Silva lacked build-up quality. ALG-AUT (Low) was a structural framing error — draw-sufficiency should have produced a DRAW prediction, not a Low-confidence WIN.)*
 
 ---
 
@@ -169,6 +173,11 @@
 - [2026-06-26] Spain's Setien-era tactical discipline (1-0 win over Uruguay) suggests possession-based systems can overcome temporary grass if they adapt their style. Spain's passing tempo was deliberately slow, avoiding the high-tempo combinations that fail on heavy surfaces.
 - [2026-06-26] BC Place temporary grass did not impair Belgium (5 goals vs New Zealand). Combined with Norway's 3 goals at MetLife (June 22), the evidence grows that elite individual finishers and direct attacking teams are not meaningfully affected by temporary grass. The heuristic's distinction between possession-heavy technical teams and direct/elite-finisher teams is well-supported.
 - [2026-06-26] The system has now missed two full matchdays (June 23 and June 26) due to orchestrator timing. Total matches with no predictions: 10. Total tokens consumed without prediction value across both missed matchdays: ~60k. This is an orchestration failure, not a skill failure.
+- [2026-06-27] When a team's two most important midfield connectors (ball-winning DM + creative playmaker) are both absent, the attack loses ~40-50% of expected output regardless of forward quality. Add a "Midfield Continuity Check" to pre-match workflow: if both the primary DM and primary creator are absent, apply a one-notch confidence downgrade.
+- [2026-06-27] The Draw-Sufficiency Confidence Discount discount should be strengthened: when the draw-sufficient team is the pre-match favorite AND its opponent is not eliminated AND both teams can advance with a draw, the predicted outcome should default to DRAW (Low confidence), not a WIN with a draw-risk note. This is the third validation of draw-sufficiency producing draws (RSA-KOR, JPN-SWE, ALG-AUT).
+- [2026-06-27] The Extreme Rotation Floor Rule's elite depth exception needs clearer criteria. Argentina's bench (Messi, Mac Allister, De Paul, Molina, Romero) is world-class — 6+ changes were at most a 1-notch drop. The exception should have been documented. Criteria: if 3+ world-class players (top-50 globally) are on the bench AND opponent is a debutant/low-quality team, confidence may remain at Medium with explicit documentation.
+- [2026-06-27] Sustained xG dominance (>0.60 xG per half, >60% possession) is a reliable structural indicator that a team with finishing deficiencies will eventually score against a high-GA opponent. Volume overcomes finishing variance. WHT structural-evidence approach validated for DRC-UZB (0-1 deficit at 65', DRC won 3-1).
+- [2026-06-27] The 5-iteration 787k-token cycle for this matchday was excessive. Only 1 prediction change (JOR-ARG downgrade) across 5 iterations. The post-60' WHT check iteration (Iteration 5) could have been eliminated by setting interval to 120 minutes from Iteration 4. Recommendation: 4 iterations max for a 3-slot matchday, saving ~250-300k tokens (~30-35%).
 
 ---
 
@@ -207,11 +216,13 @@
 
 - **Dead Rubber Motivation Asymmetry Rule (Updated 2026-06-25)**: In dead rubber matches where advancement scenarios differ (one team must-win, opponent needs only a draw), the must-win team receives a motivation bonus of ~15-20% to their implied performance. If the draw-sufficient team also benches key starters (signaling conservatism through lineup rotation), the bonus may fully close the quality gap. When both conditions apply (motivation delta + starter benching), apply a one-notch confidence downgrade to the draw-sufficient team and explicitly document the motivation delta in reasoning. **Updated sub-clause (2026-06-25):** The rule applies even without rotation if the draw-sufficient team has already secured advancement AND the opponent faces elimination. The motivation delta exists purely from match state, not just lineup decisions. When the crowd heavily favors the must-win team, apply an additional 5-10% confidence discount to the draw-sufficient favorite. Validated by ECU-GER (2026-06-25): Germany (6pts, no rotation) lost 2-1 to Ecuador (1pt, must-win, 55k fans).
 
-- **Draw-Sufficiency Confidence Discount (New 2026-06-25)**: When a team needs only 1 point to advance and faces a must-win opponent, apply a one-notch confidence discount to the draw-sufficient team's win prediction. The discount applies regardless of whether the team rotates starters. Trigger conditions: (a) team needs only 1pt to advance AND (b) opponent is winless/must-win AND (c) match is not a knockout (motivation asymmetry is strongest in group stage). Validated by JPN-SWE (2026-06-25): Japan needed 1pt, played conservatively, drew 1-1 despite 1.31 xG dominance. This parallels RSA-KOR (2026-06-24): Korea needed 1pt (Son benched), lost 1-0.
+- **Draw-Sufficiency Confidence Discount (Updated 2026-06-27)**: When the draw-sufficient team is the pre-match favorite AND its opponent is not yet eliminated AND both teams can advance with a draw, the predicted outcome should default to **DRAW (Low confidence)**, not a WIN prediction with a draw-risk note. A one-notch confidence discount on a WIN is insufficient — the structural incentives produce conservative, shared-point outcomes. Trigger conditions: (a) team needs only 1pt to advance AND (b) opponent is not eliminated (has realistic advancement path with a result) AND (c) match is in group stage. If the draw-sufficient team is the underdog, maintain the original one-notch discount on the favorite's WIN prediction (since the dynamic is different — the underdog is happy to draw, but the favorite wants to win). Validated by three cases: RSA-KOR (2026-06-24), JPN-SWE (2026-06-25), ALG-AUT (2026-06-27 — 3-3 draw in a match where AUT needed 1pt, both teams advanced).
 
-- **Extreme Rotation Floor Rule (New 2026-06-25)**: When a team makes 6+ changes to their starting XI in a match, their effective quality drops materially regardless of squad depth. Confidence must be at most Low, even against a winless opponent. Trigger conditions: (a) 6+ starting XI changes from the team's prior match AND (b) no realistic advancement stakes for the rotating team. Exception: if the rotating team has elite bench depth (all 6+ changes are at most a 1-notch quality drop per position), confidence may remain at Medium maximum, with explicit documentation of why each change is quality-neutral. Validated by TUR-USA (2026-06-25): USA made 8 changes, produced 0.52 xG in first half, and could only draw 2-2 against winless, goalless Türkiye.
+- **Extreme Rotation Floor Rule (Updated 2026-06-27)**: When a team makes 6+ changes to their starting XI in a match, their effective quality drops materially regardless of squad depth. Confidence must be at most Low, even against a winless opponent. Trigger conditions: (a) 6+ starting XI changes from the team's prior match AND (b) no realistic advancement stakes for the rotating team. Exception: if the rotating team has elite bench depth (all 6+ changes are at most a 1-notch quality drop per position), confidence may remain at Medium maximum, with explicit documentation of why each change is quality-neutral. **Elite depth exception criteria (New 2026-06-27):** To apply the exception and remain at Medium, require: (a) 3+ players on the bench who are globally top-50, AND (b) opponent is debutant or low-quality (FIFA ranking outside top 50 OR winless in tournament), AND (c) each change documented as at most a 1-notch quality drop. Validated by TUR-USA (2026-06-25, exception NOT met) and JOR-ARG (2026-06-27, exception likely met — Argentina's bench had Messi, Mac Allister, De Paul, Molina — but Low was still conservative).
 
 - **Lineup Source Reliability (New 2026-06-25)**: FotMob live match center should be the single source of truth for confirmed starting XIs. Sofascore and other aggregators may display projected lineups as "confirmed." If a lineup source conflict arises, prefer FotMob. This is the third source reliability finding (following Khel Now for Ivory Coast on June 14 and 20).
+
+- **Midfield Continuity Check (New 2026-06-27)**: When a team is missing BOTH their primary defensive midfielder (ball-winner) AND their primary creative midfielder (playmaker) simultaneously in the starting XI, their attacking output drops by ~40-50% regardless of forward quality. For teams with star attackers dependent on service, this midfield gap is a structural confidence-reducing factor. If both absences are confirmed via official lineup, apply a one-notch confidence downgrade (or if at Low already, explicitly document the dependency risk in the prediction reasoning). Validated by COL-POR (2026-06-27): Portugal without Palhinha (DM) and Bernardo Silva (creator) managed only 0.63 xG against Colombia.
 
 ### Initial Assumptions
 - Home advantage matters in World Cup group stages (host nations USA, Canada, Mexico)
@@ -265,3 +276,6 @@
 - [2026-06-26] How should the system handle "elite opponent resting starters" scenarios differently from "mediocre opponent resting starters"? Norway's 10 changes (resting Haaland, Ødegaard) vs France produced a 4-1 blowout, while USA's 8 changes (resting Pulisic, McKennie) vs Türkiye produced a 2-2 draw. The Elite Depth Exception to the Extreme Rotation Floor Rule needs definition.
 - [2026-06-26] Does BC Place's temporary grass actually improve over the tournament duration as the sod establishes? Belgium scored 5 goals there on June 26 — the highest single-match goal total at that venue. Compare with Canada's 2 goals there on June 18.
 - [2026-06-26] Is Uruguay's Bielsa-era collapse (0 wins in group stage) a system-specific failure or a personnel/adaptation issue? With 0 wins from 3 matches, this is the worst tournament performance of Bielsa's career. Should Uruguay be considered a permanently damaged team for future Bielsa-coached predictions?
+- [2026-06-27] Does the Midfield Continuity Check (both DM and creator absent) replicate across other teams and contexts? COL-POR is only one data point. Need to test on more matches where both key midfield connectors are missing.
+- [2026-06-27] Is the 4-iteration recommendation (instead of 5) generalizable to all 3-slot matchdays, or does it depend on specific matchday characteristics like time between kickoff slots and number of Medium+ confidence matches?
+- [2026-06-27] Can ALG-AUT's 3-3 draw with stoppage-time goals on both sides (90'+3' and 90'+6') be classified as a "mutually beneficial draw" where both teams accepted the point? If so, this is the strongest validation yet of the Draw-Sufficiency Discount's "default to DRAW" recommendation — both teams had clear advancement paths with a draw.
