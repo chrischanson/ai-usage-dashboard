@@ -401,6 +401,20 @@ if [ -f "${SKILLS_RUNNER}" ]; then
             log "Copied match_schedule.md to ${DAY_DIR}/"
         fi
     fi
+    # Fallback: check if the agent wrote to the project's runs directory or printed a different path
+    if [ ! -f "${DAY_DIR}/match_schedule.md" ]; then
+        PROJECT_RUN_DIR=$(echo "${OUTPUT}" | grep -E "written to.*match_schedule.md" | sed -n 's/.*written to [`'\''"]\([^`'\''"]*\).*/\1/p' | sed 's/\/match_schedule.md//')
+        if [ -n "${PROJECT_RUN_DIR}" ]; then
+            if [ -d "${WORKSPACE_DIR}/${PROJECT_RUN_DIR}" ] && [ -f "${WORKSPACE_DIR}/${PROJECT_RUN_DIR}/match_schedule.md" ]; then
+                cp -f "${WORKSPACE_DIR}/${PROJECT_RUN_DIR}/match_schedule.md" "${DAY_DIR}/"
+                log "Copied match_schedule.md from workspace project run dir to ${DAY_DIR}/"
+            elif [ -d "${PROJECT_RUN_DIR}" ] && [ -f "${PROJECT_RUN_DIR}/match_schedule.md" ]; then
+                cp -f "${PROJECT_RUN_DIR}/match_schedule.md" "${DAY_DIR}/"
+                log "Copied match_schedule.md from absolute project run dir to ${DAY_DIR}/"
+            fi
+        fi
+    fi
+
 else
     echo "Warning: run_skill.py not found, invoking ${AGENT} directly" >&2
     # Read and compile the skill prompt manually

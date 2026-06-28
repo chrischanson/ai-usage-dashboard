@@ -129,3 +129,31 @@ Canada has the superior individual quality with Jonathan David (3 goals, 6 SOT i
 - **Lineup Gate Alignment:** Kickoff at 19:00 UTC. Next interval MUST land 45-60 min before kickoff (~18:00-18:15 UTC) for official lineup verification. Official XIs typically released ~60 min before kickoff (18:00 UTC). This is the highest-value remaining iteration. Interval set to 131 min (15:49 → 18:00 UTC).
 - **Prediction Changes for this iteration:** No change to prediction or confidence.
 - **Next interval:** 131 minutes to ~18:00 UTC for lineup verification.
+
+---
+
+### Iteration 6 - 2026-06-28T18:02:00Z — Official Lineups Confirmed; Confidence Holds at Low
+- **Status:** not_started (unchanged, kickoff 19:00 UTC)
+- **Match is 58 min from kickoff. Lineup window OPEN — official XIs released.**
+- **Staleness check:** NOT stale — official starting XIs published.
+- **Official Starting XIs (per The Standard / FotMob, 2026-06-28T18:01 UTC):**
+  - **Canada (4-3-3 or 4-4-2 diamond):** Crépeau; Johnston, Cornelius, Bombito, Laryea; Eustáquio, Millar, Saliba; Buchanan, J. David, Oluwaseyi
+  - **Canada subs:** St. Clair, Goodman, Davies, Larin, Ahmed, Shaffelburg, Osorio, Choinière, Sigur, Waterman, De Fougerolles, Nelson, P. David, Jones, Fougerolles
+  - **South Africa (4-3-3):** Williams; Mudau, Mbokazi, Okon, Modiba; Mokoena, Sithole; Maseko, Mofokeng, Appollis; Makgopa
+  - **South Africa subs:** Chaine, Goss, Matuludi, Ndamane, Kabini, Sibisi, Makhanya, Cross, Mbatha, Adams, Moremi, Foster, Rayners, Sebelebele
+- **Evidence gathered:**
+  - [strong] **Eustáquio starts** — passed late fitness test despite muscle problem. Confirmed in official XI. Significant positive for Canada's midfield control and ball progression.
+  - [strong] **Davies on bench** — as predicted by 365Scores probable lineups. Available as second-half impact sub but not starter. First minutes since ACL tear possible.
+  - [medium] **Larin BENCHED** — unexpected. Canada's joint-top scorer (2 goals in 104 min) replaced by Oluwaseyi (Villarreal). Larin available as sub while trailing is powerful; while leading/drawing, Canada's attack may lack proven finishing.
+  - [medium] **Bombito starts at CB** — not De Fougerolles (on bench). Bombito (Nice) was reported injured pre-tournament but is fit. Adds height, physicality, ball-playing ability.
+  - [medium] **Millar starts over Ahmed** — preferred for left midfield. Millar offers direct running and defensive work rate.
+  - [medium] **Mokoena AND Sithole both start** — RSA midfield double pivot confirmed. Mokoena returns from suspension with defensive grit and set-piece threat.
+  - [weak] **No Alfie Jones in Canada matchday squad** — knock ruled him out entirely. Not a major loss (depth CB).
+  - [weak] **Makgopa starts alone up front** — 0 goals in tournament (1 SOT in 195 min). RSA clinical finishing concerns unaddressed.
+- **Draw-Sufficiency Check applied:** Knockout match — not applicable.
+- **Clinical Finishing Gate check applied:** Canada 13.6% conv., 1.14x efficiency — gate does not cap. South Africa 0.29x efficiency — systemic deficiency persists with Makgopa (0 goals) starting striker.
+- **Prediction:** CANADA WIN (Low) **unchanged**.
+- **Reasoning for confidence staying Low:** Lineup news is net neutral. Eustáquio starting and Bombito fit are positives. Larin benched is an unexpected negative — Oluwaseyi less proven finisher. Davies on bench (expected) maintains creative gap in starting XI. Mokoena return confirmed for RSA. Both teams still knockout debutants. Confidence could upgrade to Medium only if Canada dominates first half and leads at halftime (WHT).
+- **Prediction Changes for this iteration:** No change to prediction or confidence.
+- **Next iteration planning:** Iteration 6 of ~7 total for 1-slot matchday. Entering match-live phase (kickoff 19:00 UTC). Next high-value: **Weighted Halftime Rule** at ~19:50 UTC. Set interval to land at 19:50 UTC (108 min from 18:02 UTC) to apply WHT.
+- **Next interval:** 108 minutes to ~19:50 UTC for WHT application at halftime.
