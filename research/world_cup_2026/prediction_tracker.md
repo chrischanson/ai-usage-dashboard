@@ -10,7 +10,7 @@
 - **Dates:** June 11 – July 19, 2026
 - **Current Phase:** Group Stage
 - **Tracking Started:** 2026-06-13
-- **Total Matches Tracked:** 42
+- **Total Matches Tracked:** 48
 - **Pre-Game Accuracy (Final Pre-Kickoff):** 64.3% (27/42)
 - **Half-Time Accuracy (Frozen/Live):** 62.2% (23/37)
 
@@ -102,6 +102,12 @@
 | 2026-06-25 | Tunisia vs. Netherlands | NETHERLANDS WIN (Med) | NETHERLANDS WIN (Med) (FROZEN) | NETHERLANDS WIN | ✅ / ✅ |
 | 2026-06-25 | Türkiye vs. USA | USA WIN (Low) | USA WIN (Low) (NOT FROZEN, contradicted) | DRAW | ❌ / ❌ |
 | 2026-06-25 | Paraguay vs. Australia | DRAW (Low) | DRAW (Low) (FROZEN) | DRAW | ✅ / ✅ |
+| 2026-06-26 | France vs. Norway | N/A (complete) | N/A (complete) | FRANCE WIN 4-1 | N/A |
+| 2026-06-26 | Senegal vs. Iraq | N/A (complete) | N/A (complete) | SENEGAL WIN 5-0 | N/A |
+| 2026-06-26 | Cape Verde vs. Saudi Arabia | N/A (complete) | N/A (complete) | DRAW 0-0 | N/A |
+| 2026-06-26 | Uruguay vs. Spain | N/A (complete) | N/A (complete) | SPAIN WIN 1-0 | N/A |
+| 2026-06-26 | Egypt vs. Iran | N/A (complete) | N/A (complete) | DRAW 1-1 | N/A |
+| 2026-06-26 | New Zealand vs. Belgium | N/A (complete) | N/A (complete) | BELGIUM WIN 5-1 | N/A |
 
 *(Note: Germany vs. Curaçao pre-match prediction was GERMANY WIN with High confidence, which was correct. However, live-monitoring in-play adjusted the prediction to DRAW with Low confidence, which was frozen at halftime and recorded as incorrect for the Half-Time category. On 2026-06-20, GER-CIV HT was correctly NOT frozen — the prediction was downgraded to Low but kept as GERMANY WIN using the structural-evidence approach, and the final outcome validated this decision. On 2026-06-21, Uruguay-Cape Verde was correctly frozen at HT under WHT (2-1 Uruguay confirmed URUGUAY WIN), but set-piece defensive errors in the second half produced a 2-2 draw — the WHT protocol was correctly applied despite the incorrect outcome. NZ-Egypt was correctly NOT frozen (Egypt trailed 1-0 at HT), downgraded to Low, and validated by the final 3-1 win. On 2026-06-23, the system missed all 4 matches — prediction loop started after the matchday ended. On 2026-06-25, the system achieved 3/6 (50%) accuracy. Three misses: ECU-GER (Dead Rubber Motivation Asymmetry — Germany draw-sufficient, Ecuador must-win, 55k fans), JPN-SWE (Draw-Sufficiency — Japan needed 1pt, played conservatively), TUR-USA (Extreme Rotation — USA made 8 changes, struggled to 2-2 draw with winless Türkiye).)*
 
@@ -156,6 +162,13 @@
 - [2026-06-25] Türkiye's 62-shot goal drought confirms the Clinical Finishing Gate's predictive value. They broke the drought against a rotated USA defense, scoring from 4 shots (2 SOT, 2 goals). The Gate correctly flagged Türkiye's finishing as a systemic problem — the drought-breaking against a weakened opponent was the expected "regression to the mean" event, not a contradiction of the heuristic.
 - [2026-06-25] Sofascore's "confirmed" lineup data was a projection, not verified official data, for Türkiye-USA. FotMob's live match center had the correct lineup. FotMob should replace Sofascore as the primary lineup source for future matchdays. This issue also occurred with Khel Now for Ivory Coast lineups on June 14 and 20 — suggesting multiple sources besides FotMob are unreliable for "confirmed" lineups.
 - [2026-06-25] The 10-iteration cycle for 6 matches consumed ~1M tokens with only 1 prediction change. This is highly inefficient. Recommendation: start later (15:00 UTC vs 09:00 UTC), reduce to 5-7 iterations, and target 300k-400k tokens per matchday.
+- [2026-06-26] The timing failure recurred for a second consecutive matchday (June 26 matches missed). Root cause is now clearly orchestrator-level: the prediction loop did not launch before the first match kickoff. A guardrail should be added: if current time exceeds the last match's estimated end by >6 hours, skip the prediction loop entirely and proceed directly to postmortem.
+- [2026-06-26] Norway's 10 changes vs France (already qualified) produced a 4-1 blowout. This validates the Extreme Rotation Floor Rule (#20) with the important nuance: rotation by a weaker draw-sufficient team against an elite opponent produces an even larger blowout than normal. When the rotating team is the underdog AND eliminates its star player(s) (Haaland benched), apply an additional confidence boost to the elite opponent.
+- [2026-06-26] Cape Verde went unbeaten in all 3 group matches (0-0 vs Saudi Arabia, 0-0 vs Spain, 2-2 vs Uruguay). The Debutant Motivation Boost's "Match 1 only" assumption may need revision — Cape Verde's disciplined defensive organization persisted across all three matches, not just the opener. This may be a genuine structural quality (well-drilled low block) rather than motivation-driven.
+- [2026-06-26] Bielsa-System Defensive Fragility (#22) was validated for a third consecutive Uruguay match. Uruguay finished Group H with 0 wins (2 draws, 1 loss) — the worst performance of any Bielsa-coached side in a major tournament. Individual defensive errors occurred in every match. The heuristic's confidence discount should be strengthened from "modest" to "significant" for Uruguay specifically.
+- [2026-06-26] Spain's Setien-era tactical discipline (1-0 win over Uruguay) suggests possession-based systems can overcome temporary grass if they adapt their style. Spain's passing tempo was deliberately slow, avoiding the high-tempo combinations that fail on heavy surfaces.
+- [2026-06-26] BC Place temporary grass did not impair Belgium (5 goals vs New Zealand). Combined with Norway's 3 goals at MetLife (June 22), the evidence grows that elite individual finishers and direct attacking teams are not meaningfully affected by temporary grass. The heuristic's distinction between possession-heavy technical teams and direct/elite-finisher teams is well-supported.
+- [2026-06-26] The system has now missed two full matchdays (June 23 and June 26) due to orchestrator timing. Total matches with no predictions: 10. Total tokens consumed without prediction value across both missed matchdays: ~60k. This is an orchestration failure, not a skill failure.
 
 ---
 
@@ -247,3 +260,8 @@
 - [2026-06-25] Can the per-matchday token budget be reliably reduced from ~1M to 300k-400k without losing essential coverage? What is the minimum viable iteration count for a 3-slot matchday?
 - [2026-06-25] When should the Sofascore vs FotMob lineup discrepancy be considered resolved? Should SKILL.md be updated to specify FotMob as the preferred source?
 - [2026-06-25] Is there a minimum total xG threshold below which a DRAW prediction should be considered "lucky" even when correct? PAR-AUS had 0.49 total xG — a single goal from any source would have invalidated the prediction. Should very-low-xG draws receive a confidence discount in future predictions?
+- [2026-06-26] How can the orchestrator be guaranteed to launch the prediction loop before the first match kickoff? Two consecutive matchdays (June 23, June 26) were missed. Should the orchestrator check if current time < first_match_estimated_start before attempting predictions, and if not, skip to postmortem?
+- [2026-06-26] Does the Debutant Motivation Boost extend beyond Match 1 when the debutant's style is defensive organization rather than motivation-driven? Cape Verde went unbeaten in all 3 group matches (0.94 xG against per match). Is this a "Cape Verde-specific" outlier or should the heuristic be generalized?
+- [2026-06-26] How should the system handle "elite opponent resting starters" scenarios differently from "mediocre opponent resting starters"? Norway's 10 changes (resting Haaland, Ødegaard) vs France produced a 4-1 blowout, while USA's 8 changes (resting Pulisic, McKennie) vs Türkiye produced a 2-2 draw. The Elite Depth Exception to the Extreme Rotation Floor Rule needs definition.
+- [2026-06-26] Does BC Place's temporary grass actually improve over the tournament duration as the sod establishes? Belgium scored 5 goals there on June 26 — the highest single-match goal total at that venue. Compare with Canada's 2 goals there on June 18.
+- [2026-06-26] Is Uruguay's Bielsa-era collapse (0 wins in group stage) a system-specific failure or a personnel/adaptation issue? With 0 wins from 3 matches, this is the worst tournament performance of Bielsa's career. Should Uruguay be considered a permanently damaged team for future Bielsa-coached predictions?
