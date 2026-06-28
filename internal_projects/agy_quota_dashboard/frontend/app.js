@@ -790,7 +790,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 combined: 'Quota Limits',
                 agy: 'Antigravity Quota Limits',
                 opencode: 'OpenCode CLI Spending',
-                codex: 'Codex (OpenAI) Usage Limits',
+                codex: 'Codex Usage Limits',
             };
             const titleEl = document.getElementById('quota-title');
             if (titleEl) titleEl.textContent = titleMap[currentSource] || 'Quota Limits';
@@ -913,7 +913,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             card.innerHTML = `
-                <h3>Codex (OpenAI) <span class="badge badge-codex">${escapeHtml(planLabel)}</span></h3>
+                <h3>Codex <span class="badge badge-codex">${escapeHtml(planLabel)}</span></h3>
                 <div class="quota-limit">
                     <div class="quota-limit-header">
                         <span class="quota-limit-label">Monthly Limit (30d)</span>
@@ -927,7 +927,7 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         } else {
             card.innerHTML = `
-                <h3>Codex (OpenAI) <span class="badge badge-codex">${escapeHtml(planLabel)}</span></h3>
+                <h3>Codex <span class="badge badge-codex">${escapeHtml(planLabel)}</span></h3>
                 <div class="quota-limit">
                     <p style="color: #8a9fc8; font-size: 0.85rem; margin: 0.5rem 0;">
                         Rate limit data will populate once Codex API calls are registered.
