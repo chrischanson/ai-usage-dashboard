@@ -1,0 +1,32 @@
+# AGY Quota Dashboard systemd service
+# Install via: sudo bash install/install.sh /absolute/path/to/project
+# Or manually: edit PROJECT_DIR and USER below, then:
+#   sudo cp install/agy-dashboard.service /etc/systemd/system/agy-dashboard.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now agy-dashboard
+
+[Unit]
+Description=AGY Quota Dashboard
+Documentation=https://github.com/anomalyco/opencode
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/default/agy-dashboard
+ExecStart=PROJECT_DIR/venv/bin/python3 -m main
+WorkingDirectory=PROJECT_DIR/backend
+Restart=on-failure
+RestartSec=5
+User=PROJECT_USER
+Group=PROJECT_USER
+StandardOutput=journal
+StandardError=journal
+
+# Allow access to user home dirs (AGY DBs, OpenCode config, etc.)
+ProtectHome=false
+ProtectSystem=false
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
