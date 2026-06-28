@@ -1,0 +1,62 @@
+#! /bin/sh
+
+### BEGIN INIT INFO
+# Provides:       agy-dashboard
+# Required-Start: $remote_fs $syslog
+# Required-Stop:  $remote_fs $syslog
+# Default-Start:  2 3 4 5
+# Default-Stop:   0 1 6
+# Short-Description: AGY Quota Dashboard
+### END INIT INFO
+
+set -e
+
+PROJECT_DIR=PROJECT_DIR_PLACEHOLDER
+VENV_PYTHON="$PROJECT_DIR/venv/bin/python3"
+PIDFILE="/run/agy-dashboard.pid"
+LOG="$PROJECT_DIR/dashboard.log"
+
+export PYTHONPATH="$PROJECT_DIR/backend"
+
+test -x "$VENV_PYTHON" || exit 0
+
+umask 022
+
+. /lib/lsb/init-functions
+
+case "$1" in
+  start)
+    log_daemon_msg "Starting AGY Quota Dashboard" "agy-dashboard" || true
+    if start-stop-daemon --start --quiet --oknodo --background \
+      --make-pidfile --pidfile "$PIDFILE" \
+      --chdir "$PROJECT_DIR/backend" \
+      --startas "$VENV_PYTHON" -- -m main \
+      >> "$LOG" 2>&1; then
+      log_end_msg 0 || true
+    else
+      log_end_msg 1 || true
+    fi
+    ;;
+  stop)
+    log_daemon_msg "Stopping AGY Quota Dashboard" "agy-dashboard" || true
+    if start-stop-daemon --stop --quiet --oknodo --pidfile "$PIDFILE"; then
+      log_end_msg 0 || true
+    else
+      log_end_msg 1 || true
+    fi
+    rm -f "$PIDFILE"
+    ;;
+  restart)
+    "$0" stop
+    sleep 1
+    "$0" start
+    ;;
+  status)
+    status_of_proc -p "$PIDFILE" "$VENV_PYTHON" "agy-dashboard" && exit 0 || exit $?
+    ;;
+  *)
+    log_action_msg "Usage: /etc/init.d/agy-dashboard {start|stop|restart|status}" || true
+    exit 1
+esac
+
+exit 0
