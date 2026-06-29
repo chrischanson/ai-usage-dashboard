@@ -4,10 +4,7 @@ import json
 import os
 import sqlite3
 import shutil
-import stat
 import sys
-
-CI_MOCK_DIR = os.path.join(os.path.dirname(__file__), '.ci_mocks')
 
 
 def encode_varint(n):
@@ -43,53 +40,6 @@ def build_agy_protobuf(input_tokens, output_tokens, cache_read, model_name):
         encode_len(5, model_name.encode('utf-8'))
     )
     return outer
-
-
-def setup_mock_opencode():
-    """Create a mock `opencode` shell script on PATH."""
-    bin_dir = os.path.join(CI_MOCK_DIR, 'bin')
-    os.makedirs(bin_dir, exist_ok=True)
-    script = bin_dir + '/opencode'
-    with open(script, 'w') as f:
-        f.write('''#!/usr/bin/env bash
-cat <<'EOF'
-┌──────────────────────────────────────────────────────────────────────┐
-│                           OVERVIEW                                   │
-├──────────────────────────────────────────────────────────────────────┤
-│ Sessions        20                                                    │
-│ Messages        20                                                    │
-├──────────────────────────────────────────────────────────────────────┤
-│                       COST & TOKENS                                   │
-├──────────────────────────────────────────────────────────────────────┤
-│ Input           63,000                                                │
-│ Output          12,300                                                │
-│ Cache Read      17,000                                                │
-│ Cache Write     4,000                                                 │
-├──────────────────────────────────────────────────────────────────────┤
-│                         MODEL USAGE                                   │
-├──────────────────────────────────────────────────────────────────────┤
-│ opencode/gemini-2.5-pro                                               │
-│   Messages         12                                                 │
-│   Input Tokens     45,000                                             │
-│   Output Tokens    8,200                                              │
-│   Cache Read       12,000                                             │
-│   Cache Write      3,000                                              │
-│   Cost             $0.45                                              │
-├──────────────────────────────────────────────────────────────────────┤
-│ opencode/claude-sonnet-4.0                                            │
-│   Messages         8                                                  │
-│   Input Tokens     18,000                                             │
-│   Output Tokens    4,100                                              │
-│   Cache Read       5,000                                              │
-│   Cache Write      1,000                                              │
-│   Cost             $0.08                                              │
-└──────────────────────────────────────────────────────────────────────┘
-EOF
-exit 0
-''')
-    os.chmod(script, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
-    print(f"  mock opencode script at {script}")
-    return bin_dir
 
 
 def setup_mock_agy():
@@ -152,7 +102,6 @@ def setup_mock_codex():
             "organizations": [{"id": "org-ci-test"}],
         }
     }
-    padded = jwt_payload
     encoded = base64.urlsafe_b64encode(json.dumps(jwt_payload).encode()).rstrip(b'=').decode()
     jwt = f"header.{encoded}.signature"
     auth = {
@@ -169,15 +118,11 @@ def setup_mock_codex():
 
 def main():
     print("Setting up mock source files for CI...")
-    if os.path.exists(CI_MOCK_DIR):
-        shutil.rmtree(CI_MOCK_DIR)
+    if os.path.exists(os.path.join(os.path.dirname(__file__), '.ci_mocks')):
+        shutil.rmtree(os.path.join(os.path.dirname(__file__), '.ci_mocks'))
 
-    bin_dir = setup_mock_opencode()
     setup_mock_agy()
     setup_mock_codex()
-
-    # Print PATH export for CI
-    print(f"\nExport PATH: export PATH={bin_dir}:$PATH")
     print("Done. Mock sources ready.")
     return 0
 
