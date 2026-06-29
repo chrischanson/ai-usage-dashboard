@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 import threading
 import time
 from config import Config
-from db import connect, init_schema, insert_usage, insert_quota, record_status, prune
+from db import connect, init_schema, insert_usage, insert_quota, record_status
 
 
 class Poller:
@@ -28,8 +28,6 @@ class Poller:
         
         from integrity import fix_cycle_integrity
         fix_cycle_integrity(conn, cycle_ts)
-        
-        prune(conn, self.cfg.retention_days)
 
     def start(self) -> None:
         conn = connect(self.cfg.db_path)

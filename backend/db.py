@@ -361,7 +361,7 @@ def latest_usage(conn: sqlite3.Connection, source: str = None, cycle_ts: int = N
     return result
 
 
-def history(conn: sqlite3.Connection, source: str = None, range: str = None, limit: int = 100) -> list:
+def history(conn: sqlite3.Connection, source: str = None, range: str = None) -> list:
     cursor = conn.cursor()
 
     if source is None:
@@ -386,8 +386,8 @@ def history(conn: sqlite3.Connection, source: str = None, range: str = None, lim
     cursor.execute('''
         SELECT * FROM usage_history
         WHERE source=?
-        ORDER BY cycle_ts DESC LIMIT ?
-    ''', (source, limit))
+        ORDER BY cycle_ts DESC
+    ''', (source,))
     rows = [dict(r) for r in cursor.fetchall()]
 
     if rows:
@@ -536,10 +536,10 @@ def get_latest_usage(source=None, include_model_deltas=False):
         conn.close()
 
 
-def get_history_series(source='opencode', limit=100):
+def get_history_series(source='opencode'):
     conn = connect(DB_PATH)
     try:
-        return history(conn, source, limit=limit)
+        return history(conn, source)
     finally:
         conn.close()
 
