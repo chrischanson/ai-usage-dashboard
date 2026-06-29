@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from db import get_latest_usage, get_history_series, get_latest_quota, metrics
+from db import latest_usage, history, latest_quota, metrics
 from db import connect as _db_connect, DB_PATH, init_schema
 from quota_parser import fetch_agy_quota
 from codex_quota import fetch_codex_quota
@@ -43,43 +43,79 @@ def create_app() -> FastAPI:
     # --- Usage routes ---
     @app.get("/api/usage/latest")
     def api_latest(deltas: bool = Query(False)):
-        return get_latest_usage(include_model_deltas=deltas)
+        conn = _db_connect(DB_PATH)
+        try:
+            return latest_usage(conn, include_model_deltas=deltas)
+        finally:
+            conn.close()
 
     @app.get("/api/usage/opencode/latest")
     def api_opencode_latest(deltas: bool = Query(False)):
-        data = get_latest_usage(source='opencode', include_model_deltas=deltas)
-        return data.get('opencode', {})
+        conn = _db_connect(DB_PATH)
+        try:
+            data = latest_usage(conn, source='opencode', include_model_deltas=deltas)
+            return data.get('opencode', {})
+        finally:
+            conn.close()
 
     @app.get("/api/usage/agy/latest")
     def api_agy_latest(deltas: bool = Query(False)):
-        data = get_latest_usage(source='agy', include_model_deltas=deltas)
-        return data.get('agy', {})
+        conn = _db_connect(DB_PATH)
+        try:
+            data = latest_usage(conn, source='agy', include_model_deltas=deltas)
+            return data.get('agy', {})
+        finally:
+            conn.close()
 
     @app.get("/api/usage/codex/latest")
     def api_codex_latest(deltas: bool = Query(False)):
-        data = get_latest_usage(source='codex', include_model_deltas=deltas)
-        return data.get('codex', {})
+        conn = _db_connect(DB_PATH)
+        try:
+            data = latest_usage(conn, source='codex', include_model_deltas=deltas)
+            return data.get('codex', {})
+        finally:
+            conn.close()
 
     @app.get("/api/usage/opencode/history")
     def api_opencode_history():
-        return get_history_series(source='opencode')
+        conn = _db_connect(DB_PATH)
+        try:
+            return history(conn, source='opencode')
+        finally:
+            conn.close()
 
     @app.get("/api/usage/agy/history")
     def api_agy_history():
-        return get_history_series(source='agy')
+        conn = _db_connect(DB_PATH)
+        try:
+            return history(conn, source='agy')
+        finally:
+            conn.close()
 
     @app.get("/api/usage/codex/history")
     def api_codex_history():
-        return get_history_series(source='codex')
+        conn = _db_connect(DB_PATH)
+        try:
+            return history(conn, source='codex')
+        finally:
+            conn.close()
 
     @app.get("/api/usage/history")
     def api_history():
-        return get_history_series(source='opencode')
+        conn = _db_connect(DB_PATH)
+        try:
+            return history(conn, source=None)
+        finally:
+            conn.close()
 
     # --- Quota routes ---
     @app.get("/api/quota/latest")
     def api_quota_latest():
-        result = get_latest_quota()
+        conn = _db_connect(DB_PATH)
+        try:
+            result = latest_quota(conn)
+        finally:
+            conn.close()
 
         if 'agy' not in result:
             result['agy'] = {}
@@ -120,7 +156,11 @@ def create_app() -> FastAPI:
 
     @app.get("/api/quota/agy/latest")
     def api_quota_agy_latest():
-        result = get_latest_quota(source='agy')
+        conn = _db_connect(DB_PATH)
+        try:
+            result = latest_quota(conn, source='agy')
+        finally:
+            conn.close()
         raw = fetch_agy_quota()
         if raw and 'plan' in raw:
             if result:
@@ -131,7 +171,11 @@ def create_app() -> FastAPI:
 
     @app.get("/api/quota/opencode/latest")
     def api_quota_opencode_latest():
-        result = get_latest_quota(source='opencode')
+        conn = _db_connect(DB_PATH)
+        try:
+            result = latest_quota(conn, source='opencode')
+        finally:
+            conn.close()
         if not result:
             result = {'opencode': {}}
         opencode_live = fetch_opencode_cost()
@@ -141,7 +185,11 @@ def create_app() -> FastAPI:
 
     @app.get("/api/quota/codex/latest")
     def api_quota_codex_latest():
-        db_data = get_latest_quota(source='codex')
+        conn = _db_connect(DB_PATH)
+        try:
+            db_data = latest_quota(conn, source='codex')
+        finally:
+            conn.close()
         codex_live = fetch_codex_quota()
         if codex_live and 'error' not in codex_live:
             plan = codex_live.get('plan_type') or codex_live.get('plan', 'free')

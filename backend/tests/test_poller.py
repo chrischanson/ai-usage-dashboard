@@ -115,6 +115,31 @@ class TestPollerRunOnce(unittest.TestCase):
             p.run_once(self.conn)
             mock_fn.assert_called_once()
 
+    def test_run_once_preserves_tokens_for_tuple_collectors(self):
+        from unittest.mock import patch
+        p = self._make_poller()
+        
+        with patch.object(p, '_collect_opencode_usage') as mock_opencode, \
+             patch.object(p, '_collect_agy_usage') as mock_agy, \
+             patch.object(p, '_collect_codex_usage') as mock_codex:
+             
+            mock_opencode.return_value = (
+                {'Sessions': 5, 'Messages': 10},
+                {'Input': 12345, 'Output': 67890},
+                []
+            )
+            mock_agy.return_value = ({}, {}, [])
+            mock_codex.return_value = ({}, {}, [])
+            
+            p.run_once(self.conn)
+            
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT input_tokens, output_tokens FROM usage_history WHERE source='opencode'")
+            row = cursor.fetchone()
+            self.assertIsNotNone(row)
+            self.assertEqual(row['input_tokens'], 12345)
+            self.assertEqual(row['output_tokens'], 67890)
+
 
 if __name__ == '__main__':
     unittest.main()
