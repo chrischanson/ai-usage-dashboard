@@ -28,13 +28,41 @@ jobs:
       run: |
         PYTHONPATH=research/marathon_tracker python3 -m unittest discover -s research/marathon_tracker/tests
 
-    - name: Run Bazel Tests
+    - name: Set up mock sources for CI
       run: |
-        # Ensure Bazelisk is available (pre-installed on ubuntu-latest runners)
-        if command -v bazel &>/dev/null; then
-          bazel test //...
-        elif command -v bazelisk &>/dev/null; then
-          bazelisk test //...
-        else
-          npm install -g @bazel/bazelisk 2>/dev/null && bazel test //... || echo "Bazelisk not available, skipping Bazel tests"
+        PYTHONPATH=public_projects/ai-usage-dashboard/backend python3 public_projects/ai-usage-dashboard/backend/setup_mock_sources.py
+
+    - name: Start dashboard server
+      run: |
+        cd public_projects/ai-usage-dashboard/backend && PYTHONPATH=. nohup python3 -m main > /dev/null 2>&1 &
+        echo $! > /tmp/dashboard.pid
+        for i in $(seq 1 20); do
+          if curl -sf http://127.0.0.1:8000/health > /dev/null 2>&1; then
+            echo "Server ready (PID $(cat /tmp/dashboard.pid))"
+            break
+          fi
+          if [ "$i" = 20 ]; then
+            echo "Server failed to start"; exit 1
+          fi
+          sleep 1
+        done
+
+    - name: Seed dashboard test data
+      run: |
+        PYTHONPATH=public_projects/ai-usage-dashboard/backend python3 public_projects/ai-usage-dashboard/backend/seed_test_data.py
+
+    - name: Run dashboard integration tests
+      run: |
+        PYTHONPATH=public_projects/ai-usage-dashboard/backend python3 public_projects/ai-usage-dashboard/backend/verify.py
+
+    - name: Run dashboard unit tests
+      run: |
+        PYTHONPATH=public_projects/ai-usage-dashboard/backend python3 -m unittest discover -s public_projects/ai-usage-dashboard/backend/tests
+
+    - name: Stop dashboard server
+      if: always()
+      run: |
+        if [ -f /tmp/dashboard.pid ]; then
+          kill $(cat /tmp/dashboard.pid) 2>/dev/null || true
+          rm -f /tmp/dashboard.pid
         fi
