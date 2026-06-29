@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+venv/
+
+# Runtime databases
+*.db
+*.db.bak
+*.db-wal
+*.db-shm
+
+# Backup files
+*.bak
+*.bak_*
+
+# Log files
+*.log
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+
+# macOS
+.DS_Store
