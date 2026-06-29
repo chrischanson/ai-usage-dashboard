@@ -38,6 +38,10 @@ jobs:
             sleep 1
           done
 
+      - name: Seed test data
+        run: |
+          PYTHONPATH=backend python3 backend/seed_test_data.py
+
       - name: Run integration tests
         run: |
           PYTHONPATH=backend python3 verify.py
