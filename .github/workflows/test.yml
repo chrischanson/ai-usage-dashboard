@@ -53,7 +53,7 @@ jobs:
 
     - name: Run dashboard integration tests
       run: |
-        PYTHONPATH=public_projects/ai-usage-dashboard/backend python3 public_projects/ai-usage-dashboard/backend/verify.py
+        PYTHONPATH=public_projects/ai-usage-dashboard/backend python3 public_projects/ai-usage-dashboard/verify.py
 
     - name: Run dashboard unit tests
       run: |
