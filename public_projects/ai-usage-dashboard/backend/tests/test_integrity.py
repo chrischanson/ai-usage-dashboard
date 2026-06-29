@@ -69,18 +69,27 @@ class TestDataIntegrity(unittest.TestCase):
     def test_fix_all_integrity_back_fixes_correctly(self):
         cursor = self.conn.cursor()
         
-        # T=1000 has all sources
+        # T=1000 has all sources in both usage_history and collection_status
         for src in ['opencode', 'agy', 'codex']:
             cursor.execute('''
                 INSERT INTO usage_history (source, cycle_ts, timestamp, sessions, messages, input_tokens, output_tokens)
                 VALUES (?, 1000, '1970-01-01 00:16:40', 10, 10, 10, 10)
             ''', (src,))
+            cursor.execute('''
+                INSERT INTO collection_status (source, cycle_ts, ok, error, duration_ms)
+                VALUES (?, 1000, 1, NULL, 100)
+            ''', (src,))
             
-        # T=2000 only has agy
+        # T=2000 only has agy (but collection_status for all three to trigger the fix)
         cursor.execute('''
             INSERT INTO usage_history (source, cycle_ts, timestamp, sessions, messages, input_tokens, output_tokens)
             VALUES ('agy', 2000, '1970-01-01 00:33:20', 15, 15, 15, 15)
         ''')
+        for src in ['opencode', 'agy', 'codex']:
+            cursor.execute('''
+                INSERT INTO collection_status (source, cycle_ts, ok, error, duration_ms)
+                VALUES (?, 2000, 1, NULL, 100)
+            ''', (src,))
         
         self.conn.commit()
 
