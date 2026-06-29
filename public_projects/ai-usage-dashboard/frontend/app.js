@@ -221,13 +221,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? (cachedHistory && typeof cachedHistory === 'object' && !Array.isArray(cachedHistory))
                 : Array.isArray(cachedHistory);
             if (historyValid) renderHistoryChart(cachedHistory);
-            fetchLatest().then(() => {
-                if (timeRange !== 'all' && cachedHistory) {
-                    const overview = computeOverviewFromHistory(cachedHistory, timeRange);
-                    if (overview) renderOverview(overview);
-                }
-                refreshModels();
-            });
         });
     });
 
@@ -439,7 +432,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (modelChartInstance) modelChartInstance.destroy();
 
-        const chartTitle = mode === 'rate' ? 'Model Tokens (this period)' : 'Model Distribution';
+        const chartTitle = 'Model Distribution';
 
         modelChartInstance = new Chart(ctx, {
             type: 'doughnut',
@@ -570,8 +563,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (timeRange === 'all') {
             if (cachedLatestOverview) {
                 renderModels(cachedLatestOverview.models || []);
-                const chartModels = mode === 'rate' ? (cachedLatestOverview._modelDeltas || []) : (cachedLatestOverview.models || []);
-                renderModelChart(chartModels);
+                renderModelChart(cachedLatestOverview.models || []);
             } else {
                 renderEmptyState('models');
                 if (modelChartInstance) { modelChartInstance.destroy(); modelChartInstance = null; }
