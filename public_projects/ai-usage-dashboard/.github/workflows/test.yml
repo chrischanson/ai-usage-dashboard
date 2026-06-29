@@ -23,6 +23,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Set up mock sources for CI
+        run: |
+          PYTHONPATH=backend python3 backend/setup_mock_sources.py
+          echo "$(pwd)/backend/.ci_mocks/bin" >> $GITHUB_PATH
+
       - name: Start server
         run: |
           cd backend && PYTHONPATH=. nohup python3 -m main > /dev/null 2>&1 &
