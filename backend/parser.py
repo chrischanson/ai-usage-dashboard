@@ -1,9 +1,10 @@
 """
 Thin wrapper for backward compatibility.
 Delegates to parsers.opencode.OpenCodeParser and returns the old tuple format.
+Returns empty data if the source is unavailable.
 """
 from parsers.opencode import OpenCodeParser
-from parsers.base import ParserResult
+from parsers.base import ParserResult, SourceUnavailable
 
 
 def _result_to_tuple(result: ParserResult) -> tuple:
@@ -35,5 +36,8 @@ def _result_to_tuple(result: ParserResult) -> tuple:
 
 
 def fetch_and_parse():
-    result = OpenCodeParser().parse()
-    return _result_to_tuple(result)
+    try:
+        result = OpenCodeParser().parse()
+        return _result_to_tuple(result)
+    except SourceUnavailable:
+        return {}, {}, []
