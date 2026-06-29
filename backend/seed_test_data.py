@@ -50,14 +50,24 @@ AGY_QUOTA = {
 }
 
 OPENCODE_QUOTA = {
-    "total_cost": {
-        "monthly": {"used": 45.80, "total": 100.0, "remaining_pct": 54.2, "refreshes_in_seconds": 0},
+    "opencode": {
+        "total_cost": {"used": 45.80, "total": 100.0, "remaining_pct": 54.2, "refreshes_in_seconds": 0},
     },
 }
 
 CODEX_QUOTA = {
-    "monthly_limit": {
-        "requests": {"used": 850, "total": 2000, "remaining_pct": 57.5, "refreshes_in_seconds": 0},
+    "openai": {
+        "rate_limit": {
+            "remaining_pct": 57.5,
+            "used": 42.5,
+            "total": 100.0,
+            "refreshes_in_seconds": 0,
+        },
+        "cost": {
+            "used": 5.25,
+            "total": 10.0,
+            "remaining": 4.75,
+        },
     },
 }
 
