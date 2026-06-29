@@ -230,6 +230,8 @@ cheap `DELETE WHERE cycle_ts < now - retention`) to bound DB growth.
   serves the last `quota_snapshots` row annotated `stale: true`.
 - **Lifecycle**: the poller runs in a background thread with a
   `threading.Event` so `main.py` stops it cleanly on SIGTERM.
+- **Data Integrity Monitor**: If a source fails to report during a cycle, a Data Integrity Monitor carries forward the preceding valid record for that source (along with its model usage and quota snapshots), keeping the time-series contiguous.
+- **In-Memory Server State Warning**: Since the poller runs as a background thread inside the FastAPI/uvicorn server process, code modifications to the poller loop or database schema require a complete process restart to flush the in-memory state. Failing to restart will result in the old poller code continuing to write data (often corrupting values or recording 0s). Any corrupted intervals should be deleted from `usage_history`, and the Data Integrity Monitor should be run retrospectively to backfill them.
 
 ## API Specification
 

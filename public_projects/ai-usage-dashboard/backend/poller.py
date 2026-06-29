@@ -15,12 +15,20 @@ class Poller:
         self._stop = threading.Event()
 
     def run_once(self, conn) -> None:
-        self._poll_source(conn, 'opencode', self._collect_opencode_usage)
-        self._poll_source(conn, 'agy', self._collect_agy_usage)
-        self._poll_source(conn, 'codex', self._collect_codex_usage)
-        self._poll_quota_source(conn, 'agy', self._collect_agy_quota)
-        self._poll_quota_source(conn, 'opencode', self._collect_opencode_cost)
-        self._poll_quota_source(conn, 'codex', self._collect_codex_quota)
+        now_sec = int(time.time())
+        interval = self.cfg.poll_interval if self.cfg.poll_interval else 600
+        cycle_ts = (now_sec // interval) * interval
+
+        self._poll_source(conn, cycle_ts, 'opencode', self._collect_opencode_usage)
+        self._poll_source(conn, cycle_ts, 'agy', self._collect_agy_usage)
+        self._poll_source(conn, cycle_ts, 'codex', self._collect_codex_usage)
+        self._poll_quota_source(conn, cycle_ts, 'agy', self._collect_agy_quota)
+        self._poll_quota_source(conn, cycle_ts, 'opencode', self._collect_opencode_cost)
+        self._poll_quota_source(conn, cycle_ts, 'codex', self._collect_codex_quota)
+        
+        from integrity import fix_cycle_integrity
+        fix_cycle_integrity(conn, cycle_ts)
+        
         prune(conn, self.cfg.retention_days)
 
     def start(self) -> None:
@@ -44,25 +52,32 @@ class Poller:
                 conn.close()
             self._stop.wait(self.cfg.poll_interval)
 
-    def _poll_source(self, conn, source, collector):
+    def _poll_source(self, conn, cycle_ts, source, collector):
         start = time.time()
         try:
             result = collector()
             if result:
-                overview, cost_tokens, models = result
-                if overview.get('Sessions', 0) or overview.get('Messages', 0):
-                    insert_usage(overview, cost_tokens, models, source=source)
-            record_status(conn, source, True, None, time.time() - start)
+                if isinstance(result, tuple):
+                    overview, cost_tokens, models = result
+                    sessions = overview.get('Sessions', 0)
+                    messages = overview.get('Messages', 0)
+                    if sessions or messages:
+                        merged = {**overview, **cost_tokens}
+                        insert_usage(conn, source, cycle_ts, merged, models)
+                else:
+                    if result.sessions or result.messages:
+                        insert_usage(conn, source, cycle_ts, result, result.models)
+            record_status(conn, source, cycle_ts, True, None, (time.time() - start) * 1000)
         except Exception as e:
-            record_status(conn, source, False, str(e), time.time() - start)
+            record_status(conn, source, cycle_ts, False, str(e), (time.time() - start) * 1000)
 
-    def _poll_quota_source(self, conn, source, collector):
+    def _poll_quota_source(self, conn, cycle_ts, source, collector):
         start = time.time()
         try:
             quota = collector()
             if quota and 'error' not in quota:
                 if source == 'opencode':
-                    insert_quota({
+                    insert_quota(conn, 'opencode', cycle_ts, {
                         'opencode': {
                             'total_cost': {
                                 'used': quota['total_cost'],
@@ -71,10 +86,10 @@ class Poller:
                                 'refreshes_in': 0,
                             }
                         }
-                    }, source='opencode')
+                    })
                 elif source == 'codex':
                     if 'primary_used_pct' in quota:
-                        insert_quota({
+                        insert_quota(conn, 'codex', cycle_ts, {
                             'openai': {
                                 'rate_limit': {
                                     'remaining_pct': 100.0 - quota['primary_used_pct'],
@@ -83,9 +98,9 @@ class Poller:
                                     'refreshes_in_seconds': quota.get('resets_in_seconds', 0),
                                 }
                             }
-                        }, source='codex')
+                        })
                     elif 'total_used_usd' in quota:
-                        insert_quota({
+                        insert_quota(conn, 'codex', cycle_ts, {
                             'openai': {
                                 'cost': {
                                     'used': quota['total_used_usd'],
@@ -93,12 +108,12 @@ class Poller:
                                     'remaining': quota.get('remaining_usd', 0),
                                 }
                             }
-                        }, source='codex')
+                        })
                 else:
-                    insert_quota(quota, source=source)
-            record_status(conn, source, True, None, time.time() - start)
+                    insert_quota(conn, source, cycle_ts, quota)
+            record_status(conn, source, cycle_ts, True, None, (time.time() - start) * 1000)
         except Exception as e:
-            record_status(conn, source, False, str(e), time.time() - start)
+            record_status(conn, source, cycle_ts, False, str(e), (time.time() - start) * 1000)
 
     def _collect_opencode_usage(self):
         from parser import fetch_and_parse

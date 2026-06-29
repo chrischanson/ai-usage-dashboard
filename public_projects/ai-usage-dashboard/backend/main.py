@@ -12,6 +12,8 @@ def main():
 
     conn = connect(cfg.db_path)
     init_schema(conn)
+    from integrity import fix_all_integrity
+    fix_all_integrity(conn)
     conn.close()
 
     poller = Poller(cfg)

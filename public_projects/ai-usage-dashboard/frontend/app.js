@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let cachedLatestOverview = null;
     let lastFetchTime = 0;
     let offline = !navigator.onLine;
+    let latestCompleteTimestamp = null;
 
     if (typeof Chart !== 'undefined') {
         Chart.defaults.color = '#8a9fc8';
@@ -324,13 +325,49 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (results[2].status === 'fulfilled') {
                     try { if (results[2].value.ok) codexData = await results[2].value.json(); } catch (_) {}
                 }
-                cachedHistory = { agy: agyData, opencode: opencodeData, codex: codexData };
+                
+                let agy = agyData;
+                let opencode = opencodeData;
+                let codex = codexData;
+                
+                while (true) {
+                    const allTimes = Array.from(new Set([
+                        ...agy.map(d => d.timestamp),
+                        ...opencode.map(d => d.timestamp),
+                        ...codex.map(d => d.timestamp)
+                    ])).sort();
+                    
+                    if (allTimes.length === 0) break;
+                    
+                    const latestTs = allTimes[allTimes.length - 1];
+                    const hasAgy = agy.some(d => d.timestamp === latestTs);
+                    const hasOpencode = opencode.some(d => d.timestamp === latestTs);
+                    const hasCodex = codex.some(d => d.timestamp === latestTs);
+                    
+                    if (!(hasAgy && hasOpencode && hasCodex)) {
+                        agy = agy.filter(d => d.timestamp !== latestTs);
+                        opencode = opencode.filter(d => d.timestamp !== latestTs);
+                        codex = codex.filter(d => d.timestamp !== latestTs);
+                    } else {
+                        latestCompleteTimestamp = latestTs;
+                        break;
+                    }
+                }
+                
+                cachedHistory = { agy, opencode, codex };
                 renderHistoryChart(cachedHistory);
             } else {
                 const resp = await fetch(`/api/usage/${currentSource}/history`);
                 if (!resp.ok) throw new Error('HTTP ' + resp.status);
-                const data = await resp.json();
-                cachedHistory = (data && data.length > 0) ? data : [];
+                let data = await resp.json();
+                if (data && data.length > 0) {
+                    if (latestCompleteTimestamp) {
+                        data = data.filter(d => parseTs(d.timestamp) <= parseTs(latestCompleteTimestamp));
+                    }
+                    cachedHistory = data;
+                } else {
+                    cachedHistory = [];
+                }
                 renderHistoryChart(cachedHistory);
             }
         } catch (e) {
@@ -599,7 +636,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Forward-fill: for each unified timestamp, carry forward the last known
             // value from each source so gaps don't cause dips in stacked charts.
-            const MS_TOLERANCE = 30000;
+            const MS_TOLERANCE = 30 * 60 * 1000; // 30 minutes
             function buildFilledLookup(data) {
                 const lookup = new Map();
                 let lastEntry = null;
