@@ -132,7 +132,7 @@ if status == 200:
         ('beginAtZero: mode === \'rate\'', 'Y-axis beginAtZero adapts to mode'),
         ('deltasParam = mode === \'rate\' ? \'?deltas=true\' : \'\'', 'Model deltas param based on mode'),
         ('_modelDeltas', 'Model deltas stored separately from cumulative'),
-        ('chartTitle = mode === \'rate\' ?', 'Model chart title adapts to mode'),
+        ('chartTitle = \'Model Distribution\'', 'Model chart title static'),
     ]
     for pattern, msg in checks:
         if pattern in js:
