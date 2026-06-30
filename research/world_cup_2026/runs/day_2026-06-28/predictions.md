@@ -1,21 +1,21 @@
 ---
 date: "2026-06-28"
-iteration: 5
-last_updated: "2026-06-28T15:49:00Z"
-matches_covered: 1
-overall_confidence: "Low — staleness detected; lineup verification next at ~18:00 UTC before 19:00 kickoff"
+iteration: 7
+last_updated: "2026-06-28T20:55:00Z"
+matches_covered: 0
+overall_confidence: "Match complete — CANADA WIN (Low) correct, final score RSA 0-1 CAN"
 model: "opencode: deepseek-v4-flash-free"
-next_interval_minutes: 131
-next_difficulty: "high"
+next_interval_minutes: 180
+next_difficulty: "low"
 ---
 
-# World Cup 2026 Predictions for 2026-06-28 - Iteration 5
+# World Cup 2026 Predictions for 2026-06-28 - Iteration 7
 
 ## 📊 Executive Summary Table
 
 | Match | Status | Prediction | Confidence | Last Updated |
 |:------|:-------|:-----------|:-----------|:-------------|
-| South Africa vs Canada | not_started | CANADA WIN | Low | 2026-06-28T03:42:00Z |
+| South Africa vs Canada | complete | CANADA WIN | Low | 2026-06-28T03:42:00Z |
 
 ---
 
@@ -157,3 +157,26 @@ Canada has the superior individual quality with Jonathan David (3 goals, 6 SOT i
 - **Prediction Changes for this iteration:** No change to prediction or confidence.
 - **Next iteration planning:** Iteration 6 of ~7 total for 1-slot matchday. Entering match-live phase (kickoff 19:00 UTC). Next high-value: **Weighted Halftime Rule** at ~19:50 UTC. Set interval to land at 19:50 UTC (108 min from 18:02 UTC) to apply WHT.
 - **Next interval:** 108 minutes to ~19:50 UTC for WHT application at halftime.
+
+---
+
+### Iteration 7 - 2026-06-28T20:55:00Z — Match Complete; CANADA WIN Correct ✅
+- **Status:** complete
+- **Final score: South Africa 0-1 Canada**
+- **Goal:** Stephen Eustáquio 90'+2' (long-range strike, no assist)
+- **Verification:** Score confirmed across FIFA.com, ESPN, LA Times, CBS Sports (≥2 independent sources — verified).
+- **Weighted Halftime Rule applied (HT score: 0-0, neutral/draw):**
+  - Score did NOT confirm prediction (Canada not leading at HT) — no freeze applied.
+  - Score did NOT contradict at -0.5 (not trailing) — no structural contradiction.
+  - Per WHT: neutral/draw score → keep prediction (CANADA WIN) but note confidence remains Low.
+  - Canada's first-half dominance (12 shots, 7 SOT vs RSA 6/1) was execution noise, not structural failure. Oluwaseyi (starting for Larin) had chances but couldn't convert. Larin on bench reduced finishing quality.
+  - **Post-WHT interval efficiency:** No intermediate polling needed — match continued to full time with frozen-worthy monitoring only.
+- **Match stats (FIFA.com):**
+  - Shots: RSA 6 - CAN 12 | SOT: RSA 1 - CAN 7
+  - Possession: RSA 50% - CAN 42% (8% contested)
+  - Corners: RSA 1 - CAN 4 | Yellow cards: RSA 0 - CAN 2
+  - Crosses: RSA 3(2) - CAN 14(5) | Passes completed: RSA 472 - CAN 315
+- **Key substitutions:** Davies on for Buchanan (74'), Shaffelburg on (69'), RSA: Moremi/Rayners on (85')
+- **Prediction outcome:** CANADA WIN (Low) **CORRECT** ✅
+- **Assessment:** Canada was the better team throughout (12 shots, 7 SOT, more corners, more crosses) but struggled to break down South Africa's disciplined defensive block. The winning goal came from a moment of individual quality from captain Stephen Eustáquio — a long-range strike in stoppage time. This validates the pre-match reasoning: Canada's individual quality edge (David, Eustáquio) was decisive, but the Low confidence was appropriate given the tight, tense nature of the match. South Africa's defending was excellent (only 6 shots conceded despite Canada's pressure), and the 0-0 HT scoreline reflected a genuinely competitive knockout match.
+- **Next interval:** 180 minutes — no eligible matches remaining today. Single-match matchday complete.

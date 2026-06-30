@@ -1,5 +1,36 @@
 # 📝 World Cup 2026 Prediction Changelog — 2026-06-28
 
+## Iteration 7 - 2026-06-28T20:55:00Z
+**Model Used:** opencode: deepseek-v4-flash-free
+**Next Interval:** 180 minutes
+**Tokens:** [injected post-execution by orchestrator]
+
+**Tokens:** 95202 input + 2540 output = 97742 total
+### Eligible Matches
+- South Africa vs Canada: complete (full time)
+
+### Changes
+- South Africa vs Canada: Match complete. CANADA WIN (Low) correct ✅. Final: RSA 0-1 CAN (Eustáquio 90'+2').
+
+### Search Queries Executed
+- South Africa vs Canada: `South Africa Canada World Cup 2026 Round 32 score match center June 28`
+- South Africa vs Canada: `South Africa vs Canada live score match events FotMob World Cup 2026`
+- South Africa vs Canada: `Canada South Africa halftime score World Cup 2026 round of 32`
+
+### New Evidence
+- South Africa vs Canada: [official] FIFA.com: RSA 0-1 CAN FT, Eustáquio 90'+2'. Canada 12 shots (7 SOT), RSA 6 shots (1 SOT).
+- South Africa vs Canada: [strong] LA Times, ESPN, CBS Sports: Canada wins 1-0. 0-0 HT. Davies subbed on at 74'.
+- South Africa vs Canada: [strong] FIFA stats: Canada 42% possession, 4 corners, 2 yellow cards.
+
+### Open Questions Resolved
+- Match outcome: Canada 1-0 South Africa — prediction CORRECT. All pre-match questions resolved.
+
+### New Questions Raised
+- None — match complete. Single-match matchday finished.
+
+### Next Interval Reason
+- Wrote 180 minutes to `prediction_interval.txt` — no eligible matches remaining. Matchday complete. Next action: postmortem.
+
 ## Iteration 6 - 2026-06-28T18:02:00Z
 **Model Used:** opencode: deepseek-v4-flash-free
 **Next Interval:** 108 minutes
