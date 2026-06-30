@@ -19,6 +19,27 @@ def error_response(code: str, message: str, status: int = 400):
     )
 
 
+def _agy_quota_to_api(raw: dict) -> dict:
+    """Convert fetch_agy_quota() output into the nested group→limit dict the frontend expects."""
+    result = {}
+    plan = raw.get('plan', 'Gemini Code Assist')
+    result['_plan'] = plan
+    for group_key, limits in raw.items():
+        if group_key == 'plan' or not isinstance(limits, dict):
+            continue
+        result[group_key] = {}
+        for limit_key, info in limits.items():
+            if not isinstance(info, dict):
+                continue
+            result[group_key][limit_key] = {
+                'used': info.get('used', 0.0),
+                'total': info.get('total', 100.0),
+                'remaining_pct': info.get('remaining_pct', 0.0),
+                'refreshes_in_seconds': info.get('refreshes_in', info.get('refreshes_in_seconds', 0)),
+            }
+    return result
+
+
 def create_app() -> FastAPI:
     app = FastAPI()
 
@@ -120,7 +141,10 @@ def create_app() -> FastAPI:
         if 'agy' not in result:
             result['agy'] = {}
         raw = fetch_agy_quota()
-        if raw and 'plan' in raw:
+        if raw and 'error' not in raw:
+            # Use live AGY quota data directly — override stale DB snapshot
+            result['agy'] = _agy_quota_to_api(raw)
+        elif raw and 'plan' in raw:
             result['agy']['_plan'] = raw['plan']
 
         if 'opencode' not in result:
@@ -158,16 +182,20 @@ def create_app() -> FastAPI:
     def api_quota_agy_latest():
         conn = _db_connect(DB_PATH)
         try:
-            result = latest_quota(conn, source='agy')
+            db_result = latest_quota(conn, source='agy')
         finally:
             conn.close()
         raw = fetch_agy_quota()
+        if raw and 'error' not in raw:
+            # Use live AGY quota data directly — override stale DB snapshot
+            return {'agy': _agy_quota_to_api(raw)}
+        # Live fetch failed — fall back to DB snapshot with plan badge if available
         if raw and 'plan' in raw:
-            if result:
-                result['agy']['_plan'] = raw['plan']
+            if db_result:
+                db_result['agy']['_plan'] = raw['plan']
             else:
-                result = {'agy': {'_plan': raw['plan']}}
-        return result or {}
+                db_result = {'agy': {'_plan': raw['plan']}}
+        return db_result or {}
 
     @app.get("/api/quota/opencode/latest")
     def api_quota_opencode_latest():
