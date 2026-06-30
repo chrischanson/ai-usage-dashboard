@@ -14,11 +14,74 @@ import re
 import subprocess
 import urllib.request
 import ssl
+import socket
 from datetime import datetime, timezone
+
+# Set socket timeout globally to avoid hangs
+socket.setdefaulttimeout(3)
 
 CLOUD_CODE_ENDPOINT = 'https://daily-cloudcode-pa.googleapis.com'
 QUOTA_RPC_PATH = '/exa.language_server_pb.LanguageServerService/RetrieveUserQuotaSummary'
-KNOWN_PORTS = [41969, 36465, 44953]
+_FALLBACK_PORTS = [41969, 36465, 44953]
+
+
+def _detect_language_server_ports():
+    """Dynamically detect all listening loopback ports without scanning process PIDs (which can hang)."""
+    ports = []
+    # Read /proc/net/tcp and tcp6 for listening loopback sockets
+    for net_file in ("/proc/net/tcp", "/proc/net/tcp6"):
+        try:
+            if not os.path.exists(net_file):
+                continue
+            with open(net_file, "r") as f:
+                lines = f.readlines()
+            for line in lines[1:]:
+                parts = line.strip().split()
+                if len(parts) >= 4:
+                    local_addr = parts[1]
+                    state = parts[3]
+                    # State "0A" is TCP_LISTEN
+                    if state == "0A" and ":" in local_addr:
+                        ip_hex, port_hex = local_addr.split(":")
+                        # Check for loopback or all interfaces:
+                        # 127.0.0.1 in hex is "0100007F"
+                        # 0.0.0.0 in hex is "00000000"
+                        # IPv6 loopback is "00000000000000000000000000000001"
+                        # IPv6 any is "00000000000000000000000000000000"
+                        is_local = (
+                            ip_hex == "0100007F" or
+                            ip_hex == "00000000" or
+                            ip_hex == "00000000000000000000000000000001" or
+                            ip_hex == "00000000000000000000000000000000"
+                        )
+                        if is_local:
+                            try:
+                                p = int(port_hex, 16)
+                                if p > 1024 and p not in (8000, 9222):
+                                    ports.append(p)
+                            except ValueError:
+                                pass
+        except Exception:
+            pass
+
+    # Use ss -tln (without -p) as fallback
+    if not ports:
+        try:
+            ss_out = subprocess.check_output(['ss', '-tln'], timeout=2).decode('utf-8', errors='ignore')
+            for line in ss_out.splitlines():
+                parts = line.split()
+                for part in parts:
+                    if ':' in part:
+                        try:
+                            p = int(part.split(':')[-1])
+                            if p > 1024 and p not in (8000, 9222):
+                                ports.append(p)
+                        except ValueError:
+                            pass
+        except Exception:
+            pass
+
+    return list(set(ports)) if ports else _FALLBACK_PORTS
 
 
 def _detect_csrf_token():
@@ -132,7 +195,7 @@ def fetch_agy_quota():
         return {'error': 'Language server process or CSRF token not found', 'plan': plan}
 
     raw_data = None
-    for port in KNOWN_PORTS:
+    for port in _detect_language_server_ports():
         try:
             raw_data = _try_connect_rpc(port, csrf_token)
             if raw_data:

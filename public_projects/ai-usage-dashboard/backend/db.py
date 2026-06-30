@@ -386,18 +386,19 @@ def history(conn: sqlite3.Connection, source: str = None, range: str = None) -> 
     cursor.execute('''
         SELECT * FROM usage_history
         WHERE source=?
-        ORDER BY cycle_ts DESC
+        ORDER BY cycle_ts ASC
     ''', (source,))
     rows = [dict(r) for r in cursor.fetchall()]
 
     if rows:
-        cycle_ts_list = tuple(r['cycle_ts'] for r in rows)
-        placeholders = ','.join('?' for _ in cycle_ts_list)
-        cursor.execute(f'''
-            SELECT * FROM model_usage
-            WHERE source=? AND cycle_ts IN ({placeholders})
-            ORDER BY cycle_ts, input_tokens DESC
-        ''', (source, *cycle_ts_list))
+        # Use a JOIN instead of IN (?) to avoid hitting SQLite parameter limits
+        # as the history table grows over time.
+        cursor.execute('''
+            SELECT m.* FROM model_usage m
+            INNER JOIN usage_history h ON m.source = h.source AND m.cycle_ts = h.cycle_ts
+            WHERE m.source=?
+            ORDER BY m.cycle_ts, m.input_tokens DESC
+        ''', (source,))
         model_rows = cursor.fetchall()
 
         models_by_cycle = {}
@@ -410,7 +411,7 @@ def history(conn: sqlite3.Connection, source: str = None, range: str = None) -> 
         for r in rows:
             r['models'] = models_by_cycle.get(r['cycle_ts'], [])
 
-    return rows[::-1]
+    return rows
 
 
 def insert_quota(conn: sqlite3.Connection, source: str, *args, **kwargs) -> None:
