@@ -142,8 +142,35 @@ def create_app() -> FastAPI:
             result['agy'] = {}
         raw = fetch_agy_quota()
         if raw and 'error' not in raw:
-            # Use live AGY quota data directly — override stale DB snapshot
-            result['agy'] = _agy_quota_to_api(raw)
+            live = _agy_quota_to_api(raw)
+            # Merge: use live data only where it shows fresher quota
+            # (lower used / higher remaining) than the DB snapshot.
+            # The language server can cache stale remainingFraction
+            # after a window reset, so blindly overriding DB data
+            # would show 0% remaining even when quota has restored.
+            db_agy = result.get('agy', {})
+            for group_key, limits in live.items():
+                if group_key == '_plan' or not isinstance(limits, dict):
+                    continue
+                if group_key not in db_agy:
+                    db_agy[group_key] = limits
+                    continue
+                for limit_key, live_info in limits.items():
+                    if not isinstance(live_info, dict):
+                        continue
+                    db_info = db_agy.get(group_key, {}).get(limit_key)
+                    if not isinstance(db_info, dict):
+                        db_agy.setdefault(group_key, {})[limit_key] = live_info
+                        continue
+                    # Use live if it shows more remaining (quota restored)
+                    db_rem = db_info.get('remaining_pct', 0)
+                    live_rem = live_info.get('remaining_pct', 0)
+                    if live_rem >= db_rem:
+                        db_agy[group_key][limit_key] = live_info
+                    # else: DB has fresher data, keep it
+            result['agy'] = db_agy
+            if '_plan' in live:
+                result['agy']['_plan'] = live['_plan']
         elif raw and 'plan' in raw:
             result['agy']['_plan'] = raw['plan']
 
