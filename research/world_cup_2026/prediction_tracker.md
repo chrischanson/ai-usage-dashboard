@@ -8,11 +8,11 @@
 
 - **Tournament:** FIFA World Cup 2026 (USA / Canada / Mexico)
 - **Dates:** June 11 – July 19, 2026
-- **Current Phase:** Group Stage
+- **Current Phase:** Round of 32
 - **Tracking Started:** 2026-06-13
-- **Total Matches Tracked:** 52
-- **Pre-Game Accuracy (Final Pre-Kickoff):** 63.0% (29/46)
-- **Half-Time Accuracy (Frozen/Live):** 61.0% (25/41)
+- **Total Matches Tracked:** 53
+- **Pre-Game Accuracy (Final Pre-Kickoff):** 63.8% (30/47)
+- **Half-Time Accuracy (Frozen/Live):** 61.9% (26/42)
 
 ---
 
@@ -23,18 +23,18 @@
 |:-----------|:--------|:------|:---------|
 | High       | 4       | 5     | 80.0%    |
 | Medium     | 16      | 24    | 66.7%    |
-| Low        | 9       | 17    | 52.9%    |
+| Low        | 10      | 18    | 55.6%    |
 
-*(Note: Germany vs. Curaçao was predicted as GERMANY WIN with High confidence pre-game, and USA vs. Australia was predicted as DRAW with Low confidence pre-game. This table shows pre-kickoff lineup-verified prediction performance. On 2026-06-20, Ecuador vs. Curaçao was the first High-confidence prediction failure — Ecuador's clinical finishing deficiency was identified but not properly enforced as a confidence cap. On 2026-06-21, SPAIN WIN (High) was correct, DRAW (Low) was correct, URUGUAY WIN (Medium) was incorrect (frozen at HT, lost 2-2 on set-piece goals), and EGYPT WIN (Medium) was correct (trailed 1-0 at HT but won 3-1, WHT downgraded to Low). On 2026-06-22, JOR-ALG (ALGERIA WIN Medium) was correct but the Clinical Finishing Gate was not properly enforced — a compliance violation documented in the postmortem. On 2026-06-27, DRC-UZB (Medium) was correct, COL-POR (Low) was incorrect but within variance, ALG-AUT (Low) was incorrect (draw-sufficiency produced draw), and JOR-ARG (Low, downgraded from Medium on rotation) was correct.)*
+*(Note: Germany vs. Curaçao was predicted as GERMANY WIN with High confidence pre-game, and USA vs. Australia was predicted as DRAW with Low confidence pre-game. This table shows pre-kickoff lineup-verified prediction performance. On 2026-06-20, Ecuador vs. Curaçao was the first High-confidence prediction failure — Ecuador's clinical finishing deficiency was identified but not properly enforced as a confidence cap. On 2026-06-21, SPAIN WIN (High) was correct, DRAW (Low) was correct, URUGUAY WIN (Medium) was incorrect (frozen at HT, lost 2-2 on set-piece goals), and EGYPT WIN (Medium) was correct (trailed 1-0 at HT but won 3-1, WHT downgraded to Low). On 2026-06-22, JOR-ALG (ALGERIA WIN Medium) was correct but the Clinical Finishing Gate was not properly enforced — a compliance violation documented in the postmortem. On 2026-06-27, DRC-UZB (Medium) was correct, COL-POR (Low) was incorrect but within variance, ALG-AUT (Low) was incorrect (draw-sufficiency produced draw), and JOR-ARG (Low, downgraded from Medium on rotation) was correct. On 2026-06-28, CANADA WIN (Low) was correct — Canada won 1-0 with a 90'+2' goal. Low confidence was appropriate given Larin's benching (surprise), both teams' knockout debut, and Canada's key creative absences (Davies, Koné).)*
 
 ### Half-Time (Frozen / Live-Monitoring)
 | Confidence | Correct | Total | Accuracy |
 |:-----------|:--------|:------|:---------|
 | High       | 2       | 3     | 66.7%    |
 | Medium     | 13      | 18    | 72.2%    |
-| Low        | 10      | 20    | 50.0%    |
+| Low        | 11      | 21    | 52.4%    |
 
-*(Note: Under the Weighted Halftime Rule, in-play monitoring downgraded Germany vs. Curaçao to Low-confidence DRAW, and downgraded Saudi Arabia vs. Uruguay to Low-confidence URUGUAY WIN. On 2026-06-20, GER-CIV was correctly NOT frozen at HT, confidence was downgraded to Low (structural evidence approach), and the final outcome was correct. On 2026-06-21, WHT was applied to two matches: Uruguay-Cape Verde (correctly frozen at 2-1 Uruguay, final was 2-2 — prediction incorrect but protocol correctly applied) and NZ-Egypt (correctly downgraded to Low and NOT frozen, Egypt trailed 1-0 at HT but won 3-1 — prediction correct). On 2026-06-27, WHT was applied to 4 matches: COL-POR (frozen at 0-0, contradicted, ❌), DRC-UZB (frozen at 0-1 DRC trailing, correctly frozen, ✅), ALG-AUT (frozen at 2-2, contradicted, ❌), JOR-ARG (frozen at 2-1 ARG, confirmed, ✅).)*
+*(Note: Under the Weighted Halftime Rule, in-play monitoring downgraded Germany vs. Curaçao to Low-confidence DRAW, and downgraded Saudi Arabia vs. Uruguay to Low-confidence URUGUAY WIN. On 2026-06-20, GER-CIV was correctly NOT frozen at HT, confidence was downgraded to Low (structural evidence approach), and the final outcome was correct. On 2026-06-21, WHT was applied to two matches: Uruguay-Cape Verde (correctly frozen at 2-1 Uruguay, final was 2-2 — prediction incorrect but protocol correctly applied) and NZ-Egypt (correctly downgraded to Low and NOT frozen, Egypt trailed 1-0 at HT but won 3-1 — prediction correct). On 2026-06-27, WHT was applied to 4 matches: COL-POR (frozen at 0-0, contradicted, ❌), DRC-UZB (frozen at 0-1 DRC trailing, correctly frozen, ✅), ALG-AUT (frozen at 2-2, contradicted, ❌), JOR-ARG (frozen at 2-1 ARG, confirmed, ✅). On 2026-06-28, RSA-CAN was correctly NOT frozen at 0-0 HT (neutral/draw — neither confirms nor contradicts). Canada dominated the first half (12 shots, 7 SOT) — the scoreline was execution noise, not structural failure. The structural-evidence approach was validated for the neutral/draw HT case.)*
 
 ---
 
@@ -43,7 +43,7 @@
 | Phase | Pre-Game Correct | Half-Time Correct | Total | Pre-Game Acc | Half-Time Acc |
 |:------|:-----------------|:------------------|:------|:-------------|:--------------|
 | Group Stage | 29 | 25 | 46 | 63.0% | 61.0% |
-| Round of 32 | 0 | 0 | 0 | N/A | N/A |
+| Round of 32 | 1 | 1 | 1 | 100% | 100% |
 | Round of 16 | 0 | 0 | 0 | N/A | N/A |
 | Quarter-finals | 0 | 0 | 0 | N/A | N/A |
 | Semi-finals | 0 | 0 | 0 | N/A | N/A |
@@ -112,8 +112,9 @@
 | 2026-06-27 | DR Congo vs. Uzbekistan | DR CONGO WIN (Medium) | DR CONGO WIN (Medium) (FROZEN, contradicted at 0-1) | DRC WIN 3-1 | ✅ / ✅ |
 | 2026-06-27 | Algeria vs. Austria | AUSTRIA WIN (Low) | AUSTRIA WIN (Low) (FROZEN, contradicted at 2-2) | DRAW 3-3 | ❌ / ❌ |
 | 2026-06-27 | Jordan vs. Argentina | ARGENTINA WIN (Low, downgraded from Medium) | ARGENTINA WIN (Low) (FROZEN, confirmed at 2-1) | ARG WIN 3-1 | ✅ / ✅ |
+| 2026-06-28 | South Africa vs. Canada | CANADA WIN (Low) | CANADA WIN (Low) (NOT FROZEN, neutral 0-0 HT) | CANADA WIN 1-0 | ✅ / ✅ |
 
-*(Note: Germany vs. Curaçao pre-match prediction was GERMANY WIN with High confidence, which was correct. However, live-monitoring in-play adjusted the prediction to DRAW with Low confidence, which was frozen at halftime and recorded as incorrect for the Half-Time category. On 2026-06-20, GER-CIV HT was correctly NOT frozen — the prediction was downgraded to Low but kept as GERMANY WIN using the structural-evidence approach, and the final outcome validated this decision. On 2026-06-21, Uruguay-Cape Verde was correctly frozen at HT under WHT (2-1 Uruguay confirmed URUGUAY WIN), but set-piece defensive errors in the second half produced a 2-2 draw — the WHT protocol was correctly applied despite the incorrect outcome. NZ-Egypt was correctly NOT frozen (Egypt trailed 1-0 at HT), downgraded to Low, and validated by the final 3-1 win. On 2026-06-23, the system missed all 4 matches — prediction loop started after the matchday ended. On 2026-06-25, the system achieved 3/6 (50%) accuracy. Three misses: ECU-GER (Dead Rubber Motivation Asymmetry — Germany draw-sufficient, Ecuador must-win, 55k fans), JPN-SWE (Draw-Sufficiency — Japan needed 1pt, played conservatively), TUR-USA (Extreme Rotation — USA made 8 changes, struggled to 2-2 draw with winless Türkiye). On 2026-06-27, the system achieved 2/4 (50%) accuracy. DRC-UZB (Medium) and JOR-ARG (Low) were correctly predicted. COL-POR (Low) was a midfield dependency miss — Portugal without Palhinha and Bernardo Silva lacked build-up quality. ALG-AUT (Low) was a structural framing error — draw-sufficiency should have produced a DRAW prediction, not a Low-confidence WIN.)*
+*(Note: Germany vs. Curaçao pre-match prediction was GERMANY WIN with High confidence, which was correct. However, live-monitoring in-play adjusted the prediction to DRAW with Low confidence, which was frozen at halftime and recorded as incorrect for the Half-Time category. On 2026-06-20, GER-CIV HT was correctly NOT frozen — the prediction was downgraded to Low but kept as GERMANY WIN using the structural-evidence approach, and the final outcome validated this decision. On 2026-06-21, Uruguay-Cape Verde was correctly frozen at HT under WHT (2-1 Uruguay confirmed URUGUAY WIN), but set-piece defensive errors in the second half produced a 2-2 draw — the WHT protocol was correctly applied despite the incorrect outcome. NZ-Egypt was correctly NOT frozen (Egypt trailed 1-0 at HT), downgraded to Low, and validated by the final 3-1 win. On 2026-06-23, the system missed all 4 matches — prediction loop started after the matchday ended. On 2026-06-25, the system achieved 3/6 (50%) accuracy. Three misses: ECU-GER (Dead Rubber Motivation Asymmetry — Germany draw-sufficient, Ecuador must-win, 55k fans), JPN-SWE (Draw-Sufficiency — Japan needed 1pt, played conservatively), TUR-USA (Extreme Rotation — USA made 8 changes, struggled to 2-2 draw with winless Türkiye). On 2026-06-27, the system achieved 2/4 (50%) accuracy. DRC-UZB (Medium) and JOR-ARG (Low) were correctly predicted. COL-POR (Low) was a midfield dependency miss — Portugal without Palhinha and Bernardo Silva lacked build-up quality. ALG-AUT (Low) was a structural framing error — draw-sufficiency should have produced a DRAW prediction, not a Low-confidence WIN. On 2026-06-28, the system achieved 1/1 (100%) with CANADA WIN (Low) correct. The 0-0 HT scoreline was handled correctly under WHT (neutral/draw — no freeze, no flip). The prediction never changed across 8 iterations — the correct answer was found in Iteration 1. However, the 8-iteration cycle exceeded the 5-iteration cap for a 1-slot matchday, driven by a ~15-hour pre-kickoff start time that produced 4 low-value staleness iterations.)*
 
 ---
 
@@ -178,6 +179,9 @@
 - [2026-06-27] The Extreme Rotation Floor Rule's elite depth exception needs clearer criteria. Argentina's bench (Messi, Mac Allister, De Paul, Molina, Romero) is world-class — 6+ changes were at most a 1-notch drop. The exception should have been documented. Criteria: if 3+ world-class players (top-50 globally) are on the bench AND opponent is a debutant/low-quality team, confidence may remain at Medium with explicit documentation.
 - [2026-06-27] Sustained xG dominance (>0.60 xG per half, >60% possession) is a reliable structural indicator that a team with finishing deficiencies will eventually score against a high-GA opponent. Volume overcomes finishing variance. WHT structural-evidence approach validated for DRC-UZB (0-1 deficit at 65', DRC won 3-1).
 - [2026-06-27] The 5-iteration 787k-token cycle for this matchday was excessive. Only 1 prediction change (JOR-ARG downgrade) across 5 iterations. The post-60' WHT check iteration (Iteration 5) could have been eliminated by setting interval to 120 minutes from Iteration 4. Recommendation: 4 iterations max for a 3-slot matchday, saving ~250-300k tokens (~30-35%).
+- [2026-06-28] Iteration cap violation: 8 iterations for a 1-slot matchday exceeded the 5-iteration cap. Root cause: prediction loop started ~15 hours before kickoff instead of the recommended ~5 hours. The first 4 iterations (03:42–15:49 UTC) burned ~100k tokens with zero prediction changes. Enforcing the recommended start time (≤5h before first kickoff) would have saved ~35% of tokens.
+- [2026-06-28] WHT neutral/draw handling validated for the first time in a knockout match. The 0-0 HT scoreline was correctly identified as neither confirming nor contradicting CANADA WIN. The structural-evidence approach (Canada's first-half dominance despite 0 goals) prevented unnecessary freezing or downgrading. No SKILL.md update needed — existing WHT rules handle the neutral/draw case appropriately.
+- [2026-06-28] Larin's benching was the single most informative lineup surprise. Canada's joint-top scorer (2 goals, 104 min) was replaced by Oluwaseyi (0 tournament goals). This directly downgraded Canada's anticipated finishing quality and correctly kept confidence at Low. The lineup gate alignment (108-minute interval from pre-lineup check → lineup verify) was correctly calibrated and should serve as a template for future matchdays.
 
 ---
 
@@ -279,3 +283,6 @@
 - [2026-06-27] Does the Midfield Continuity Check (both DM and creator absent) replicate across other teams and contexts? COL-POR is only one data point. Need to test on more matches where both key midfield connectors are missing.
 - [2026-06-27] Is the 4-iteration recommendation (instead of 5) generalizable to all 3-slot matchdays, or does it depend on specific matchday characteristics like time between kickoff slots and number of Medium+ confidence matches?
 - [2026-06-27] Can ALG-AUT's 3-3 draw with stoppage-time goals on both sides (90'+3' and 90'+6') be classified as a "mutually beneficial draw" where both teams accepted the point? If so, this is the strongest validation yet of the Draw-Sufficiency Discount's "default to DRAW" recommendation — both teams had clear advancement paths with a draw.
+- [2026-06-28] Does Canada's midfield workhorse approach (Eustáquio + Saliba + Millar as a functional midfield) hold up against stronger knockout opponents given they are missing their two best creative players (Davies, Koné)?
+- [2026-06-28] Is Larin's benching a tactical preference by Marsch rather than a form decision? If Larin is benched again in the Round of 16, the system should note it as a pattern rather than a surprise.
+- [2026-06-28] Can the orchestrator enforce a launch-time guardrail to prevent >10 hours pre-kickoff starts? Two full matchdays (June 23, June 26) were missed due to timing issues, and the June 28 matchday burned ~100k excess tokens from an excessively early start.

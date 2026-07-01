@@ -1,5 +1,32 @@
 # 📝 World Cup 2026 Prediction Changelog — 2026-06-28
 
+## Iteration 8 - 2026-06-28T21:00:00Z
+**Model Used:** opencode: deepseek-v4-flash-free
+**Next Interval:** 180 minutes
+**Tokens:** [injected post-execution by orchestrator]
+
+**Tokens:** 20884 input + 1262 output = 22146 total
+### Eligible Matches
+- South Africa vs Canada: complete (finalized in Iteration 7)
+
+### Changes
+- South Africa vs Canada: No changes. Match complete since Iteration 7. CANADA WIN (Low) ✅ correct.
+
+### Search Queries Executed
+- None — matchday complete, no eligible matches.
+
+### New Evidence
+- None — matchday complete.
+
+### Open Questions Resolved
+- All questions resolved in prior iterations.
+
+### New Questions Raised
+- None — matchday finished.
+
+### Next Interval Reason
+- Wrote 180 minutes to `prediction_interval.txt` — no eligible matches remain. Matchday complete. Proceed to postmortem.
+
 ## Iteration 7 - 2026-06-28T20:55:00Z
 **Model Used:** opencode: deepseek-v4-flash-free
 **Next Interval:** 180 minutes

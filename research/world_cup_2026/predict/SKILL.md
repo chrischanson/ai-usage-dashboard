@@ -329,7 +329,7 @@ The file content of `{INTERVAL_PATH}` must be exactly one integer between 60 and
 
 Token efficiency requires limiting the total number of iterations per matchday and starting the run at the right time. Postmortems have shown that early-start, low-value iterations account for 65-70% of total token burn with zero prediction changes.
 
-**Recommended start time:** Do NOT begin the prediction loop more than ~5 hours before the first match kickoff. For a 20:00 UTC kickoff slot, begin at ~15:00 UTC (not 09:00 UTC). This eliminates 3-4 low-value pre-lineup iterations that produce no prediction changes.
+**Recommended start time:** Do NOT begin the prediction loop more than ~5 hours before the first match kickoff. For a 20:00 UTC kickoff slot, begin at ~15:00 UTC (not 09:00 UTC). This eliminates 3-4 low-value pre-lineup iterations that produce no prediction changes. Violated on 2026-06-28: the loop started at 03:42 UTC for a 19:00 UTC kickoff, producing 4 low-value staleness iterations that burned ~100k excess tokens. The orchestrator should consider a launch guardrail: if `current_utc < first_kickoff_utc - 10 hours`, delay launch.
 
 **Iteration budget per matchday (3 match time-slots):**
 - Target: **≤7 total iterations**. Suggested allocation:
@@ -340,7 +340,7 @@ Token efficiency requires limiting the total number of iterations per matchday a
   5. **FT slot 1 + lineup slot 2** — results + injury/press for next slot
   6. **WHT slot 2 + lineup slot 3** — HT + next lineup verification
   7. **FT slot 2 + WHT/FT slot 3** — final results verification
-- If there are only 1-2 match time-slots, cap at **≤5 total iterations**.
+- If there are only 1-2 match time-slots, cap at **≤5 total iterations**. For knockout matches that may go to extra time (120+ min), budget 1 additional WHT-check iteration at ~105 min if the score is level and confidence is Medium+, bringing the cap to 6.
 - If the iteration produces zero prediction or confidence changes AND no match is within 90 minutes of kickoff or halftime, do NOT schedule a follow-up iteration below 180 minutes.
 
 3. Predict the complexity/difficulty of the questions for the next iteration:
