@@ -28,6 +28,8 @@ PORT="${USAGE_PORT:-8000}"
 if [[ "$1" == "--background" || "$1" == "-b" ]]; then
     echo "Starting Uvicorn server in background (detached)..."
     nohup python3 -m main > ../dashboard.log 2>&1 &
+    PID=$!
+    echo $PID > /tmp/dashboard.pid
     disown
     echo "Server started in background. Logs are written to dashboard.log"
 else

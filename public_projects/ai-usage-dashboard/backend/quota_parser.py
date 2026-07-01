@@ -25,10 +25,43 @@ QUOTA_RPC_PATH = '/exa.language_server_pb.LanguageServerService/RetrieveUserQuot
 _FALLBACK_PORTS = [41969, 36465, 44953]
 
 
+def _detect_language_server_pids():
+    """Find all PIDs for the language server using safe pgrep."""
+    for pattern in ('language_server_linux_x64', 'language_server'):
+        try:
+            out = subprocess.check_output(['pgrep', '-f', pattern], timeout=2)
+            pids = [int(p) for p in out.decode().strip().split() if p.isdigit()]
+            if pids:
+                return pids
+        except Exception:
+            pass
+    return []
+
+
 def _detect_language_server_ports():
-    """Dynamically detect all listening loopback ports without scanning process PIDs (which can hang)."""
+    """Dynamically detect loopback ports matched to the language server PIDs."""
+    pids = _detect_language_server_pids()
+    if not pids:
+        return _FALLBACK_PORTS
+
+    # Find the inodes of all sockets owned by our language server PIDs
+    inodes = set()
+    for pid in pids:
+        try:
+            fd_dir = f"/proc/{pid}/fd"
+            if os.path.exists(fd_dir):
+                for fd in os.listdir(fd_dir):
+                    try:
+                        link = os.readlink(os.path.join(fd_dir, fd))
+                        if link.startswith("socket:["):
+                            inodes.add(link[8:-1])
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
     ports = []
-    # Read /proc/net/tcp and tcp6 for listening loopback sockets
+    # Read /proc/net/tcp and tcp6 for listening loopback sockets matching these inodes
     for net_file in ("/proc/net/tcp", "/proc/net/tcp6"):
         try:
             if not os.path.exists(net_file):
@@ -37,28 +70,16 @@ def _detect_language_server_ports():
                 lines = f.readlines()
             for line in lines[1:]:
                 parts = line.strip().split()
-                if len(parts) >= 4:
-                    local_addr = parts[1]
+                if len(parts) >= 10:
                     state = parts[3]
+                    inode = parts[9]
                     # State "0A" is TCP_LISTEN
-                    if state == "0A" and ":" in local_addr:
-                        ip_hex, port_hex = local_addr.split(":")
-                        # Check for loopback or all interfaces:
-                        # 127.0.0.1 in hex is "0100007F"
-                        # 0.0.0.0 in hex is "00000000"
-                        # IPv6 loopback is "00000000000000000000000000000001"
-                        # IPv6 any is "00000000000000000000000000000000"
-                        is_local = (
-                            ip_hex == "0100007F" or
-                            ip_hex == "00000000" or
-                            ip_hex == "00000000000000000000000000000001" or
-                            ip_hex == "00000000000000000000000000000000"
-                        )
-                        if is_local:
+                    if state == "0A" and inode in inodes:
+                        local_addr = parts[1]
+                        if ":" in local_addr:
+                            ip_hex, port_hex = local_addr.split(":")
                             try:
-                                p = int(port_hex, 16)
-                                if p > 1024 and p not in (8000, 9222):
-                                    ports.append(p)
+                                ports.append(int(port_hex, 16))
                             except ValueError:
                                 pass
         except Exception:
@@ -85,16 +106,17 @@ def _detect_language_server_ports():
 
 
 def _detect_csrf_token():
-    """Detect the dynamic CSRF token from the running language server process."""
-    try:
-        output = subprocess.check_output(['ps', 'ux']).decode('utf-8', errors='ignore')
-        for line in output.splitlines():
-            if 'language_server_linux_x64' in line:
-                match = re.search(r'--csrf_token\s+([a-zA-Z0-9-]+)', line)
-                if match:
-                    return match.group(1)
-    except Exception:
-        pass
+    """Detect the dynamic CSRF token from the command line of the language server process."""
+    for pid in _detect_language_server_pids():
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as f:
+                cmdline = f.read()
+            args = [arg.decode("utf-8", errors="ignore") for arg in cmdline.split(b"\x00") if arg]
+            for i, arg in enumerate(args):
+                if arg == "--csrf_token" and i + 1 < len(args):
+                    return args[i + 1]
+        except Exception:
+            pass
     return None
 
 

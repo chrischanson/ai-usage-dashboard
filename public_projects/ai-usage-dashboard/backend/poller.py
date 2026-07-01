@@ -10,47 +10,8 @@ from db import connect, init_schema, insert_usage, insert_quota, record_status
 
 
 def _filter_stale_quota(conn, source, new_quota):
-    """Remove stale parts from new quota data by comparing against DB.
-
-    The language server can cache remainingFraction after a 5-hour window resets,
-    returning 0% remaining even when quota has been restored. Per limit, if the
-    new data shows dramatically worse remaining_pct than the DB snapshot (more
-    than halved), discard that limit — the DB value is likely fresher.
-    """
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT DISTINCT cycle_ts FROM quota_snapshots WHERE source=? ORDER BY cycle_ts DESC LIMIT 1",
-        (source,)
-    )
-    row = cursor.fetchone()
-    if not row:
-        return new_quota  # no DB data, trust everything
-    cts = row['cycle_ts']
-    cursor.execute(
-        "SELECT model_group, limit_type, remaining_pct FROM quota_snapshots WHERE source=? AND cycle_ts=?",
-        (source, cts)
-    )
-    db_rows = {(r['model_group'], r['limit_type']): r['remaining_pct'] for r in cursor.fetchall()}
-
-    filtered = {}
-    for group_key, limits in new_quota.items():
-        if group_key == 'plan' or not isinstance(limits, dict):
-            filtered[group_key] = limits
-            continue
-        filtered[group_key] = {}
-        for limit_key, info in limits.items():
-            if not isinstance(info, dict):
-                filtered[group_key][limit_key] = info
-                continue
-            key = (group_key, limit_key)
-            db_rem = db_rows.get(key)
-            new_rem = info.get('remaining_pct', 0)
-            if db_rem is not None and db_rem > 10 and new_rem < db_rem * 0.5:
-                # New data dropped by more than half while DB shows significant remaining
-                # — language server returned stale cached data
-                continue
-            filtered[group_key][limit_key] = info
-    return filtered
+    """Return new quota data directly to ensure database stores accurate live readings."""
+    return new_quota
 
 
 class Poller:
