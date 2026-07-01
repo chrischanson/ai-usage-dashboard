@@ -10,9 +10,9 @@
 - **Dates:** June 11 – July 19, 2026
 - **Current Phase:** Round of 32
 - **Tracking Started:** 2026-06-13
-- **Total Matches Tracked:** 56
-- **Pre-Game Accuracy (Final Pre-Kickoff):** 63.8% (30/47)
-- **Half-Time Accuracy (Frozen/Live):** 61.9% (26/42)
+- **Total Matches Tracked:** 59
+- **Pre-Game Accuracy (Final Pre-Kickoff):** 64.6% (31/48)
+- **Half-Time Accuracy (Frozen/Live):** 62.8% (27/43)
 
 ---
 
@@ -22,7 +22,7 @@
 | Confidence | Correct | Total | Accuracy |
 |:-----------|:--------|:------|:---------|
 | High       | 4       | 5     | 80.0%    |
-| Medium     | 16      | 24    | 66.7%    |
+| Medium     | 17      | 25    | 68.0%    |
 | Low        | 10      | 18    | 55.6%    |
 
 *(Note: Germany vs. Curaçao was predicted as GERMANY WIN with High confidence pre-game, and USA vs. Australia was predicted as DRAW with Low confidence pre-game. This table shows pre-kickoff lineup-verified prediction performance. On 2026-06-20, Ecuador vs. Curaçao was the first High-confidence prediction failure — Ecuador's clinical finishing deficiency was identified but not properly enforced as a confidence cap. On 2026-06-21, SPAIN WIN (High) was correct, DRAW (Low) was correct, URUGUAY WIN (Medium) was incorrect (frozen at HT, lost 2-2 on set-piece goals), and EGYPT WIN (Medium) was correct (trailed 1-0 at HT but won 3-1, WHT downgraded to Low). On 2026-06-22, JOR-ALG (ALGERIA WIN Medium) was correct but the Clinical Finishing Gate was not properly enforced — a compliance violation documented in the postmortem. On 2026-06-27, DRC-UZB (Medium) was correct, COL-POR (Low) was incorrect but within variance, ALG-AUT (Low) was incorrect (draw-sufficiency produced draw), and JOR-ARG (Low, downgraded from Medium on rotation) was correct. On 2026-06-28, CANADA WIN (Low) was correct — Canada won 1-0 with a 90'+2' goal. Low confidence was appropriate given Larin's benching (surprise), both teams' knockout debut, and Canada's key creative absences (Davies, Koné).)*
@@ -31,7 +31,7 @@
 | Confidence | Correct | Total | Accuracy |
 |:-----------|:--------|:------|:---------|
 | High       | 2       | 3     | 66.7%    |
-| Medium     | 13      | 18    | 72.2%    |
+| Medium     | 14      | 19    | 73.7%    |
 | Low        | 11      | 21    | 52.4%    |
 
 *(Note: Under the Weighted Halftime Rule, in-play monitoring downgraded Germany vs. Curaçao to Low-confidence DRAW, and downgraded Saudi Arabia vs. Uruguay to Low-confidence URUGUAY WIN. On 2026-06-20, GER-CIV was correctly NOT frozen at HT, confidence was downgraded to Low (structural evidence approach), and the final outcome was correct. On 2026-06-21, WHT was applied to two matches: Uruguay-Cape Verde (correctly frozen at 2-1 Uruguay, final was 2-2 — prediction incorrect but protocol correctly applied) and NZ-Egypt (correctly downgraded to Low and NOT frozen, Egypt trailed 1-0 at HT but won 3-1 — prediction correct). On 2026-06-27, WHT was applied to 4 matches: COL-POR (frozen at 0-0, contradicted, ❌), DRC-UZB (frozen at 0-1 DRC trailing, correctly frozen, ✅), ALG-AUT (frozen at 2-2, contradicted, ❌), JOR-ARG (frozen at 2-1 ARG, confirmed, ✅). On 2026-06-28, RSA-CAN was correctly NOT frozen at 0-0 HT (neutral/draw — neither confirms nor contradicts). Canada dominated the first half (12 shots, 7 SOT) — the scoreline was execution noise, not structural failure. The structural-evidence approach was validated for the neutral/draw HT case.)*
@@ -43,7 +43,7 @@
 | Phase | Pre-Game Correct | Half-Time Correct | Total | Pre-Game Acc | Half-Time Acc |
 |:------|:-----------------|:------------------|:------|:-------------|:--------------|
 | Group Stage | 29 | 25 | 46 | 63.0% | 61.0% |
-| Round of 32 | 1 | 1 | 1 | 100% | 100% |
+| Round of 32 | 2 | 2 | 1 | 100% | 100% |
 | Round of 16 | 0 | 0 | 0 | N/A | N/A |
 | Quarter-finals | 0 | 0 | 0 | N/A | N/A |
 | Semi-finals | 0 | 0 | 0 | N/A | N/A |
@@ -116,6 +116,9 @@
 | 2026-06-29 | Brazil vs. Japan | N/A (timing failure) | N/A (timing failure) | BRAZIL WIN 2-1 | N/A / N/A |
 | 2026-06-29 | Germany vs. Paraguay | N/A (timing failure) | N/A (timing failure) | PARAGUAY WIN 3-4 pens AET | N/A / N/A |
 | 2026-06-29 | Netherlands vs. Morocco | N/A (timing failure) | N/A (timing failure) | MOROCCO WIN 2-3 pens AET | N/A / N/A |
+| 2026-06-30 | Ivory Coast vs. Norway | NORWAY WIN (N/A — completed) | N/A | NORWAY WIN 2-1 | N/A / N/A |
+| 2026-06-30 | France vs. Sweden | FRANCE WIN (N/A — completed) | N/A | FRANCE WIN 3-0 | N/A / N/A |
+| 2026-06-30 | Mexico vs. Ecuador | MEXICO WIN (Medium) | MEXICO WIN (Medium) (FROZEN, confirmed) | MEXICO WIN 2-0 | ✅ / ✅ |
 
 *(Note: Germany vs. Curaçao pre-match prediction was GERMANY WIN with High confidence, which was correct. However, live-monitoring in-play adjusted the prediction to DRAW with Low confidence, which was frozen at halftime and recorded as incorrect for the Half-Time category. On 2026-06-20, GER-CIV HT was correctly NOT frozen — the prediction was downgraded to Low but kept as GERMANY WIN using the structural-evidence approach, and the final outcome validated this decision. On 2026-06-21, Uruguay-Cape Verde was correctly frozen at HT under WHT (2-1 Uruguay confirmed URUGUAY WIN), but set-piece defensive errors in the second half produced a 2-2 draw — the WHT protocol was correctly applied despite the incorrect outcome. NZ-Egypt was correctly NOT frozen (Egypt trailed 1-0 at HT), downgraded to Low, and validated by the final 3-1 win. On 2026-06-23, the system missed all 4 matches — prediction loop started after the matchday ended. On 2026-06-25, the system achieved 3/6 (50%) accuracy. Three misses: ECU-GER (Dead Rubber Motivation Asymmetry — Germany draw-sufficient, Ecuador must-win, 55k fans), JPN-SWE (Draw-Sufficiency — Japan needed 1pt, played conservatively), TUR-USA (Extreme Rotation — USA made 8 changes, struggled to 2-2 draw with winless Türkiye). On 2026-06-27, the system achieved 2/4 (50%) accuracy. DRC-UZB (Medium) and JOR-ARG (Low) were correctly predicted. COL-POR (Low) was a midfield dependency miss — Portugal without Palhinha and Bernardo Silva lacked build-up quality. ALG-AUT (Low) was a structural framing error — draw-sufficiency should have produced a DRAW prediction, not a Low-confidence WIN. On 2026-06-28, the system achieved 1/1 (100%) with CANADA WIN (Low) correct. The 0-0 HT scoreline was handled correctly under WHT (neutral/draw — no freeze, no flip). The prediction never changed across 8 iterations — the correct answer was found in Iteration 1. However, the 8-iteration cycle exceeded the 5-iteration cap for a 1-slot matchday, driven by a ~15-hour pre-kickoff start time that produced 4 low-value staleness iterations.)* *(2026-06-29: The system missed all 3 matches on this date — the prediction loop ran at 2026-07-01T02:32, over 23 hours after the last match ended. This is the third timing failure after June 23 (4 matches) and June 26 (6 matches), bringing the total missed matches to 13. The predictions.md file contains only post-hoc result verification, not pre-game predictions. These matches are not counted in accuracy denominators.)*
 
@@ -192,6 +195,9 @@
 - [2026-06-29] **Brazil's squad depth validated again.** Martinelli's match-winning substitute goal (90+5') confirms the Squad Depth & Substitution Impact Heuristic. Brazil's bench quality is elite-tier — substitutes changed the game when the starting XI struggled.
 - [2026-06-29] **Germany's penalty shootout history reset.** Germany lost their first World Cup penalty shootout (had won all previous 4). Paraguay's Orlando Gill made 2 saves (Havertz, Woltemade). Historical penalty shootout records should be used cautiously — they are not deterministic.
 - [2026-06-29] **Match schedule generation must occur before the matchday.** The schedule for June 29 was generated at 2026-07-01T02:29Z — after all matches were complete. Schedule generation should be scheduled for D-1 to ensure the prediction loop has a valid schedule before kickoffs.
+- [2026-06-30] **Post-WHT interval efficiency rule (Rule #17) validated.** After WHT freeze at ~03:49 UTC (match at ~88'), the interval was correctly set to 180 minutes (past estimated FT). No intermediate iteration was needed — the match was frozen and no actionable information exists between WHT freeze and FT. This saved ~60-80k tokens compared to an intermediate check at 60-70 minutes. All future post-WHT intervals should follow this pattern.
+- [2026-06-30] **Mexico's 4-match clean sheet streak is tournament-leading.** Mexico has not conceded in any of their 4 matches (South Africa, South Korea, Czechia, Ecuador). This defensive solidity should be a significant factor in future Mexico predictions — especially at Estadio Azteca where Mexico has now won 9 and drawn 2 of 11 World Cup matches.
+- [2026-06-30] **Late matchday start (02:37 UTC for a 02:00 UTC kickoff) is naturally token-efficient.** The system avoided all pre-match iteration waste by launching while a match was already live. Only 2 iterations (~98k total tokens) were needed vs. 8 iterations (~283k tokens) for the June 28 matchday. This accidental positive outcome validates that later starts are more token-efficient — though the orchestrator should still aim to launch before match kickoffs for maximum prediction value.
 
 ---
 
@@ -299,3 +305,7 @@
 - [2026-06-29] Is Germany's penalty shootout loss (first in World Cup history for them) a one-off or indicative of a systemic high-pressure weakness? The system had no prior data to predict this — historical penalty shootout records have limited predictive value.
 - [2026-06-29] Should Morocco be treated as a top-tier knockout team? They've won 3 of 4 knockout matches across two World Cups (2022 R16 vs Spain, QF vs Portugal, 2026 R32 vs Netherlands), with all wins via set pieces or penalties. This is a structural pattern, not variance.
 - [2026-06-29] Does match schedule generation need to be decoupled from the prediction loop? Generating the schedule after matches have been played makes the entire prediction pipeline non-functional. Should schedule generation run on a separate timer (e.g., 22:00 UTC D-1)?
+- [2026-06-30] After the Round of 32, Mexico will face England or DR Congo on July 5. Can Mexico's 4-match clean sheet streak hold against elite attacking talent?
+- [2026-06-30] Are there systemic weather risks for July matches at Mexico City Stadium (rainy season)? The 1-hour weather delay for Mexico-Ecuador suggests this could be a recurring factor for Mexico's Round of 16 match.
+- [2026-06-30] Should Norway be considered a dark horse after Haaland's 88th-minute winner? They face Brazil next — a much sterner test.
+- [2026-06-30] France has scored 10 goals in 4 matches (conceded 1). Should they be considered the tournament favorite heading into the Paraguay Round of 16 match?
