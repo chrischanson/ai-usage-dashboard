@@ -331,6 +331,8 @@ Token efficiency requires limiting the total number of iterations per matchday a
 
 **Recommended start time:** Do NOT begin the prediction loop more than ~5 hours before the first match kickoff. For a 20:00 UTC kickoff slot, begin at ~15:00 UTC (not 09:00 UTC). This eliminates 3-4 low-value pre-lineup iterations that produce no prediction changes. Violated on 2026-06-28: the loop started at 03:42 UTC for a 19:00 UTC kickoff, producing 4 low-value staleness iterations that burned ~100k excess tokens. The orchestrator should consider a launch guardrail: if `current_utc < first_kickoff_utc - 10 hours`, delay launch.
 
+**Late-start guardrail (New 2026-06-29):** If the prediction loop is invoked with `current_utc > last_match_kickoff_utc + 6 hours`, skip predictions entirely and proceed directly to postmortem. Do NOT attempt to generate predictions or run research — all matches are already complete and no prediction state changes are possible. This wastes 60-80k+ tokens per invocation. Violated on three matchdays: June 23 (4 matches missed, successful), June 26 (6 matches missed), and June 29 (3 matches missed, ~80k tokens burned). Total tokens wasted across all three failures: ~240k+.
+
 **Iteration budget per matchday (3 match time-slots):**
 - Target: **≤7 total iterations**. Suggested allocation:
   1. **Initial predictions** — pre-match analysis for all matches (~5h before first kickoff)
