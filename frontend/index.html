@@ -15,6 +15,20 @@
         <header>
             <h1>Model Usage Dashboard</h1>
             <div class="header-right">
+                <div class="tabs" id="source-tabs" role="tablist" aria-label="Data source">
+                    <button class="tab active" data-source="combined" id="tab-combined" role="tab" aria-selected="true" aria-controls="panel-main">
+                        All
+                    </button>
+                    <button class="tab" data-source="agy" id="tab-agy" role="tab" aria-selected="false" aria-controls="panel-main">
+                        Antigravity
+                    </button>
+                    <button class="tab" data-source="opencode" id="tab-opencode" role="tab" aria-selected="false" aria-controls="panel-main">
+                        OpenCode
+                    </button>
+                    <button class="tab" data-source="codex" id="tab-codex" role="tab" aria-selected="false" aria-controls="panel-main">
+                        Codex
+                    </button>
+                </div>
                 <div class="time-range-buttons" role="group" aria-label="Time range">
                     <button class="range-btn" data-range="1h" aria-label="Last hour">1h</button>
                     <button class="range-btn" data-range="6h" aria-label="Last 6 hours">6h</button>
@@ -36,22 +50,6 @@
             <span id="error-message"></span>
             <button id="retry-btn" class="retry-btn" aria-label="Retry loading data">Retry</button>
             <button id="dismiss-btn" class="dismiss-btn" aria-label="Dismiss error">&times;</button>
-        </div>
-
-        <!-- Source Tabs -->
-        <div class="tabs" id="source-tabs" role="tablist" aria-label="Data source">
-            <button class="tab active" data-source="combined" id="tab-combined" role="tab" aria-selected="true" aria-controls="panel-main">
-                All
-            </button>
-            <button class="tab" data-source="agy" id="tab-agy" role="tab" aria-selected="false" aria-controls="panel-main">
-                Antigravity
-            </button>
-            <button class="tab" data-source="opencode" id="tab-opencode" role="tab" aria-selected="false" aria-controls="panel-main">
-                OpenCode
-            </button>
-            <button class="tab" data-source="codex" id="tab-codex" role="tab" aria-selected="false" aria-controls="panel-main">
-                Codex
-            </button>
         </div>
 
         <main id="panel-main" role="tabpanel">
@@ -100,7 +98,7 @@
                             <button class="mode-btn" data-mode="rate" aria-label="Rate mode, individual line graphs">Rate</button>
                         </div>
                     </div>
-                    <p class="chart-tip">Use scroll wheel to zoom, click and drag to pan. Double-click to reset zoom.</p>
+                    <p class="chart-tip">Scroll to zoom, drag to pan, or double-click to reset.</p>
                     <canvas id="historyChart"></canvas>
                 </div>
                 <div class="chart-container glass">
@@ -112,9 +110,22 @@
             <!-- Model Breakdown -->
             <section class="models-list" aria-label="Model breakdown">
                 <h2>Models</h2>
-                <div id="models-container" class="glass-container">
-                    <div class="skeleton skeleton-model" aria-label="Loading models"></div>
-                    <div class="skeleton skeleton-model" aria-label="Loading models"></div>
+                <div class="table-wrapper glass">
+                    <table id="models-table">
+                        <thead>
+                            <tr>
+                                <th data-sort="model_name" class="sortable sort-asc" scope="col">Model <span class="sort-arrow" aria-hidden="true"></span></th>
+                                <th data-sort="input_tokens" class="sortable" scope="col">Input <span class="sort-arrow" aria-hidden="true"></span></th>
+                                <th data-sort="output_tokens" class="sortable" scope="col">Output <span class="sort-arrow" aria-hidden="true"></span></th>
+                                <th data-sort="total" class="sortable" scope="col">Total <span class="sort-arrow" aria-hidden="true"></span></th>
+                                <th data-sort="pct" class="sortable" scope="col">% <span class="sort-arrow" aria-hidden="true"></span></th>
+                                <th data-sort="cost" class="sortable" scope="col">Cost <span class="sort-arrow" aria-hidden="true"></span></th>
+                            </tr>
+                        </thead>
+                        <tbody id="models-tbody">
+                            <tr><td colspan="6"><div class="skeleton skeleton-text" aria-label="Loading models"></div></td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </section>
         </main>

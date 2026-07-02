@@ -8,7 +8,20 @@ document.addEventListener('DOMContentLoaded', () => {
     let cachedLatestOverview = null;
     let lastFetchTime = 0;
     let offline = !navigator.onLine;
+    let sortColumn = 'total';
+    let sortDirection = 'desc';
+    let cachedModelData = null;
     let latestCompleteTimestamp = null;
+
+    const RANGE_LABELS = {
+        '1h': ' (Last Hour)',
+        '6h': ' (Last 6 Hours)',
+        '1d': ' (Last 24 Hours)',
+        '1w': ' (Last Week)',
+        '1m': ' (Last Month)',
+        '3m': ' (Last 3 Months)',
+        'all': ' (All Time)'
+    };
 
     if (typeof Chart !== 'undefined') {
         Chart.defaults.color = '#8a9fc8';
@@ -62,6 +75,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + 'M';
         if (n >= 1_000)     return (n / 1_000).toFixed(1) + 'K';
         return Math.round(n).toLocaleString();
+    }
+
+    function formatCost(n) {
+        if (n == null || n === 0) return '--';
+        if (n < 0.01) return '<$0.01';
+        return '$' + n.toFixed(2);
     }
 
     function setCard(id, val) {
@@ -198,7 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (overview) {
                     renderOverview(overview);
                     const label = document.getElementById('time-range-label');
-                    if (label) label.textContent = ' (' + timeRange.toUpperCase() + ')';
+                    if (label) label.textContent = RANGE_LABELS[timeRange] || '';
                 } else if (cachedLatestOverview) {
                     renderOverview(cachedLatestOverview);
                     const label = document.getElementById('time-range-label');
@@ -221,6 +240,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? (cachedHistory && typeof cachedHistory === 'object' && !Array.isArray(cachedHistory))
                 : Array.isArray(cachedHistory);
             if (historyValid) renderHistoryChart(cachedHistory);
+        });
+    });
+
+    // --- Table sort ---
+    document.querySelectorAll('#models-table th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const col = th.dataset.sort;
+            if (sortColumn === col) {
+                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortColumn = col;
+                sortDirection = (col === 'model_name') ? 'asc' : 'desc';
+            }
+            renderSortedModels();
         });
     });
 
@@ -372,13 +405,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (target === 'overview') {
             setCard('total-sessions', '--');
             setCard('total-messages', '--');
-            setCard('input-tokens', 'No data yet');
+            setCard('input-tokens', 'No data available');
             setCard('output-tokens', '--');
             setCard('cache-reads', '--');
         } else if (target === 'models') {
-            const container = document.getElementById('models-container');
-            if (container) {
-                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128202;</div><p>No data yet &mdash; polling every 10 min.</p></div>';
+            const tbody = document.getElementById('models-tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="empty-state-icon">&#128202;</div><p>No data collected yet. Polling runs every 10 minutes.</p></td></tr>';
             }
         }
     }
@@ -392,28 +425,79 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderModels(models) {
-        const container = document.getElementById('models-container');
+        const tbody = document.getElementById('models-tbody');
+        if (!tbody) return;
         if (!models || !models.length) {
-            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128202;</div><p>No model data available.</p></div>';
+            tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="empty-state-icon">&#128202;</div><p>No model usage data available.</p></td></tr>';
             return;
         }
-        container.innerHTML = '';
-        models.forEach(m => {
-            const total = (m.input_tokens || 0) + (m.output_tokens || 0);
+
+        const palette = COLORS[currentSource].donut;
+        const grandTotal = models.reduce((sum, m) => sum + (m.input_tokens || 0) + (m.output_tokens || 0), 0);
+
+        const rows = models.map((m, i) => {
+            const input = m.input_tokens || 0;
+            const output = m.output_tokens || 0;
+            const total = input + output;
+            const pct = grandTotal > 0 ? (total / grandTotal * 100) : 0;
+            const cost = m.cost;
+            const color = palette[i % palette.length];
+            const name = m.model_name.split('/').pop();
             const badgeHtml = m.source ? `<span class="badge badge-${m.source}">${escapeHtml(m.source)}</span>` : '';
-            const div = document.createElement('div');
-            div.className = 'model-item';
-            div.innerHTML = `
-                <div class="model-info">
-                    <h4>${escapeHtml(m.model_name)}${badgeHtml}</h4>
-                    <p>${formatNum(m.messages)} messages</p>
-                </div>
-                <div class="model-stats">
-                    <div class="tokens">${formatNum(total)} tokens</div>
-                    <p>in ${formatNum(m.input_tokens)} &middot; out ${formatNum(m.output_tokens)}</p>
-                </div>
-            `;
-            container.appendChild(div);
+            return {
+                model_name: m.model_name,
+                displayName: name,
+                badge: badgeHtml,
+                color: color,
+                input_tokens: input,
+                output_tokens: output,
+                total: total,
+                pct: pct,
+                cost: cost,
+                messages: m.messages || 0,
+            };
+        });
+
+        cachedModelData = rows;
+        renderSortedModels();
+    }
+
+    function renderSortedModels() {
+        const tbody = document.getElementById('models-tbody');
+        if (!tbody || !cachedModelData) return;
+
+        const sorted = [...cachedModelData].sort((a, b) => {
+            let av, bv;
+            if (sortColumn === 'model_name') {
+                av = a.model_name.toLowerCase();
+                bv = b.model_name.toLowerCase();
+                if (av < bv) return sortDirection === 'asc' ? -1 : 1;
+                if (av > bv) return sortDirection === 'asc' ? 1 : -1;
+                return 0;
+            }
+            av = a[sortColumn] || 0;
+            bv = b[sortColumn] || 0;
+            return sortDirection === 'asc' ? av - bv : bv - av;
+        });
+
+        tbody.innerHTML = sorted.map(m => {
+            const costDisplay = formatCost(m.cost);
+            const costClass = (m.cost == null || m.cost === 0) ? 'model-cost muted' : 'model-cost';
+            return `<tr>
+                <td><div class="model-name"><span class="model-color-dot" style="background:${m.color}"></span>${escapeHtml(m.model_name)}${m.badge}</div></td>
+                <td>${formatNum(m.input_tokens)}</td>
+                <td>${formatNum(m.output_tokens)}</td>
+                <td>${formatNum(m.total)}</td>
+                <td>${m.pct.toFixed(1)}%</td>
+                <td class="${costClass}">${costDisplay}</td>
+            </tr>`;
+        }).join('');
+
+        document.querySelectorAll('#models-table th.sortable').forEach(th => {
+            th.classList.remove('sort-asc', 'sort-desc');
+            if (th.dataset.sort === sortColumn) {
+                th.classList.add(sortDirection === 'asc' ? 'sort-asc' : 'sort-desc');
+            }
         });
     }
 
@@ -450,7 +534,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 plugins: {
                     legend: {
                         position: 'bottom',
-                        labels: { padding: 16, font: { size: 11 } },
+                        align: 'start',
+                        labels: { padding: 12, font: { size: 11 } },
                     },
                     title: {
                         display: true,
@@ -853,7 +938,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('fetchQuota error:', e);
             const container = document.getElementById('quota-cards');
             if (container) {
-                container.innerHTML = '<div class="empty-state"><p>Failed to load quota data.</p></div>';
+                container.innerHTML = '<div class="empty-state"><p>Failed to retrieve quota data.</p></div>';
             }
         }
     }
@@ -865,7 +950,7 @@ document.addEventListener('DOMContentLoaded', () => {
         container.className = 'quota-cards source-' + source;
         container.innerHTML = '';
         if (!data || Object.keys(data).length === 0) {
-            container.innerHTML = '<div class="empty-state"><p>No quota data available.</p></div>';
+            container.innerHTML = '<div class="empty-state"><p>No quota details available.</p></div>';
             return;
         }
 
@@ -901,9 +986,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         let refreshStr = '';
                         if (seconds > 0) {
                             if (seconds < 3600) {
-                                refreshStr = `Refreshes in ${Math.round(seconds / 60)}m`;
+                                refreshStr = `Refreshes in ${Math.round(seconds / 60)} min`;
                             } else {
-                                refreshStr = `Refreshes in ${Math.round(seconds / 3600)}h`;
+                                refreshStr = `Refreshes in ${Math.round(seconds / 3600)} hr`;
                             }
                         }
                         limitsHtml += `
@@ -935,8 +1020,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <h3>OpenCode <span class="badge badge-opencode">Free Tier</span></h3>
             <div class="quota-limit">
                 <div class="quota-limit-header">
-                    <span class="quota-limit-label">Total Cost</span>
-                    <span class="quota-limit-value">$${spent.toFixed(2)}</span>
+                     <span class="quota-limit-label">Total Cost</span>
+                     <span class="quota-limit-value">$${spent.toFixed(2)}</span>
                 </div>
             </div>
         `;
@@ -956,11 +1041,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const seconds = rateLimit.refreshes_in || rateLimit.refreshes_in_seconds || 0;
             let refreshStr = '';
             if (seconds >= 86400) {
-                refreshStr = `Resets in ${Math.round(seconds / 86400)}d`;
+                refreshStr = `Resets in ${Math.round(seconds / 86400)} days`;
             } else if (seconds >= 3600) {
-                refreshStr = `Resets in ${Math.round(seconds / 3600)}h`;
+                refreshStr = `Resets in ${Math.round(seconds / 3600)} hr`;
             } else if (seconds > 0) {
-                refreshStr = `Resets in ${Math.round(seconds / 60)}m`;
+                refreshStr = `Resets in ${Math.round(seconds / 60)} min`;
             }
 
             card.innerHTML = `
@@ -981,7 +1066,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <h3>Codex <span class="badge badge-codex">${escapeHtml(planLabel)}</span></h3>
                 <div class="quota-limit">
                     <p style="color: #8a9fc8; font-size: 0.85rem; margin: 0.5rem 0;">
-                        Rate limit data will populate once Codex API calls are registered.
+                        Rate limit details will populate once Codex activity is recorded.
                     </p>
                 </div>
             `;
