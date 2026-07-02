@@ -190,8 +190,8 @@ header h1 {
 }
 
 .tab.active[data-source="codex"] {
-    color: #10a37f;
-    border-bottom-color: #10a37f;
+    color: #10b981;
+    border-bottom-color: #10b981;
 }
 
 .tab-icon { font-size: 1rem; }
