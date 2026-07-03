@@ -464,3 +464,241 @@ downstream agents stay aligned.
 13. **UX and accessibility are requirements** — loading/error/empty/stale/
     offline states, keyboard nav, ARIA, AA contrast (contrast computed in
     verify), reduced motion, and ≥44px touch targets are acceptance criteria.
+
+# Future Roadmap & Improvement Plan
+
+## Improvement Plan — Claude Support + Robustness
+
+Status: **proposal** (no code written yet). Date: 2026-07-02.
+
+Two goals: (1) add **Claude (Claude Code)** as a fourth source, including
+5-hour-session and weekly limit remaining; (2) make the system **more
+robust**. Feasibility of (1) was verified live on this machine — see below.
+
+---
+
+### Part 1 — Claude source
+
+#### 1.1 Verified data sources (tested 2026-07-02 on this host)
+
+**Quota (5h + weekly): OAuth usage endpoint.** This is the same endpoint
+Claude Code's `/usage` panel uses.
+
+- Token: `~/.claude/.credentials.json` → `claudeAiOauth.accessToken`
+  (plus `subscriptionType` — e.g. `"pro"` — for the plan badge, and
+  `expiresAt` in **milliseconds**).
+- Request: `GET https://api.anthropic.com/api/oauth/usage` with headers
+  `Authorization: Bearer <accessToken>` and `anthropic-beta: oauth-2025-04-20`.
+- Verified response (HTTP 200) contains exactly what we need:
+
+```json
+{
+  "five_hour": { "utilization": 10.0, "resets_at": "2026-07-03T07:20:00+00:00" },
+  "seven_day": { "utilization": 2.0,  "resets_at": "2026-07-08T10:00:00+00:00" },
+  "limits": [
+    { "kind": "session",       "group": "session", "percent": 10, "severity": "normal", "resets_at": "...", "is_active": true },
+    { "kind": "weekly_all",    "group": "weekly",  "percent": 2,  "severity": "normal", "resets_at": "..." },
+    { "kind": "weekly_scoped", "group": "weekly",  "percent": 1,  "scope": { "model": { "display_name": "Fable" } } }
+  ]
+}
+```
+
+`utilization`/`percent` are % used; `remaining = 100 − utilization`.
+`limits[]` additionally gives per-model weekly limits and a `severity`
+(`normal`/…) we can color bars with. Fields like `used_dollars` are null on
+subscription plans — ignore them.
+
+**Usage history: local transcripts.** `~/.claude/projects/**/*.jsonl` —
+one file per session. Assistant lines carry
+`message.usage = { input_tokens, cache_creation_input_tokens,
+cache_read_input_tokens, output_tokens }` and `message.model`. Verified
+present on this host. This is local-first, consistent with the design's
+"no network calls for usage" rule.
+
+#### 1.2 New modules (mirror the Codex pattern)
+
+**`claude_parser.py`** → returns the standard `(overview, cost_tokens,
+models)` / `ParserResult` contract:
+
+- Scan `~/.claude/projects/**/*.jsonl` (path overridable via
+  `CLAUDE_HOME`/`USAGE_CLAUDE_DIR` env).
+- Sessions = distinct transcript files (or `sessionId`s); messages = user +
+  assistant message lines.
+- Tokens: sum `message.usage` per `message.model`. **Dedup required**: the
+  same assistant message can appear on multiple lines (streaming rewrites,
+  resumed sessions) — dedup on (`message.id`, `requestId`) before summing,
+  the same approach ccusage uses. Count sidechain (sub-agent) lines too but
+  dedup applies equally.
+- Map `cache_read_input_tokens` → `cache_read`,
+  `cache_creation_input_tokens` → `cache_write`.
+- Missing `~/.claude/projects` → `SourceUnavailable` (source shows as
+  unavailable, nothing crashes).
+- Cost: skip (subscription plan; no reliable local price data). Column stays 0.
+
+**`claude_quota.py`**:
+
+- Read credentials file; if missing (e.g. macOS Keychain-only setups) or
+  `expiresAt <= now`, return `{'error': ...}` → API serves last snapshot
+  marked stale. **Never refresh the token ourselves** — refreshing rotates
+  it and can race/log out Claude Code. Claude Code refreshes it on next use;
+  we just re-read the file each poll.
+- Call the usage endpoint with `USAGE_NETWORK_TIMEOUT`. On 401/timeout →
+  error dict (stale fallback), never raise past the collector.
+- Output rows fit the existing `quota_snapshots` schema unchanged:
+  - `model_group='session'`, `limit_type='five_hour'`
+  - `model_group='weekly'`, `limit_type='all_models'`
+  - `model_group='weekly'`, `limit_type='<model display_name>'` for each
+    `weekly_scoped` entry
+  with `used=utilization`, `total=100`, `remaining_pct=100−utilization`,
+  `refreshes_in_seconds = resets_at − now`.
+- Plan badge: `subscriptionType` from credentials ("Claude Pro" / "Claude
+  Max"), like Codex's JWT-derived badge.
+- Security: never log or store the token; only derived percentages go to DB.
+
+#### 1.3 Wiring
+
+- **Poller**: register `claude` usage + quota collectors (one line each once
+  the source registry from Part 2 exists).
+- **API**: `claude` becomes valid in the per-source routes (free after the
+  `{source}` route refactor below; without it, 8 more copy-pasted handlers).
+- **Frontend**: add a "Claude" tab; quota card renders two headline bars —
+  "Session (5h): X% left, resets in Hh Mm" and "Week: Y% left, resets <day>"
+  — plus per-model weekly bars when present, using the existing AGY
+  limit-bar renderer. Color by `severity`/threshold (amber ≥ 75% used, red ≥
+  90%). Plan badge next to the tab title.
+- **Polling cadence**: quota comes from the 10-min poll snapshot, same as
+  other sources, with the existing live-enrichment-on-request pattern for
+  `/api/quota/claude/latest` **behind a ≥60 s in-process TTL cache** so the
+  60 s frontend loop can't hammer Anthropic (see robustness item R7).
+- **Docs**: README + DESIGN source tables gain a Claude row.
+
+#### 1.4 Tests
+
+- Fixture JSONL transcript (few sessions, duplicate message.id lines,
+  sidechain lines) → expected ParserResult; missing dir → `SourceUnavailable`.
+- `claude_quota` with a mocked HTTP response (the verified JSON above) →
+  expected snapshot rows; expired-token fixture → stale path; 401 → stale path.
+- verify.py: extend `api` group for `/api/usage/claude/*` +
+  `/api/quota/claude/latest`, `html/js` groups for the tab and quota card.
+
+---
+
+### Part 2 — Robustness
+
+Findings from reading the code (ordered by impact). Each is a discrete,
+independently verifiable change.
+
+#### R1. Unit tests don't cover the production parse path (highest impact)
+`backend/tests/test_parsers.py` tests the `parsers/` package
+(`OpenCodeParser`, `AgyParser`, `CodexParser`), but the poller actually
+imports the flat modules `parser.py`, `agy_parser.py`, `codex_parser.py`.
+Two parallel implementations; the tested one is dead code in production.
+**Fix**: pick one home (the `parsers/` package, per DESIGN), port the flat
+modules' logic into it, make the poller consume it, delete the duplicates.
+The Claude parser then lands in the consolidated location from day one.
+
+#### R2. `collection_status` collisions hide failures
+`record_status` is called twice per source per cycle (usage, then quota)
+with the same `(source, cycle_ts)` key and `INSERT OR REPLACE` — the quota
+status **overwrites** the usage status. A failed usage parse followed by a
+successful quota fetch reports `ok=1`. `/metrics` and `/ready` lie.
+**Fix**: add a `kind` column (`usage`/`quota`) to the unique key (or record
+quota as `source='<src>:quota'`); surface both in `/metrics`. Also drop the
+dual-signature back-compat shim in `record_status`.
+
+#### R3. Retention is never enforced
+`db.prune()` exists, is tested in verify.py, and is **never called** by the
+poller — `USAGE_RETENTION_DAYS` does nothing and the DB grows without bound
+(DESIGN requires prune once per cycle). **Fix**: call it at the end of
+`run_once`.
+
+#### R4. Integrity monitor can fabricate data indefinitely
+`fix_cycle_integrity` carries the last row forward whenever a source misses
+a cycle, but (a) carried rows are **indistinguishable** from real readings,
+and (b) there's no cap — uninstall Codex and the dashboard shows a healthy
+flat line forever, while quota snapshots are duplicated as if fresh.
+**Fix**: add a `carried_forward` flag column (surface it in the API so the
+frontend can render gaps differently / show the stale badge); cap
+carry-forward at N consecutive cycles (e.g. 6 = 1 h), after which the gap is
+real and the source shows unavailable. Don't carry quota snapshots forward —
+the stale-fallback path already covers quota.
+
+#### R5. Poller silently drops data and mis-reports success
+`_poll_source` only inserts when `sessions or messages` is truthy, but still
+records `ok=True` — an all-zero (or shape-mismatched) result looks
+successful while writing nothing, which then triggers R4's fabrication.
+**Fix**: record a distinct status (`ok=False, error='empty result'`) or
+insert the zero row honestly; decide per source and test it.
+
+#### R6. Live collector calls inside request handlers
+`/api/quota/*` handlers call `fetch_agy_quota()` / `fetch_codex_quota()` /
+`fetch_opencode_cost()` synchronously on every request. The frontend polls
+every 60 s, so network/subprocess work runs 10× more often than the poll
+interval that's supposed to be the rate limiter, and the quota-formatting
+logic is duplicated between `api.py` and `poller.py`.
+**Fix**: one shared "collect + normalize" function per source used by both;
+in the API, wrap it in a small in-process TTL cache (≥60 s) and fall back to
+the last snapshot with an explicit `stale: true` marker (DESIGN specifies
+this marker; today nothing sets it).
+
+#### R7. Copy-pasted per-source routes → add a source registry
+Eight near-identical handlers for three sources (soon four). Unknown sources
+fall through to the generic 404 instead of the specified `source_unknown`
+envelope, and `?range=`/`?limit=` from DESIGN are unimplemented.
+**Fix**: a `SOURCES` registry (name → parser, quota collector, quota
+normalizer) consumed by poller and API; routes become
+`/api/usage/{source}/latest|history` with registry validation → 404
+`source_unknown`. Adding Claude (or removing a source) becomes a one-line
+registry change. Frontend similarly derives tabs from a config array instead
+of hardcoded `agy` special cases where practical.
+
+#### R8. Config isn't actually the single source of truth
+`db.py` reads `USAGE_DB_PATH` into a module-global `DB_PATH` at import time
+and `api.py` uses it directly, bypassing `Config`; several db functions open
+their own ad-hoc connections via `connect(DB_PATH)`. Tests that set a temp
+DB path can silently hit the real DB.
+**Fix**: thread one `Config` through `create_app(cfg)`/db calls; kill the
+module-global.
+
+#### R9. Operational polish (small, do opportunistically)
+- `/ready` and `/metrics` run `init_schema()` on every request — move to startup.
+- Poller logs with `print()`; DESIGN promises structured JSON logs — use
+  `logging` with the JSON formatter, include `source`, `cycle_ts`, `duration_ms`.
+- `main.py` installs SIGTERM handlers that `sys.exit()` while uvicorn also
+  manages signals — poller shutdown ordering is unreliable; use uvicorn's
+  lifespan/shutdown hook to stop the poller.
+- `config.py` error message bug: `''.join(sorted(_VALID_LOG_LEVELS))` prints
+  `DEBUGERRORINFOWARNING` — use `', '.join`.
+- Repo hygiene: `dashboard.log`, `usage.db.bak` in the working tree —
+  confirm `.gitignore` covers them; prune orphan scripts (`poll_once.py`,
+  `seed_test_data.py`, `setup_mock_sources.py`, `migrate_db.py`) or move to
+  a `scripts/` dir; sync README (`USAGE_HOST` default 127.0.0.1) with DESIGN
+  (0.0.0.0).
+
+---
+
+### Suggested milestone order
+
+| # | Work | Why this order | Verify |
+|---|---|---|---|
+| M1 | R1 parser consolidation + R7 source registry & `{source}` routes | Everything else (incl. Claude) plugs into this seam | unit tests + `verify.py --group api` |
+| M2 | Claude usage parser + tests | Independent of quota; gives the tab data | parser unit tests |
+| M3 | Claude quota collector + snapshot mapping + tests | Endpoint verified working; schema needs no change | quota unit tests |
+| M4 | Frontend: Claude tab + 5h/weekly quota card | Depends on M2/M3 | `verify.py --group html js css` |
+| M5 | R2 status kinds, R3 prune, R5 honest statuses | Data-integrity trio; small independent diffs | unit tests + `/metrics` check |
+| M6 | R4 carried_forward flag + cap | Builds on R2/R5 semantics | integrity unit tests |
+| M7 | R6 TTL cache + shared normalizers, R8 config threading | API-side cleanup | `verify.py` full |
+| M8 | R9 polish + docs (README/DESIGN Claude rows, config table) | Last | `verify.py` full + CI |
+
+Rollback safety: every milestone is additive or behind the existing schema
+(one new nullable column in M5/M6: `kind`, `carried_forward` — additive per
+the DESIGN migration policy, bump `schema_version`).
+
+### Open questions (defaults chosen, flag if you disagree)
+
+1. **Claude cost column**: leave at 0 (subscription plan) vs. compute from
+   public per-token pricing. Default: leave at 0.
+2. **Transcript scan cost**: full rescan each 10-min cycle (simple, matches
+   AGY) vs. incremental offsets in `meta`. Default: full rescan; revisit if
+   a cycle exceeds ~1 s on real data.
+3. **Carry-forward cap** (R4): proposed 6 cycles (1 h). Any preference?

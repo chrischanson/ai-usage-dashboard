@@ -5,8 +5,16 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
+from unittest.mock import patch, MagicMock
 from config import load_config
 from poller import Poller
+from parsers.base import ParserResult
+
+
+def _fake_entry(result: ParserResult):
+    entry = MagicMock()
+    entry.parser.return_value.parse.return_value = result
+    return entry
 
 
 class TestPollerConstruction(unittest.TestCase):
@@ -64,81 +72,56 @@ class TestPollerRunOnce(unittest.TestCase):
         self.conn.close()
         os.unlink(self.tf.name)
 
-    def _make_poller(self):
-        return Poller(self.cfg)
-
-    def test_run_once_calls_opencode_usage_collector(self):
-        from unittest.mock import patch
-        p = self._make_poller()
-        with patch.object(p, '_collect_opencode_usage') as mock_fn:
-            mock_fn.return_value = ({}, {}, [])
+    def _run_once_with(self, entries):
+        p = Poller(self.cfg)
+        with patch('poller.get_all_sources', return_value=entries), \
+             patch.object(p, '_collect_agy_quota', return_value={}), \
+             patch.object(p, '_collect_opencode_cost', return_value={}), \
+             patch.object(p, '_collect_codex_quota', return_value={}), \
+             patch.object(p, '_collect_claude_quota', return_value={}):
             p.run_once(self.conn)
-            mock_fn.assert_called_once()
 
-    def test_run_once_calls_agy_usage_collector(self):
-        from unittest.mock import patch
-        p = self._make_poller()
-        with patch.object(p, '_collect_agy_usage') as mock_fn:
-            mock_fn.return_value = ({}, {}, [])
-            p.run_once(self.conn)
-            mock_fn.assert_called_once()
+    def test_run_once_polls_every_registry_source(self):
+        entries = {
+            'opencode': _fake_entry(ParserResult()),
+            'codex': _fake_entry(ParserResult()),
+        }
+        self._run_once_with(entries)
+        for entry in entries.values():
+            entry.parser.return_value.parse.assert_called_once()
 
-    def test_run_once_calls_codex_usage_collector(self):
-        from unittest.mock import patch
-        p = self._make_poller()
-        with patch.object(p, '_collect_codex_usage') as mock_fn:
-            mock_fn.return_value = ({}, {}, [])
-            p.run_once(self.conn)
-            mock_fn.assert_called_once()
+    def test_run_once_stores_raw_parser_reading(self):
+        entries = {'opencode': _fake_entry(ParserResult(
+            sessions=5, messages=10, input_tokens=12345, output_tokens=67890))}
+        self._run_once_with(entries)
+        row = self.conn.execute(
+            "SELECT input_tokens, output_tokens FROM usage_history WHERE source='opencode'"
+        ).fetchone()
+        self.assertIsNotNone(row)
+        self.assertEqual(row['input_tokens'], 12345)
+        self.assertEqual(row['output_tokens'], 67890)
 
-    def test_run_once_calls_agy_quota_collector(self):
-        from unittest.mock import patch
-        p = self._make_poller()
-        with patch.object(p, '_collect_agy_quota') as mock_fn:
-            mock_fn.return_value = {}
-            p.run_once(self.conn)
-            mock_fn.assert_called_once()
+    def test_run_once_records_empty_result_status(self):
+        entries = {'opencode': _fake_entry(ParserResult())}
+        self._run_once_with(entries)
+        row = self.conn.execute(
+            "SELECT ok, error FROM collection_status WHERE source='opencode' AND kind='usage'"
+        ).fetchone()
+        self.assertIsNotNone(row)
+        self.assertEqual(row['ok'], 0)
+        self.assertEqual(row['error'], 'empty result')
+        count = self.conn.execute("SELECT COUNT(*) FROM usage_history").fetchone()[0]
+        self.assertEqual(count, 0)
 
-    def test_run_once_calls_opencode_cost_collector(self):
-        from unittest.mock import patch
-        p = self._make_poller()
-        with patch.object(p, '_collect_opencode_cost') as mock_fn:
-            mock_fn.return_value = {}
-            p.run_once(self.conn)
-            mock_fn.assert_called_once()
-
-    def test_run_once_calls_codex_quota_collector(self):
-        from unittest.mock import patch
-        p = self._make_poller()
-        with patch.object(p, '_collect_codex_quota') as mock_fn:
-            mock_fn.return_value = {}
-            p.run_once(self.conn)
-            mock_fn.assert_called_once()
-
-    def test_run_once_preserves_tokens_for_tuple_collectors(self):
-        from unittest.mock import patch
-        p = self._make_poller()
-        
-        with patch.object(p, '_collect_opencode_usage') as mock_opencode, \
-             patch.object(p, '_collect_agy_usage') as mock_agy, \
-             patch.object(p, '_collect_codex_usage') as mock_codex:
-             
-            mock_opencode.return_value = (
-                {'Sessions': 5, 'Messages': 10},
-                {'Input': 12345, 'Output': 67890},
-                []
-            )
-            mock_agy.return_value = ({}, {}, [])
-            mock_codex.return_value = ({}, {}, [])
-            
-            p.run_once(self.conn)
-            
-            cursor = self.conn.cursor()
-            cursor.execute("SELECT input_tokens, output_tokens FROM usage_history WHERE source='opencode'")
-            row = cursor.fetchone()
-            self.assertIsNotNone(row)
-            self.assertEqual(row['input_tokens'], 12345)
-            self.assertEqual(row['output_tokens'], 67890)
+    def test_run_once_records_parser_failure_status(self):
+        entry = MagicMock()
+        entry.parser.return_value.parse.side_effect = RuntimeError('boom')
+        self._run_once_with({'codex': entry})
+        row = self.conn.execute(
+            "SELECT ok, error FROM collection_status WHERE source='codex' AND kind='usage'"
+        ).fetchone()
+        self.assertEqual(row['ok'], 0)
+        self.assertEqual(row['error'], 'boom')
 
 
 if __name__ == '__main__':

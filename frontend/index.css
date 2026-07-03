@@ -186,6 +186,10 @@ header h1 {
     color: #10b981;
 }
 
+.tab.active[data-source="claude"] {
+    color: #d4a574;
+}
+
 .tab-icon { font-size: 1rem; }
 
 /* Glass card */
@@ -471,6 +475,12 @@ header h1 {
     border: 1px solid rgba(16, 163, 127, 0.3);
 }
 
+.badge-claude {
+    background: rgba(212, 165, 116, 0.15);
+    color: #d4a574;
+    border: 1px solid rgba(212, 165, 116, 0.3);
+}
+
 .chart-tip {
     font-size: 0.7rem;
     color: var(--text-secondary);
@@ -556,7 +566,11 @@ header h1 {
 }
 
 .quota-cards.source-combined {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: 0.5fr 1fr 1fr 1fr 1fr;
+}
+
+@media (max-width: 900px) {
+    .quota-cards.source-combined { grid-template-columns: repeat(2, 1fr); }
 }
 
 .quota-cards.source-agy {
@@ -565,10 +579,6 @@ header h1 {
 
 .quota-cards {
     grid-template-columns: 1fr;
-}
-
-@media (max-width: 900px) {
-    .quota-cards.source-combined { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 600px) {

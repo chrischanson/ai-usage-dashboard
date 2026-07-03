@@ -43,7 +43,7 @@ def load_config() -> Config:
     ll = os.getenv('USAGE_LOG_LEVEL', 'INFO')
     if ll not in _VALID_LOG_LEVELS:
         raise ValueError(
-            f"USAGE_LOG_LEVEL must be one of {''.join(sorted(_VALID_LOG_LEVELS))}, got {ll!r}"
+            f"USAGE_LOG_LEVEL must be one of {', '.join(sorted(_VALID_LOG_LEVELS))}, got {ll!r}"
         )
     return Config(
         db_path=_get_default_db_path(),

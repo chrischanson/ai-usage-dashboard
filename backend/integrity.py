@@ -1,96 +1,119 @@
-import sqlite3
-from datetime import datetime, timezone
+"""Data-integrity validation for the usage database.
 
-def fix_cycle_integrity(conn: sqlite3.Connection, cycle_ts: int) -> None:
-    """Ensures that all expected sources ('opencode', 'agy', 'codex') have rows for cycle_ts.
-    
-    If any expected source is missing a row in usage_history, we find the latest preceding
-    row for that source and carry its values forward.
+The database stores raw observations only (see db.py); nothing here writes
+to the data tables. Gaps stay gaps on disk — display continuity is handled
+at read time (db.history forward-fills the combined view; the frontend
+forward-fills the per-source charts). This module just answers "does the
+stored data satisfy its invariants?" and reports anything that doesn't.
+"""
+import sqlite3
+import time
+
+from db import _USAGE_FIELDS
+
+
+def check_integrity(conn: sqlite3.Connection, poll_interval: int = 600) -> dict:
+    """Validate the raw-observation invariants. Returns:
+    {
+      'ok': bool,            # hard invariants hold
+      'warnings': [str, ...],# soft findings (counter resets, model-sum drift)
+      'checks': {name: {...}, ...}
+    }
     """
     cursor = conn.cursor()
-    
-    # 1. Determine which sources are already recorded for this cycle_ts
-    cursor.execute("SELECT DISTINCT source FROM usage_history WHERE cycle_ts=?", (cycle_ts,))
-    existing_sources = {row[0] for row in cursor.fetchall()}
-    
-    # If no source has recorded data for this cycle, then the cycle was pruned or not polled
-    if not existing_sources:
-        cursor.execute("SELECT COUNT(*) FROM collection_status WHERE cycle_ts=?", (cycle_ts,))
-        if cursor.fetchone()[0] == 0:
-            return
-        
-    expected_sources = {'opencode', 'agy', 'codex'}
-    missing_sources = expected_sources - existing_sources
-    
-    if not missing_sources:
-        return
-        
-    # Formatting helper for the timestamp string
-    ts_str = datetime.fromtimestamp(cycle_ts, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-    
-    for src in missing_sources:
-        # Find the latest preceding record for this source
-        cursor.execute('''
-            SELECT * FROM usage_history
-            WHERE source=? AND cycle_ts < ? AND cycle_ts > 0
-            ORDER BY cycle_ts DESC LIMIT 1
-        ''', (src, cycle_ts))
-        prev_row = cursor.fetchone()
-        
-        if prev_row:
-            prev_data = dict(prev_row)
-            prev_cycle_ts = prev_data.get('cycle_ts')
-            
-            # Prepare data to carry forward
-            prev_data.pop('id', None)
-            prev_data['cycle_ts'] = cycle_ts
-            prev_data['timestamp'] = ts_str
-            
-            cols = prev_data.keys()
-            placeholders = ', '.join(['?'] * len(cols))
-            sql = f"INSERT OR REPLACE INTO usage_history ({', '.join(cols)}) VALUES ({placeholders})"
-            conn.execute(sql, list(prev_data.values()))
-            
-            # Carry forward model usage
-            cursor.execute('''
-                SELECT * FROM model_usage
-                WHERE source=? AND cycle_ts=?
-            ''', (src, prev_cycle_ts))
-            model_rows = [dict(r) for r in cursor.fetchall()]
-            for mr_data in model_rows:
-                mr_data.pop('id', None)
-                mr_data['cycle_ts'] = cycle_ts
-                mr_data['timestamp'] = ts_str
-                
-                m_cols = mr_data.keys()
-                m_placeholders = ', '.join(['?'] * len(m_cols))
-                m_sql = f"INSERT OR REPLACE INTO model_usage ({', '.join(m_cols)}) VALUES ({m_placeholders})"
-                conn.execute(m_sql, list(mr_data.values()))
-                
-            # Carry forward quota snapshots
-            cursor.execute('''
-                SELECT * FROM quota_snapshots
-                WHERE source=? AND cycle_ts=?
-            ''', (src, prev_cycle_ts))
-            quota_rows = [dict(r) for r in cursor.fetchall()]
-            for qr_data in quota_rows:
-                qr_data.pop('id', None)
-                qr_data['cycle_ts'] = cycle_ts
-                qr_data['timestamp'] = ts_str
-                
-                q_cols = qr_data.keys()
-                q_placeholders = ', '.join(['?'] * len(q_cols))
-                q_sql = f"INSERT OR REPLACE INTO quota_snapshots ({', '.join(q_cols)}) VALUES ({q_placeholders})"
-                conn.execute(q_sql, list(qr_data.values()))
+    warnings = []
+    checks = {}
 
+    # Rows migrated from the pre-v3 accumulated format are display-correct
+    # but not clean raw observations, so checks that assume raw semantics
+    # (monotonicity, model sums) only apply to cycles recorded after the
+    # migration. Status pairing and staleness stay global.
+    cursor.execute("SELECT value FROM meta WHERE key='v3_migrated_after_cycle'")
+    row = cursor.fetchone()
+    migrated_after = int(row[0]) if row else 0
+    checks['raw_checks_after_cycle'] = migrated_after
 
-def fix_all_integrity(conn: sqlite3.Connection) -> None:
-    """Finds all unique cycle_ts values in the database and runs fix_cycle_integrity on them."""
-    cursor = conn.cursor()
-    cursor.execute("SELECT DISTINCT cycle_ts FROM collection_status WHERE cycle_ts > 0 ORDER BY cycle_ts ASC")
-    cycles = [row[0] for row in cursor.fetchall()]
-    
-    for cycle_ts in cycles:
-        fix_cycle_integrity(conn, cycle_ts)
-    
-    conn.commit()
+    # 1. Monotonicity: raw lifetime counters should never decrease. A
+    # decrease means the tool's local state was reset/reinstalled — the
+    # read-time derivation clamps that cycle's delta to 0, so this is a
+    # warning (data is explainable), not a corruption.
+    resets = []
+    cursor.execute("SELECT DISTINCT source FROM usage_history")
+    for (src,) in [tuple(r) for r in cursor.fetchall()]:
+        cursor.execute(
+            "SELECT * FROM usage_history WHERE source=? AND cycle_ts >= ? ORDER BY cycle_ts ASC",
+            (src, migrated_after))
+        prev = None
+        for row in cursor.fetchall():
+            if prev is not None:
+                for f in _USAGE_FIELDS:
+                    if (row[f] or 0) < (prev[f] or 0):
+                        resets.append({
+                            'source': src, 'field': f, 'cycle_ts': row['cycle_ts'],
+                            'previous': prev[f], 'value': row[f],
+                        })
+            prev = row
+    checks['counter_resets'] = resets
+    for r in resets:
+        warnings.append(
+            f"{r['source']}.{r['field']} decreased at cycle {r['cycle_ts']} "
+            f"({r['previous']} -> {r['value']}): tool state was likely reset")
+
+    # 2. Status pairing: every usage row must have a collection_status row
+    # (the write layer enforces this, so a violation means external writes).
+    cursor.execute('''
+        SELECT COUNT(*) FROM usage_history h
+        WHERE NOT EXISTS (
+            SELECT 1 FROM collection_status s
+            WHERE s.source = h.source AND s.kind = 'usage' AND s.cycle_ts = h.cycle_ts
+        )
+    ''')
+    unpaired = cursor.fetchone()[0]
+    checks['rows_missing_status'] = unpaired
+    if unpaired:
+        warnings.append(
+            f"{unpaired} usage_history row(s) have no collection_status pair "
+            "(written outside the poller?)")
+
+    # 3. Model consistency: per cycle, the per-model token sums should match
+    # the source-level reading. Soft check with generous tolerance: opencode's
+    # own stats command rounds its overview totals (e.g. "21.8m"), so a few
+    # percent of steady drift is the tool's rounding, not corruption.
+    mismatches = []
+    cursor.execute('''
+        SELECT h.source, h.cycle_ts,
+               h.input_tokens + h.output_tokens AS total,
+               SUM(m.input_tokens + m.output_tokens) AS model_total
+        FROM usage_history h
+        JOIN model_usage m ON m.source = h.source AND m.cycle_ts = h.cycle_ts
+        WHERE h.cycle_ts > ?
+        GROUP BY h.source, h.cycle_ts
+    ''', (migrated_after,))
+    for row in cursor.fetchall():
+        total, model_total = row['total'] or 0, row['model_total'] or 0
+        if total and abs(model_total - total) > max(1000, 0.10 * total):
+            mismatches.append({
+                'source': row['source'], 'cycle_ts': row['cycle_ts'],
+                'source_total': total, 'model_total': model_total,
+            })
+    checks['model_sum_mismatches'] = mismatches
+    for m in mismatches:
+        warnings.append(
+            f"{m['source']} cycle {m['cycle_ts']}: model tokens sum to "
+            f"{m['model_total']} but source row says {m['source_total']}")
+
+    # 4. Staleness: the newest observation should be recent.
+    cursor.execute("SELECT MAX(cycle_ts) FROM usage_history")
+    newest = cursor.fetchone()[0]
+    stale = bool(newest) and (time.time() - newest) > 2 * poll_interval
+    checks['newest_cycle_ts'] = newest
+    checks['stale'] = stale
+    if stale:
+        warnings.append(
+            f"newest observation is cycle {newest}, older than 2x the poll interval")
+
+    return {
+        'ok': unpaired == 0 and not stale,
+        'warnings': warnings,
+        'checks': checks,
+    }

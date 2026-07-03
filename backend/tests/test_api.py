@@ -33,17 +33,14 @@ class TestCreateApp(unittest.TestCase):
     def test_create_app_has_usage_routes(self):
         app = create_app()
         routes = {r.path for r in app.routes}
-        for p in ('/api/usage/latest', '/api/usage/opencode/latest',
-                  '/api/usage/agy/latest', '/api/usage/codex/latest',
-                  '/api/usage/opencode/history', '/api/usage/agy/history',
-                  '/api/usage/codex/history', '/api/usage/history'):
+        for p in ('/api/usage/latest', '/api/usage/{source}/latest',
+                  '/api/usage/{source}/history', '/api/usage/history'):
             self.assertIn(p, routes)
 
     def test_create_app_has_quota_routes(self):
         app = create_app()
         routes = {r.path for r in app.routes}
-        for p in ('/api/quota/latest', '/api/quota/agy/latest',
-                  '/api/quota/opencode/latest', '/api/quota/codex/latest'):
+        for p in ('/api/quota/latest', '/api/quota/{source}/latest'):
             self.assertIn(p, routes)
 
     def test_create_app_has_root_redirect(self):

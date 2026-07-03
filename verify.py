@@ -121,15 +121,15 @@ if status == 200:
         ('cachedHistory =', 'Caches history data after fetch'),
         ('filterByTimeRange(data, range)',
          'filterByTimeRange function'),
-        ('computeRate(series, label)',
-         'computeRate function for delta computation'),
+        ('delta_input_tokens',
+         'Rate mode plots backend-served deltas'),
         ('document.querySelectorAll(\'.range-btn\')',
          'Time range button event listeners'),
         ('document.querySelectorAll(\'.mode-btn\')',
          'Mode toggle event listeners'),
         ('renderHistoryChart(cachedHistory)',
          'Chart re-renders from cache on range/mode change'),
-        ('beginAtZero: mode === \'rate\'', 'Y-axis beginAtZero adapts to mode'),
+        ('beginAtZero: true', 'Y-axis begins at zero'),
         ('deltasParam = mode === \'rate\' ? \'?deltas=true\' : \'\'', 'Model deltas param based on mode'),
         ('_modelDeltas', 'Model deltas stored separately from cumulative'),
         ('chartTitle = \'Model Distribution\'', 'Model chart title static'),
@@ -149,7 +149,7 @@ if status == 200:
     for pattern, msg in [
         ('.source-combined', '.source-combined class'),
         ('.source-agy', '.source-agy class'),
-        ('grid-template-columns: repeat(4, 1fr)', 'Combined 4-column grid'),
+        ('0.5fr 1fr 1fr 1fr 1fr', 'Combined 5-column grid with OpenCode half-width'),
         ('grid-template-columns: repeat(2, 1fr)', 'AGY 2-column grid'),
         ('@media (max-width: 900px)', 'Responsive breakpoint at 900px'),
         ('@media (max-width: 600px)', 'Responsive breakpoint at 600px'),
@@ -694,10 +694,10 @@ try:
 
     cur = conn.execute("SELECT value FROM meta WHERE key='schema_version'")
     row = cur.fetchone()
-    if row and row['value'] == '1':
-        ok('meta has initial schema_version=1')
+    if row and row['value'] in ('1', '2', '3'):
+        ok(f'meta has schema_version={row["value"]}')
     else:
-        fail('schema_version missing from meta')
+        fail(f'schema_version missing or wrong from meta, got: {row}')
 
     conn.close()
 except Exception as e:
@@ -711,7 +711,7 @@ tf3.close()
 try:
     conn = connect(tf3.name)
     init_schema(conn)
-    record_status(conn, 'test_source', True, '', 123.4)
+    record_status(conn, 'test_source', 'usage', 0, True, '', 123.4)
     cur = conn.execute(
         "SELECT source, ok, error, duration_ms FROM collection_status WHERE source='test_source'"
     )
@@ -721,7 +721,7 @@ try:
     else:
         fail(f'record_status() row incorrect: {dict(row) if row else None}')
 
-    record_status(conn, 'test_source', False, 'something broke', 0.0)
+    record_status(conn, 'test_source', 'usage', 0, False, 'something broke', 0.0)
     cur = conn.execute(
         "SELECT error FROM collection_status WHERE source='test_source' AND ok=0"
     )
@@ -743,19 +743,22 @@ tf4.close()
 try:
     conn = connect(tf4.name)
     init_schema(conn)
-    old_ts = '2000-01-01 00:00:00'
+    # Two ancient cycles: prune keeps the newest pre-cutoff row per source
+    # as an anchor and deletes the rest.
     conn.execute(
-        "INSERT INTO usage_history (timestamp, source) VALUES (?, 'test_prune')",
-        (old_ts,)
+        "INSERT INTO usage_history (timestamp, source, cycle_ts) VALUES ('2000-01-01 00:00:00', 'test_prune', 946684800)"
+    )
+    conn.execute(
+        "INSERT INTO usage_history (timestamp, source, cycle_ts) VALUES ('2000-01-02 00:00:00', 'test_prune', 946771200)"
     )
     conn.commit()
     prune(conn, 1)
     cur = conn.execute("SELECT COUNT(*) AS cnt FROM usage_history WHERE source='test_prune'")
     cnt = cur.fetchone()['cnt']
-    if cnt == 0:
-        ok('prune() removes rows older than retention_days')
+    if cnt == 1:
+        ok('prune() removes old rows but keeps one anchor per source')
     else:
-        fail(f'prune() did not remove old rows, {cnt} remain')
+        fail(f'prune() expected 1 anchor row to remain, got {cnt}')
     conn.close()
 except Exception as e:
     fail(f'prune() test error: {e}')
@@ -768,7 +771,7 @@ tf5.close()
 try:
     conn = connect(tf5.name)
     init_schema(conn)
-    record_status(conn, 'test_metrics', True, '', 50.0)
+    record_status(conn, 'test_metrics', 'usage', 0, True, '', 50.0)
     m = metrics(conn)
     if 'per_source' in m and 'total_polls' in m and 'db_size_bytes' in m:
         ok('metrics() returns dict with per_source, total_polls, db_size_bytes')
@@ -926,32 +929,20 @@ try:
 except ImportError as e:
     fail(f'parsers/__init__ re-export error: {e}')
 
-# Backward-compatible wrappers
-for mod_name, func_name in [
-    ('parser', 'fetch_and_parse'),
-    ('agy_parser', 'fetch_agy_usage'),
-    ('codex_parser', 'fetch_codex_usage'),
-]:
-    try:
-        mod = __import__(mod_name, fromlist=[func_name])
-        fn = getattr(mod, func_name)
-        if callable(fn):
-            ok(f'{mod_name}.{func_name}() is callable')
-        else:
-            fail(f'{mod_name}.{func_name}() not callable')
-        result = fn()
-        if isinstance(result, tuple) and len(result) == 3:
-            overview, cost_tokens, models = result
-            if isinstance(overview, dict) and isinstance(cost_tokens, dict) and isinstance(models, list):
-                ok(f'{mod_name}.{func_name}() returns (dict, dict, list)')
-            else:
-                fail(f'{mod_name}.{func_name}() return types wrong')
-        else:
-            fail(f'{mod_name}.{func_name}() does not return 3-tuple')
-    except ImportError as e:
-        fail(f'{mod_name} import error: {e}')
-    except Exception as e:
-        fail(f'{mod_name}.{func_name}() error: {e}')
+# All sources go through the registry; each entry's parser returns ParserResult
+try:
+    from source_registry import get_all_sources
+    entries = get_all_sources()
+    if set(entries) == {'opencode', 'agy', 'codex', 'claude'}:
+        ok('source_registry lists opencode, agy, codex, claude')
+    else:
+        fail(f'source_registry sources unexpected: {sorted(entries)}')
+    if all(callable(e.parser) for e in entries.values()):
+        ok('every registry entry has a callable parser factory')
+    else:
+        fail('registry entry missing parser factory')
+except ImportError as e:
+    fail(f'source_registry import error: {e}')
 
 # SourceUnavailable raised when source is missing
 try:
@@ -1090,12 +1081,12 @@ try:
     routes = {r.path for r in app.routes}
     expected_routes = [
         '/health', '/ready', '/metrics',
-        '/api/usage/latest', '/api/usage/opencode/latest',
-        '/api/usage/agy/latest', '/api/usage/codex/latest',
-        '/api/usage/opencode/history', '/api/usage/agy/history',
-        '/api/usage/codex/history', '/api/usage/history',
-        '/api/quota/latest', '/api/quota/agy/latest',
-        '/api/quota/opencode/latest', '/api/quota/codex/latest',
+        '/api/usage/latest',
+        '/api/usage/{source}/latest',
+        '/api/usage/{source}/history',
+        '/api/usage/history',
+        '/api/quota/latest',
+        '/api/quota/{source}/latest',
         '/', '/static',
     ]
     for route in expected_routes:
@@ -1362,6 +1353,209 @@ if 'retention_days' in config_py_str:
     ok('Config: retention_days present')
 else:
     fail('Config: missing retention_days')
+
+# ── 35. Claude Parser ──
+heading(37, 'Claude Parser')
+
+claude_parser_path = os.path.join(os.path.dirname(__file__), 'backend', 'parsers', 'claude.py')
+if os.path.exists(claude_parser_path):
+    ok('parsers/claude.py exists')
+else:
+    fail('parsers/claude.py not found')
+
+try:
+    from parsers.claude import ClaudeParser
+    cp = ClaudeParser(projects_dir='/nonexistent')
+    if issubclass(ClaudeParser, Parser):
+        ok('ClaudeParser implements Parser')
+    else:
+        fail('ClaudeParser does not implement Parser')
+    if hasattr(cp, 'parse') and callable(cp.parse):
+        ok('ClaudeParser has callable parse()')
+    else:
+        fail('ClaudeParser parse() not callable')
+    try:
+        cp.parse()
+        fail('ClaudeParser.parse() should raise SourceUnavailable on missing dir')
+    except SourceUnavailable:
+        ok('ClaudeParser raises SourceUnavailable on missing dir')
+except ImportError as e:
+    fail(f'ClaudeParser import error: {e}')
+
+# ── 36. Claude Quota ──
+heading(38, 'Claude Quota')
+
+claude_quota_path = os.path.join(os.path.dirname(__file__), 'backend', 'claude_quota.py')
+if os.path.exists(claude_quota_path):
+    ok('claude_quota.py exists')
+else:
+    fail('claude_quota.py not found')
+
+try:
+    from claude_quota import fetch_claude_quota
+    if callable(fetch_claude_quota):
+        ok('fetch_claude_quota() is callable')
+    else:
+        fail('fetch_claude_quota() not callable')
+    result = fetch_claude_quota()
+    if isinstance(result, dict):
+        ok('fetch_claude_quota() returns dict')
+    else:
+        fail('fetch_claude_quota() does not return dict')
+except ImportError as e:
+    fail(f'claude_quota import error: {e}')
+except Exception as e:
+    fail(f'claude_quota error: {e}')
+
+# ── 37. Source Registry ──
+heading(39, 'Source Registry')
+
+registry_path = os.path.join(os.path.dirname(__file__), 'backend', 'source_registry.py')
+if os.path.exists(registry_path):
+    ok('source_registry.py exists')
+else:
+    fail('source_registry.py not found')
+
+try:
+    from source_registry import get_all_names, is_valid_source, get_source
+    names = get_all_names()
+    for src in ('opencode', 'agy', 'codex', 'claude'):
+        if src in names:
+            ok(f'Source registry: {src} registered')
+        else:
+            fail(f'Source registry: {src} missing')
+        if is_valid_source(src):
+            ok(f'Source registry: is_valid_source({src}) = True')
+        else:
+            fail(f'Source registry: is_valid_source({src}) = False')
+    if not is_valid_source('nonexistent'):
+        ok('Source registry: is_valid_source("nonexistent") = False')
+    else:
+        fail('Source registry: is_valid_source("nonexistent") = True')
+except ImportError as e:
+    fail(f'Source registry import error: {e}')
+
+# ── 38. Collection Status kind column (R2) ──
+heading(40, 'R2: collection_status kind column')
+
+db_py_str = open(os.path.join(os.path.dirname(__file__), 'backend', 'db.py')).read()
+if "kind TEXT NOT NULL DEFAULT 'usage'" in db_py_str:
+    ok('db.py: collection_status has kind column')
+else:
+    fail('db.py: collection_status missing kind column')
+if "UNIQUE(source, kind, cycle_ts)" in db_py_str:
+    ok('db.py: collection_status UNIQUE includes kind')
+else:
+    fail('db.py: collection_status UNIQUE missing kind')
+
+# ── 39. Prune called in poller (R3) ──
+heading(41, 'R3: prune called in poller')
+
+poller_py_str = open(os.path.join(os.path.dirname(__file__), 'backend', 'poller.py')).read()
+if 'prune(conn' in poller_py_str:
+    ok('poller.py: prune() called')
+else:
+    fail('poller.py: prune() not called')
+
+# ── 40. TTL cache for quota (R6) ──
+heading(42, 'R6: TTL cache for quota')
+
+api_py_str = open(os.path.join(os.path.dirname(__file__), 'backend', 'api.py')).read()
+if '_quota_cache' in api_py_str or '_QUOTA_TTL_SECONDS' in api_py_str:
+    ok('api.py: TTL cache present')
+else:
+    fail('api.py: TTL cache missing')
+if '_get_cached_quota' in api_py_str:
+    ok('api.py: _get_cached_quota function present')
+else:
+    fail('api.py: _get_cached_quota missing')
+
+# ── 41. Dynamic source routes (R7) ──
+heading(43, 'R7: Dynamic source routes')
+
+if "/api/usage/{source}/latest" in api_py_str:
+    ok('api.py: dynamic usage/{source}/latest route')
+else:
+    fail('api.py: missing dynamic usage route')
+if "/api/usage/{source}/history" in api_py_str:
+    ok('api.py: dynamic usage/{source}/history route')
+else:
+    fail('api.py: missing dynamic history route')
+if "/api/quota/{source}/latest" in api_py_str:
+    ok('api.py: dynamic quota/{source}/latest route')
+else:
+    fail('api.py: missing dynamic quota route')
+if "source_unknown" in api_py_str:
+    ok('api.py: source_unknown error response')
+else:
+    fail('api.py: missing source_unknown error')
+
+# ── 42. Claude in frontend ──
+heading(44, 'Claude in frontend')
+
+html = open(os.path.join(os.path.dirname(__file__), 'frontend', 'index.html')).read()
+if 'data-source="claude"' in html:
+    ok('HTML: Claude tab present')
+else:
+    fail('HTML: Claude tab missing')
+if 'tab-claude' in html:
+    ok('HTML: tab-claude id present')
+else:
+    fail('HTML: tab-claude id missing')
+
+js = open(os.path.join(os.path.dirname(__file__), 'frontend', 'app.js')).read()
+if "'claude'" in js:
+    ok('JS: Claude source handled')
+else:
+    fail('JS: Claude source missing')
+if 'renderClaudeQuota' in js:
+    ok('JS: renderClaudeQuota function present')
+else:
+    fail('JS: renderClaudeQuota missing')
+if 'badge-claude' in js:
+    ok('JS: Claude badge class used')
+else:
+    fail('JS: Claude badge class missing')
+
+css = open(os.path.join(os.path.dirname(__file__), 'frontend', 'index.css')).read()
+if '.badge-claude' in css:
+    ok('CSS: .badge-claude style')
+else:
+    fail('CSS: .badge-claude missing')
+if '.tab.active[data-source="claude"]' in css:
+    ok('CSS: Claude tab active style')
+else:
+    fail('CSS: Claude tab active style missing')
+
+# ── 43. Honest status on empty result (R5) ──
+heading(45, 'R5: Honest status on empty result')
+
+if "'empty result'" in poller_py_str:
+    ok('poller.py: records "empty result" status')
+else:
+    fail('poller.py: missing empty result status')
+
+# ── 44. Config error message fix (R9) ──
+heading(46, 'R9: Config error message')
+
+config_py = open(os.path.join(os.path.dirname(__file__), 'backend', 'config.py')).read()
+if "', '.join(sorted(_VALID_LOG_LEVELS))" in config_py:
+    ok('config.py: error message uses ", ".join()')
+else:
+    fail('config.py: error message uses wrong join')
+
+# ── 45. Schema version 3 ──
+heading(47, 'Schema version 3')
+
+if "'schema_version', '3'" in db_py_str:
+    ok('db.py: schema_version set to 3')
+else:
+    fail('db.py: schema_version not 3')
+
+if '_migrate_schema' in db_py_str:
+    ok('db.py: _migrate_schema function present')
+else:
+    fail('db.py: _migrate_schema missing')
 
 # Summary ──
 print()

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Model Usage Dashboard</title>
-    <meta name="description" content="Live model usage and quota dashboard for Antigravity, OpenCode, and Codex">
+    <meta name="description" content="Live model usage and quota dashboard for Antigravity, OpenCode, Codex, and Claude">
     <link rel="stylesheet" href="index.css">
     <script src="chart.js"></script>
     <script src="hammer.js"></script>
@@ -27,6 +27,9 @@
                     </button>
                     <button class="tab" data-source="codex" id="tab-codex" role="tab" aria-selected="false" aria-controls="panel-main">
                         Codex
+                    </button>
+                    <button class="tab" data-source="claude" id="tab-claude" role="tab" aria-selected="false" aria-controls="panel-main">
+                        Claude
                     </button>
                 </div>
                 <div class="time-range-buttons" role="group" aria-label="Time range">

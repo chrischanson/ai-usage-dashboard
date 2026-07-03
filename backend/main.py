@@ -12,8 +12,10 @@ def main():
 
     conn = connect(cfg.db_path)
     init_schema(conn)
-    from integrity import fix_all_integrity
-    fix_all_integrity(conn)
+    from integrity import check_integrity
+    report = check_integrity(conn, cfg.poll_interval)
+    for warning in report['warnings']:
+        print(f"[startup] integrity: {warning}")
     conn.close()
 
     poller = Poller(cfg)

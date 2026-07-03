@@ -63,9 +63,17 @@ document.addEventListener('DOMContentLoaded', () => {
             outFill: 'rgba(52, 211, 153, 0.08)',
             donut: ['#10b981', '#34d399', '#f59e0b', '#9b6dff', '#ec4899', '#f97316'],
         },
+        claude: {
+            accent: '#d4a574',
+            line: '#d4a574',
+            lineFill: 'rgba(212, 165, 116, 0.12)',
+            outLine: '#e8c49a',
+            outFill: 'rgba(232, 196, 154, 0.08)',
+            donut: ['#d4a574', '#e8c49a', '#f59e0b', '#9b6dff', '#ec4899', '#f97316'],
+        },
         combined: {
             accent: '#10c48a',
-            donut: ['#9b6dff', '#4f8aff', '#10c48a', '#f59e0b', '#ec4899', '#f97316'],
+            donut: ['#9b6dff', '#4f8aff', '#10c48a', '#d4a574', '#f59e0b', '#ec4899', '#f97316'],
         },
     };
 
@@ -284,13 +292,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 const agy = raw.agy || {};
                 const opencode = raw.opencode || {};
                 const codex = raw.codex || {};
+                const claude = raw.claude || {};
 
                 data = {
-                    sessions: (agy.sessions || 0) + (opencode.sessions || 0) + (codex.sessions || 0),
-                    messages: (agy.messages || 0) + (opencode.messages || 0) + (codex.messages || 0),
-                    input_tokens: (agy.input_tokens || 0) + (opencode.input_tokens || 0) + (codex.input_tokens || 0),
-                    output_tokens: (agy.output_tokens || 0) + (opencode.output_tokens || 0) + (codex.output_tokens || 0),
-                    cache_read: (agy.cache_read || 0) + (opencode.cache_read || 0) + (codex.cache_read || 0),
+                    sessions: (agy.sessions || 0) + (opencode.sessions || 0) + (codex.sessions || 0) + (claude.sessions || 0),
+                    messages: (agy.messages || 0) + (opencode.messages || 0) + (codex.messages || 0) + (claude.messages || 0),
+                    input_tokens: (agy.input_tokens || 0) + (opencode.input_tokens || 0) + (codex.input_tokens || 0) + (claude.input_tokens || 0),
+                    output_tokens: (agy.output_tokens || 0) + (opencode.output_tokens || 0) + (codex.output_tokens || 0) + (claude.output_tokens || 0),
+                    cache_read: (agy.cache_read || 0) + (opencode.cache_read || 0) + (codex.cache_read || 0) + (claude.cache_read || 0),
                     models: [],
                     model_deltas: [],
                 };
@@ -298,14 +307,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 const agyModelsCumulative = (agy.models || []).map(function(m) { return Object.assign({}, m, { source: 'agy' }); });
                 const opencodeModelsCumulative = (opencode.models || []).map(function(m) { return Object.assign({}, m, { source: 'opencode' }); });
                 const codexModelsCumulative = (codex.models || []).map(function(m) { return Object.assign({}, m, { source: 'codex' }); });
-                data.models = [...agyModelsCumulative, ...opencodeModelsCumulative, ...codexModelsCumulative].sort(function(a, b) {
+                const claudeModelsCumulative = (claude.models || []).map(function(m) { return Object.assign({}, m, { source: 'claude' }); });
+                data.models = [...agyModelsCumulative, ...opencodeModelsCumulative, ...codexModelsCumulative, ...claudeModelsCumulative].sort(function(a, b) {
                     return ((b.input_tokens || 0) + (b.output_tokens || 0)) - ((a.input_tokens || 0) + (a.output_tokens || 0));
                 });
 
                 const agyDeltas = (agy.model_deltas || []).map(function(m) { return Object.assign({}, m, { source: 'agy' }); });
                 const opencodeDeltas = (opencode.model_deltas || []).map(function(m) { return Object.assign({}, m, { source: 'opencode' }); });
                 const codexDeltas = (codex.model_deltas || []).map(function(m) { return Object.assign({}, m, { source: 'codex' }); });
-                data._modelDeltas = [...agyDeltas, ...opencodeDeltas, ...codexDeltas].sort(function(a, b) {
+                const claudeDeltas = (claude.model_deltas || []).map(function(m) { return Object.assign({}, m, { source: 'claude' }); });
+                data._modelDeltas = [...agyDeltas, ...opencodeDeltas, ...codexDeltas, ...claudeDeltas].sort(function(a, b) {
                     return ((b.input_tokens || 0) + (b.output_tokens || 0)) - ((a.input_tokens || 0) + (a.output_tokens || 0));
                 });
             } else {
@@ -339,9 +350,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const results = await Promise.allSettled([
                     fetch('/api/usage/agy/history'),
                     fetch('/api/usage/opencode/history'),
-                    fetch('/api/usage/codex/history')
+                    fetch('/api/usage/codex/history'),
+                    fetch('/api/usage/claude/history')
                 ]);
-                let agyData = [], opencodeData = [], codexData = [];
+                let agyData = [], opencodeData = [], codexData = [], claudeData = [];
                 if (results[0].status === 'fulfilled') {
                     try { if (results[0].value.ok) agyData = await results[0].value.json(); } catch (_) {}
                 }
@@ -351,16 +363,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (results[2].status === 'fulfilled') {
                     try { if (results[2].value.ok) codexData = await results[2].value.json(); } catch (_) {}
                 }
+                if (results[3].status === 'fulfilled') {
+                    try { if (results[3].value.ok) claudeData = await results[3].value.json(); } catch (_) {}
+                }
                 
                 let agy = agyData;
                 let opencode = opencodeData;
                 let codex = codexData;
+                let claude = claudeData;
                 
                 while (true) {
                     const allTimes = Array.from(new Set([
                         ...agy.map(d => d.timestamp),
                         ...opencode.map(d => d.timestamp),
-                        ...codex.map(d => d.timestamp)
+                        ...codex.map(d => d.timestamp),
+                        ...claude.map(d => d.timestamp)
                     ])).sort();
                     
                     if (allTimes.length === 0) break;
@@ -369,18 +386,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     const hasAgy = agy.some(d => d.timestamp === latestTs);
                     const hasOpencode = opencode.some(d => d.timestamp === latestTs);
                     const hasCodex = codex.some(d => d.timestamp === latestTs);
+                    const hasClaude = claude.some(d => d.timestamp === latestTs);
                     
-                    if (!(hasAgy && hasOpencode && hasCodex)) {
+                    if (!(hasAgy && hasOpencode && hasCodex && hasClaude)) {
                         agy = agy.filter(d => d.timestamp !== latestTs);
                         opencode = opencode.filter(d => d.timestamp !== latestTs);
                         codex = codex.filter(d => d.timestamp !== latestTs);
+                        claude = claude.filter(d => d.timestamp !== latestTs);
                     } else {
                         latestCompleteTimestamp = latestTs;
                         break;
                     }
                 }
                 
-                cachedHistory = { agy, opencode, codex };
+                cachedHistory = { agy, opencode, codex, claude };
                 renderHistoryChart(cachedHistory);
             } else {
                 const resp = await fetch(`/api/usage/${currentSource}/history`);
@@ -561,18 +580,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return data.filter(d => parseTs(d.timestamp) >= cutoff);
     }
 
-    function computeRate(series, label) {
-        if (!series || series.length === 0) return [];
-        const result = [{ ...series[0], [label]: 0 }];
-        for (let i = 1; i < series.length; i++) {
-            const prev = series[i - 1];
-            const curr = series[i];
-            const delta = Math.max(0, (curr[label] || 0) - (prev[label] || 0));
-            result.push({ ...curr, [label]: delta });
-        }
-        return result;
-    }
-
     function computeOverviewFromHistory(history, range) {
         if (range === 'all' || !history) return null;
         function sourceDelta(data) {
@@ -593,12 +600,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const agy = sourceDelta(history.agy);
             const opencode = sourceDelta(history.opencode);
             const codex = sourceDelta(history.codex);
+            const claude = sourceDelta(history.claude);
             return {
-                sessions: (agy?.sessions || 0) + (opencode?.sessions || 0) + (codex?.sessions || 0),
-                messages: (agy?.messages || 0) + (opencode?.messages || 0) + (codex?.messages || 0),
-                input_tokens: (agy?.input_tokens || 0) + (opencode?.input_tokens || 0) + (codex?.input_tokens || 0),
-                output_tokens: (agy?.output_tokens || 0) + (opencode?.output_tokens || 0) + (codex?.output_tokens || 0),
-                cache_read: (agy?.cache_read || 0) + (opencode?.cache_read || 0) + (codex?.cache_read || 0),
+                sessions: (agy?.sessions || 0) + (opencode?.sessions || 0) + (codex?.sessions || 0) + (claude?.sessions || 0),
+                messages: (agy?.messages || 0) + (opencode?.messages || 0) + (codex?.messages || 0) + (claude?.messages || 0),
+                input_tokens: (agy?.input_tokens || 0) + (opencode?.input_tokens || 0) + (codex?.input_tokens || 0) + (claude?.input_tokens || 0),
+                output_tokens: (agy?.output_tokens || 0) + (opencode?.output_tokens || 0) + (codex?.output_tokens || 0) + (claude?.output_tokens || 0),
+                cache_read: (agy?.cache_read || 0) + (opencode?.cache_read || 0) + (codex?.cache_read || 0) + (claude?.cache_read || 0),
             };
         }
         return sourceDelta(history) || null;
@@ -633,10 +641,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const agy = sourceModels(history.agy);
             const opencode = sourceModels(history.opencode);
             const codex = sourceModels(history.codex);
+            const claude = sourceModels(history.claude);
             const combined = [];
             (agy || []).forEach(function(m) { combined.push(Object.assign({}, m, { source: 'agy' })); });
             (opencode || []).forEach(function(m) { combined.push(Object.assign({}, m, { source: 'opencode' })); });
             (codex || []).forEach(function(m) { combined.push(Object.assign({}, m, { source: 'codex' })); });
+            (claude || []).forEach(function(m) { combined.push(Object.assign({}, m, { source: 'claude' })); });
             return combined.sort(function(a, b) {
                 return ((b.input_tokens || 0) + (b.output_tokens || 0)) - ((a.input_tokens || 0) + (a.output_tokens || 0));
             });
@@ -699,14 +709,25 @@ document.addEventListener('DOMContentLoaded', () => {
         let unitLabel = isTotal ? 'Tokens' : '\u0394 tokens';
 
         if (currentSource === 'combined') {
-            let agy = filterByTimeRange(history.agy || [], timeRange);
-            let opencode = filterByTimeRange(history.opencode || [], timeRange);
-            let codex = filterByTimeRange(history.codex || [], timeRange);
+            const agyFull = history.agy || [];
+            const opencodeFull = history.opencode || [];
+            const codexFull = history.codex || [];
+            const claudeFull = history.claude || [];
+
+            // The API serves cumulative-since-first-observation totals in
+            // input_tokens/output_tokens and per-cycle increments in
+            // delta_input_tokens/delta_output_tokens (derived in db.py from
+            // the raw stored observations) — plot them as-is.
+            let agy = filterByTimeRange(agyFull, timeRange);
+            let opencode = filterByTimeRange(opencodeFull, timeRange);
+            let codex = filterByTimeRange(codexFull, timeRange);
+            let claude = filterByTimeRange(claudeFull, timeRange);
 
             const allTimes = Array.from(new Set([
                 ...agy.map(d => d.timestamp),
                 ...opencode.map(d => d.timestamp),
-                ...codex.map(d => d.timestamp)
+                ...codex.map(d => d.timestamp),
+                ...claude.map(d => d.timestamp)
             ])).sort();
 
             labels = allTimes.map(formatLabel);
@@ -744,11 +765,29 @@ document.addEventListener('DOMContentLoaded', () => {
             const agyLookup = buildFilledLookup(agy);
             const opencodeLookup = buildFilledLookup(opencode);
             const codexLookup = buildFilledLookup(codex);
+            const claudeLookup = buildFilledLookup(claude);
 
             const mapFromLookup = (lookup, key) => {
                 return allTimes.map(ts => {
                     const found = lookup.get(ts);
                     return found ? found[key] : 0;
+                });
+            };
+
+            // Rate mode plots the backend-served per-cycle deltas
+            // (delta_input_tokens / delta_output_tokens). A cycle that was
+            // collected but had no usage plots as 0 — the line returns to
+            // zero rather than bridging idle periods, which would read as
+            // continuous usage. Only cycles with no collected data at all
+            // become gaps (null + spanGaps).
+            // Combined view sums Input+Output per source (4 lines, matching
+            // Total mode's grouping) instead of 8 separate lines — input vs.
+            // output split is still available per-source on its own tab.
+            const mapRateTotalFromLookup = (lookup) => {
+                return allTimes.map(ts => {
+                    const found = lookup.get(ts);
+                    if (!found) return null;
+                    return (found.delta_input_tokens || 0) + (found.delta_output_tokens || 0);
                 });
             };
 
@@ -780,64 +819,48 @@ document.addEventListener('DOMContentLoaded', () => {
                         backgroundColor: 'rgba(16, 185, 129, 0.18)',
                         fill: true, tension: 0.4, spanGaps: true, pointRadius: 2, stack: 'stack0',
                     },
+                    {
+                        label: 'Claude',
+                        data: mapTotalFromLookup(claudeLookup),
+                        borderColor: '#d4a574',
+                        backgroundColor: 'rgba(212, 165, 116, 0.18)',
+                        fill: true, tension: 0.4, spanGaps: true, pointRadius: 2, stack: 'stack0',
+                    },
                 ];
             } else {
-                agy = computeRate(agy, 'input_tokens');
-                agy = computeRate(agy, 'output_tokens');
-                opencode = computeRate(opencode, 'input_tokens');
-                opencode = computeRate(opencode, 'output_tokens');
-                codex = computeRate(codex, 'input_tokens');
-                codex = computeRate(codex, 'output_tokens');
-                const agyRateLookup = buildFilledLookup(agy);
-                const opencodeRateLookup = buildFilledLookup(opencode);
-                const codexRateLookup = buildFilledLookup(codex);
                 datasets = [
                     {
-                        label: 'AGY Input',
-                        data: mapFromLookup(agyRateLookup, 'input_tokens'),
+                        label: 'AGY',
+                        data: mapRateTotalFromLookup(agyLookup),
                         borderColor: '#9b6dff',
-                        backgroundColor: 'rgba(155, 109, 255, 0.03)',
+                        backgroundColor: 'rgba(155, 109, 255, 0.06)',
                         fill: true, tension: 0.4, spanGaps: true, pointRadius: 2,
                     },
                     {
-                        label: 'AGY Output',
-                        data: mapFromLookup(agyRateLookup, 'output_tokens'),
-                        borderColor: '#c084fc',
-                        backgroundColor: 'rgba(192, 132, 252, 0.02)',
-                        fill: true, tension: 0.4, spanGaps: true, pointRadius: 2,
-                    },
-                    {
-                        label: 'OpenCode Input',
-                        data: mapFromLookup(opencodeRateLookup, 'input_tokens'),
+                        label: 'OpenCode',
+                        data: mapRateTotalFromLookup(opencodeLookup),
                         borderColor: '#4f8aff',
-                        backgroundColor: 'rgba(79, 138, 255, 0.03)',
+                        backgroundColor: 'rgba(79, 138, 255, 0.06)',
                         fill: true, tension: 0.4, spanGaps: true, pointRadius: 2,
                     },
                     {
-                        label: 'OpenCode Output',
-                        data: mapFromLookup(opencodeRateLookup, 'output_tokens'),
-                        borderColor: '#60a5fa',
-                        backgroundColor: 'rgba(96, 165, 250, 0.02)',
-                        fill: true, tension: 0.4, spanGaps: true, pointRadius: 2,
-                    },
-                    {
-                        label: 'Codex Input',
-                        data: mapFromLookup(codexRateLookup, 'input_tokens'),
+                        label: 'Codex',
+                        data: mapRateTotalFromLookup(codexLookup),
                         borderColor: '#10b981',
-                        backgroundColor: 'rgba(16, 185, 129, 0.03)',
+                        backgroundColor: 'rgba(16, 185, 129, 0.06)',
                         fill: true, tension: 0.4, spanGaps: true, pointRadius: 2,
                     },
                     {
-                        label: 'Codex Output',
-                        data: mapFromLookup(codexRateLookup, 'output_tokens'),
-                        borderColor: '#34d399',
-                        backgroundColor: 'rgba(52, 211, 153, 0.02)',
+                        label: 'Claude',
+                        data: mapRateTotalFromLookup(claudeLookup),
+                        borderColor: '#d4a574',
+                        backgroundColor: 'rgba(212, 165, 116, 0.06)',
                         fill: true, tension: 0.4, spanGaps: true, pointRadius: 2,
                     },
                 ];
             }
         } else {
-            let series = filterByTimeRange(history, timeRange);
+            let series = filterByTimeRange(history || [], timeRange);
             labels = series.map(d => formatLabel(d.timestamp));
             const c = COLORS[currentSource];
 
@@ -845,36 +868,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 datasets = [
                     {
                         label: 'Input Tokens',
-                        data: series.map(d => d.input_tokens),
+                        data: series.map(d => d.input_tokens || 0),
                         borderColor: c.line,
                         backgroundColor: c.lineFill,
                         fill: true, tension: 0.4, pointRadius: 3, stack: 'stack0',
                     },
                     {
                         label: 'Output Tokens',
-                        data: series.map(d => d.output_tokens),
+                        data: series.map(d => d.output_tokens || 0),
                         borderColor: c.outLine,
                         backgroundColor: c.outFill,
                         fill: true, tension: 0.4, pointRadius: 3, stack: 'stack0',
                     },
                 ];
             } else {
-                series = computeRate(series, 'input_tokens');
-                series = computeRate(series, 'output_tokens');
+                // Backend-served per-cycle deltas; zero-usage cycles plot as
+                // 0 so the line returns to zero between bursts of activity.
                 datasets = [
                     {
                         label: '\u0394 Input',
-                        data: series.map(d => d.input_tokens),
+                        data: series.map(d => d.delta_input_tokens || 0),
                         borderColor: c.line,
                         backgroundColor: c.lineFill,
-                        fill: true, tension: 0.4, pointRadius: 3,
+                        fill: true, tension: 0.4, spanGaps: true, pointRadius: 3,
                     },
                     {
                         label: '\u0394 Output',
-                        data: series.map(d => d.output_tokens),
+                        data: series.map(d => d.delta_output_tokens || 0),
                         borderColor: c.outLine,
                         backgroundColor: c.outFill,
-                        fill: true, tension: 0.4, pointRadius: 3,
+                        fill: true, tension: 0.4, spanGaps: true, pointRadius: 3,
                     },
                 ];
             }
@@ -890,7 +913,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 interaction: { intersect: false, mode: 'index' },
                 scales: {
                     y: {
-                        beginAtZero: mode === 'rate',
+                        // Linear for both modes: Rate needs to render true
+                        // zeros (log scales can't), so idle cycles visibly
+                        // return the line to the axis.
+                        type: 'linear',
+                        beginAtZero: true,
                         stacked: isTotal,
                         grid: { color: 'rgba(255,255,255,0.04)' },
                         title: { display: true, text: unitLabel, color: '#8a9fc8', font: { size: 10 } },
@@ -927,6 +954,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 agy: 'AGY Quota Limits',
                 opencode: 'OpenCode CLI Spending',
                 codex: 'Codex Usage Limits',
+                claude: 'Claude Usage Limits',
             };
             const titleEl = document.getElementById('quota-title');
             if (titleEl) titleEl.textContent = titleMap[currentSource] || 'Quota Limits';
@@ -970,6 +998,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     const plan = quotaData._plan || 'free';
                     renderCodexQuota(container, rateLimit, plan);
                 }
+            } else if (src === 'claude') {
+                renderClaudeQuota(container, quotaData);
             } else {
                 const agyPlan = quotaData._plan || 'Free';
                 for (const [group, limits] of Object.entries(quotaData)) {
@@ -1071,6 +1101,100 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `;
         }
+        container.appendChild(card);
+    }
+
+    function renderClaudeQuota(container, data) {
+        const card = document.createElement('div');
+        card.className = 'quota-group';
+
+        const plan = data._plan || 'Claude Pro';
+
+        let limitsHtml = '';
+
+        // Session (5h) limit
+        const sessionGroup = data.session || {};
+        const sessionLimit = sessionGroup.five_hour || {};
+        if (sessionLimit.used !== undefined) {
+            const remaining = sessionLimit.remaining_pct || 0;
+            const barColor = remaining > 50 ? 'green' : remaining > 20 ? 'amber' : 'red';
+            const seconds = sessionLimit.refreshes_in_seconds || 0;
+            let refreshStr = '';
+            if (seconds > 0) {
+                if (seconds < 3600) {
+                    refreshStr = `Resets in ${Math.round(seconds / 60)} min`;
+                } else {
+                    refreshStr = `Resets in ${Math.round(seconds / 3600)} hr`;
+                }
+            }
+            limitsHtml += `
+                <div class="quota-limit">
+                    <div class="quota-limit-header">
+                        <span class="quota-limit-label">Session (5h)</span>
+                        <span class="quota-limit-value">${remaining.toFixed(1)}% left</span>
+                    </div>
+                    <div class="quota-bar-bg">
+                        <div class="quota-bar-fill ${barColor}" style="width: ${remaining}%"></div>
+                    </div>
+                    <div class="quota-refresh">${refreshStr}</div>
+                </div>
+            `;
+        }
+
+        // Weekly limit
+        const weeklyGroup = data.weekly || {};
+        const weeklyAll = weeklyGroup.all_models || {};
+        if (weeklyAll.used !== undefined) {
+            const remaining = weeklyAll.remaining_pct || 0;
+            const barColor = remaining > 50 ? 'green' : remaining > 20 ? 'amber' : 'red';
+            const seconds = weeklyAll.refreshes_in_seconds || 0;
+            let refreshStr = '';
+            if (seconds > 0) {
+                if (seconds >= 86400) {
+                    refreshStr = `Resets in ${Math.round(seconds / 86400)} days`;
+                } else if (seconds >= 3600) {
+                    refreshStr = `Resets in ${Math.round(seconds / 3600)} hr`;
+                } else {
+                    refreshStr = `Resets in ${Math.round(seconds / 60)} min`;
+                }
+            }
+            limitsHtml += `
+                <div class="quota-limit">
+                    <div class="quota-limit-header">
+                        <span class="quota-limit-label">Weekly (All Models)</span>
+                        <span class="quota-limit-value">${remaining.toFixed(1)}% left</span>
+                    </div>
+                    <div class="quota-bar-bg">
+                        <div class="quota-bar-fill ${barColor}" style="width: ${remaining}%"></div>
+                    </div>
+                    <div class="quota-refresh">${refreshStr}</div>
+                </div>
+            `;
+        }
+
+        // Per-model weekly limits
+        for (const [modelName, info] of Object.entries(weeklyGroup)) {
+            if (modelName === 'all_models' || !info || typeof info !== 'object') continue;
+            if (info.used === undefined) continue;
+            const remaining = info.remaining_pct || 0;
+            const barColor = remaining > 50 ? 'green' : remaining > 20 ? 'amber' : 'red';
+            limitsHtml += `
+                <div class="quota-limit">
+                    <div class="quota-limit-header">
+                        <span class="quota-limit-label">Weekly: ${escapeHtml(modelName)}</span>
+                        <span class="quota-limit-value">${remaining.toFixed(1)}% left</span>
+                    </div>
+                    <div class="quota-bar-bg">
+                        <div class="quota-bar-fill ${barColor}" style="width: ${remaining}%"></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        card.innerHTML = `
+            <h3>Claude <span class="badge badge-claude">${escapeHtml(plan)}</span></h3>
+            ${limitsHtml || '<p style="color: #8a9fc8; font-size: 0.85rem; margin: 0.5rem 0;">Claude quota data will appear once authenticated.</p>'}
+        `;
         container.appendChild(card);
     }
 

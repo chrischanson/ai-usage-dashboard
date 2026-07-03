@@ -1,17 +1,12 @@
-from parser import fetch_and_parse
+from parsers.opencode import OpenCodeParser
+
 
 def fetch_opencode_cost():
     try:
-        overview, cost_tokens, models = fetch_and_parse()
-        cost_by_model = {}
-        total_cost = 0.0
-        for m in models:
-            c = m.get('Cost', 0) or 0
-            if c:
-                cost_by_model[m['name']] = c
-                total_cost += c
+        result = OpenCodeParser().parse()
+        cost_by_model = {m.model_name: m.cost for m in result.models if m.cost}
         return {
-            'total_cost': total_cost,
+            'total_cost': sum(cost_by_model.values()),
             'cost_by_model': cost_by_model,
         }
     except Exception as e:

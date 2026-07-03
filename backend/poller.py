@@ -6,15 +6,16 @@ sys.path.insert(0, os.path.dirname(__file__))
 import threading
 import time
 from config import Config
-from db import connect, init_schema, insert_usage, insert_quota, record_status
-
-
-def _filter_stale_quota(conn, source, new_quota):
-    """Return new quota data directly to ensure database stores accurate live readings."""
-    return new_quota
+from db import connect, init_schema, record_observation, record_quota, record_status, prune
+from source_registry import get_all_sources
+from util import parse_iso_seconds
 
 
 class Poller:
+    """The only writer of usage data. Each cycle it stores every parser's
+    raw reading verbatim (see db.record_observation) — all delta/total logic
+    happens at read time in db.py."""
+
     def __init__(self, cfg: Config):
         self.cfg = cfg
         self._stop = threading.Event()
@@ -24,15 +25,19 @@ class Poller:
         interval = self.cfg.poll_interval if self.cfg.poll_interval else 600
         cycle_ts = (now_sec // interval) * interval
 
-        self._poll_source(conn, cycle_ts, 'opencode', self._collect_opencode_usage)
-        self._poll_source(conn, cycle_ts, 'agy', self._collect_agy_usage)
-        self._poll_source(conn, cycle_ts, 'codex', self._collect_codex_usage)
+        for source, entry in get_all_sources().items():
+            self._poll_usage(conn, cycle_ts, source, entry)
         self._poll_quota_source(conn, cycle_ts, 'agy', self._collect_agy_quota)
         self._poll_quota_source(conn, cycle_ts, 'opencode', self._collect_opencode_cost)
         self._poll_quota_source(conn, cycle_ts, 'codex', self._collect_codex_quota)
-        
-        from integrity import fix_cycle_integrity
-        fix_cycle_integrity(conn, cycle_ts)
+        self._poll_quota_source(conn, cycle_ts, 'claude', self._collect_claude_quota)
+
+        from integrity import check_integrity
+        report = check_integrity(conn, interval)
+        for warning in report['warnings']:
+            print(f"[poller] integrity: {warning}")
+
+        prune(conn, self.cfg.retention_days)
 
     def start(self) -> None:
         conn = connect(self.cfg.db_path)
@@ -55,24 +60,20 @@ class Poller:
                 conn.close()
             self._stop.wait(self.cfg.poll_interval)
 
-    def _poll_source(self, conn, cycle_ts, source, collector):
+    def _poll_usage(self, conn, cycle_ts, source, entry):
         start = time.time()
         try:
-            result = collector()
-            if result:
-                if isinstance(result, tuple):
-                    overview, cost_tokens, models = result
-                    sessions = overview.get('Sessions', 0)
-                    messages = overview.get('Messages', 0)
-                    if sessions or messages:
-                        merged = {**overview, **cost_tokens}
-                        insert_usage(conn, source, cycle_ts, merged, models)
-                else:
-                    if result.sessions or result.messages:
-                        insert_usage(conn, source, cycle_ts, result, result.models)
-            record_status(conn, source, cycle_ts, True, None, (time.time() - start) * 1000)
+            result = entry.parser().parse()
+            if result and (result.sessions or result.messages):
+                record_observation(conn, source, cycle_ts, result)
+                record_status(conn, source, 'usage', cycle_ts, True, None,
+                              (time.time() - start) * 1000)
+            else:
+                record_status(conn, source, 'usage', cycle_ts, False,
+                              'empty result', (time.time() - start) * 1000)
         except Exception as e:
-            record_status(conn, source, cycle_ts, False, str(e), (time.time() - start) * 1000)
+            record_status(conn, source, 'usage', cycle_ts, False, str(e),
+                          (time.time() - start) * 1000)
 
     def _poll_quota_source(self, conn, cycle_ts, source, collector):
         start = time.time()
@@ -80,7 +81,7 @@ class Poller:
             quota = collector()
             if quota and 'error' not in quota:
                 if source == 'opencode':
-                    insert_quota(conn, 'opencode', cycle_ts, {
+                    record_quota(conn, 'opencode', cycle_ts, {
                         'opencode': {
                             'total_cost': {
                                 'used': quota['total_cost'],
@@ -92,7 +93,7 @@ class Poller:
                     })
                 elif source == 'codex':
                     if 'primary_used_pct' in quota:
-                        insert_quota(conn, 'codex', cycle_ts, {
+                        record_quota(conn, 'codex', cycle_ts, {
                             'openai': {
                                 'rate_limit': {
                                     'remaining_pct': 100.0 - quota['primary_used_pct'],
@@ -103,7 +104,7 @@ class Poller:
                             }
                         })
                     elif 'total_used_usd' in quota:
-                        insert_quota(conn, 'codex', cycle_ts, {
+                        record_quota(conn, 'codex', cycle_ts, {
                             'openai': {
                                 'cost': {
                                     'used': quota['total_used_usd'],
@@ -112,24 +113,51 @@ class Poller:
                                 }
                             }
                         })
+                elif source == 'claude':
+                    if 'five_hour' in quota:
+                        rows = []
+                        fh = quota['five_hour']
+                        rows.append({
+                            'model_group': 'session',
+                            'limit_type': 'five_hour',
+                            'used': fh.get('utilization', 0),
+                            'total': 100.0,
+                            'remaining_pct': 100.0 - fh.get('utilization', 0),
+                            'refreshes_in_seconds': parse_iso_seconds(fh.get('resets_at', '')),
+                        })
+                        wd = quota.get('seven_day', {})
+                        rows.append({
+                            'model_group': 'weekly',
+                            'limit_type': 'all_models',
+                            'used': wd.get('utilization', 0),
+                            'total': 100.0,
+                            'remaining_pct': 100.0 - wd.get('utilization', 0),
+                            'refreshes_in_seconds': parse_iso_seconds(wd.get('resets_at', '')),
+                        })
+                        for lim in quota.get('limits', []):
+                            if lim.get('kind') == 'weekly_scoped' and lim.get('scope', {}).get('model', {}).get('display_name'):
+                                model_name = lim['scope']['model']['display_name']
+                                rows.append({
+                                    'model_group': 'weekly',
+                                    'limit_type': model_name,
+                                    'used': lim.get('percent', 0),
+                                    'total': 100.0,
+                                    'remaining_pct': 100.0 - lim.get('percent', 0),
+                                    'refreshes_in_seconds': parse_iso_seconds(lim.get('resets_at', '')),
+                                })
+                        record_quota(conn, 'claude', cycle_ts, rows)
                 else:
-                    filtered = _filter_stale_quota(conn, source, quota)
-                    insert_quota(conn, source, cycle_ts, filtered)
-            record_status(conn, source, cycle_ts, True, None, (time.time() - start) * 1000)
+                    record_quota(conn, source, cycle_ts, quota)
+            else:
+                record_status(conn, source, 'quota', cycle_ts, False,
+                              quota.get('error', 'empty result') if quota else 'empty result',
+                              (time.time() - start) * 1000)
+                return
+            record_status(conn, source, 'quota', cycle_ts, True, None,
+                          (time.time() - start) * 1000)
         except Exception as e:
-            record_status(conn, source, cycle_ts, False, str(e), (time.time() - start) * 1000)
-
-    def _collect_opencode_usage(self):
-        from parser import fetch_and_parse
-        return fetch_and_parse()
-
-    def _collect_agy_usage(self):
-        from agy_parser import fetch_agy_usage
-        return fetch_agy_usage()
-
-    def _collect_codex_usage(self):
-        from codex_parser import fetch_codex_usage
-        return fetch_codex_usage()
+            record_status(conn, source, 'quota', cycle_ts, False, str(e),
+                          (time.time() - start) * 1000)
 
     def _collect_agy_quota(self):
         from quota_parser import fetch_agy_quota
@@ -142,3 +170,7 @@ class Poller:
     def _collect_codex_quota(self):
         from codex_quota import fetch_codex_quota
         return fetch_codex_quota()
+
+    def _collect_claude_quota(self):
+        from claude_quota import fetch_claude_quota
+        return fetch_claude_quota()

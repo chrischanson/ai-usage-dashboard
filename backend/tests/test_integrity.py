@@ -1,13 +1,26 @@
 import unittest
+import os
+import sys
+import time
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
 import sqlite3
-from datetime import datetime, timezone
-from integrity import fix_cycle_integrity, fix_all_integrity
-from db import init_schema
+from integrity import check_integrity
+from db import init_schema, record_status
+from parsers.base import ParserResult
 
 
-class TestDataIntegrity(unittest.TestCase):
+def _insert_raw(conn, source, cycle_ts, input_tokens, output_tokens=0):
+    from db import record_observation
+    record_observation(conn, source, cycle_ts, ParserResult(
+        sessions=1, messages=1,
+        input_tokens=input_tokens, output_tokens=output_tokens,
+    ))
+
+
+class TestCheckIntegrity(unittest.TestCase):
     def setUp(self):
-        # Create an in-memory SQLite database for testing
         self.conn = sqlite3.connect(':memory:')
         self.conn.row_factory = sqlite3.Row
         init_schema(self.conn)
@@ -15,91 +28,46 @@ class TestDataIntegrity(unittest.TestCase):
     def tearDown(self):
         self.conn.close()
 
-    def test_fix_cycle_integrity_carries_forward(self):
-        cursor = self.conn.cursor()
-        
-        # Insert a valid cycle for all sources at T=1000
-        cursor.execute('''
-            INSERT INTO usage_history (source, cycle_ts, timestamp, sessions, messages, input_tokens, output_tokens)
-            VALUES ('opencode', 1000, '1970-01-01 00:16:40', 10, 100, 1000, 200)
-        ''')
-        cursor.execute('''
-            INSERT INTO usage_history (source, cycle_ts, timestamp, sessions, messages, input_tokens, output_tokens)
-            VALUES ('agy', 1000, '1970-01-01 00:16:40', 20, 200, 2000, 400)
-        ''')
-        cursor.execute('''
-            INSERT INTO usage_history (source, cycle_ts, timestamp, sessions, messages, input_tokens, output_tokens)
-            VALUES ('codex', 1000, '1970-01-01 00:16:40', 30, 300, 3000, 600)
-        ''')
-        
-        # Insert model usage for opencode at T=1000
-        cursor.execute('''
-            INSERT INTO model_usage (source, cycle_ts, timestamp, model_name, messages, input_tokens, output_tokens, cost)
-            VALUES ('opencode', 1000, '1970-01-01 00:16:40', 'gpt-4', 100, 1000, 200, 0.05)
-        ''')
-        
-        # In the next cycle (T=2000), only 'opencode' reports
-        cursor.execute('''
-            INSERT INTO usage_history (source, cycle_ts, timestamp, sessions, messages, input_tokens, output_tokens)
-            VALUES ('opencode', 2000, '1970-01-01 00:33:20', 11, 105, 1100, 210)
-        ''')
-        
+    def test_clean_recent_data_is_ok(self):
+        now_cycle = (int(time.time()) // 600) * 600
+        _insert_raw(self.conn, 'codex', now_cycle - 600, 1000)
+        _insert_raw(self.conn, 'codex', now_cycle, 1500)
+        report = check_integrity(self.conn, poll_interval=600)
+        self.assertTrue(report['ok'])
+        self.assertEqual(report['warnings'], [])
+        self.assertEqual(report['checks']['counter_resets'], [])
+        self.assertEqual(report['checks']['rows_missing_status'], 0)
+
+    def test_counter_reset_is_warned_not_fatal(self):
+        now_cycle = (int(time.time()) // 600) * 600
+        _insert_raw(self.conn, 'codex', now_cycle - 600, 5000)
+        _insert_raw(self.conn, 'codex', now_cycle, 100)  # tool state reset
+        report = check_integrity(self.conn, poll_interval=600)
+        self.assertTrue(report['ok'])
+        resets = report['checks']['counter_resets']
+        self.assertTrue(any(r['source'] == 'codex' and r['field'] == 'input_tokens' for r in resets))
+        self.assertTrue(report['warnings'])
+
+    def test_missing_status_row_fails(self):
+        # Bypass the write layer to simulate an ungoverned external write.
+        now_cycle = (int(time.time()) // 600) * 600
+        self.conn.execute(
+            "INSERT INTO usage_history (source, cycle_ts, timestamp, sessions, messages, input_tokens, output_tokens) "
+            "VALUES ('codex', ?, '2026-01-01 00:00:00', 1, 1, 10, 10)", (now_cycle,))
         self.conn.commit()
+        report = check_integrity(self.conn, poll_interval=600)
+        self.assertFalse(report['ok'])
+        self.assertEqual(report['checks']['rows_missing_status'], 1)
 
-        # Run integrity fix on T=2000
-        fix_cycle_integrity(self.conn, 2000)
-        self.conn.commit()
+    def test_stale_data_fails(self):
+        _insert_raw(self.conn, 'codex', 1000, 1000)  # ancient cycle
+        report = check_integrity(self.conn, poll_interval=600)
+        self.assertFalse(report['ok'])
+        self.assertTrue(report['checks']['stale'])
 
-        # Verify that 'agy' and 'codex' were successfully carried forward to T=2000
-        cursor.execute("SELECT * FROM usage_history WHERE cycle_ts=2000 ORDER BY source")
-        rows = [dict(r) for r in cursor.fetchall()]
-        
-        self.assertEqual(len(rows), 3)
-        self.assertEqual(rows[0]['source'], 'agy')
-        self.assertEqual(rows[0]['sessions'], 20)  # Carried forward
-        self.assertEqual(rows[0]['input_tokens'], 2000)  # Carried forward
-        self.assertEqual(rows[0]['timestamp'], '1970-01-01 00:33:20')  # Aligned timestamp
-        
-        self.assertEqual(rows[1]['source'], 'codex')
-        self.assertEqual(rows[1]['sessions'], 30)  # Carried forward
-        
-        self.assertEqual(rows[2]['source'], 'opencode')
-        self.assertEqual(rows[2]['sessions'], 11)  # Original new value
-
-    def test_fix_all_integrity_back_fixes_correctly(self):
-        cursor = self.conn.cursor()
-        
-        # T=1000 has all sources in both usage_history and collection_status
-        for src in ['opencode', 'agy', 'codex']:
-            cursor.execute('''
-                INSERT INTO usage_history (source, cycle_ts, timestamp, sessions, messages, input_tokens, output_tokens)
-                VALUES (?, 1000, '1970-01-01 00:16:40', 10, 10, 10, 10)
-            ''', (src,))
-            cursor.execute('''
-                INSERT INTO collection_status (source, cycle_ts, ok, error, duration_ms)
-                VALUES (?, 1000, 1, NULL, 100)
-            ''', (src,))
-            
-        # T=2000 only has agy (but collection_status for all three to trigger the fix)
-        cursor.execute('''
-            INSERT INTO usage_history (source, cycle_ts, timestamp, sessions, messages, input_tokens, output_tokens)
-            VALUES ('agy', 2000, '1970-01-01 00:33:20', 15, 15, 15, 15)
-        ''')
-        for src in ['opencode', 'agy', 'codex']:
-            cursor.execute('''
-                INSERT INTO collection_status (source, cycle_ts, ok, error, duration_ms)
-                VALUES (?, 2000, 1, NULL, 100)
-            ''', (src,))
-        
-        self.conn.commit()
-
-        # Run full back-fix
-        fix_all_integrity(self.conn)
-        self.conn.commit()
-
-        # Check total rows at T=2000 (should be 3)
-        cursor.execute("SELECT COUNT(*) FROM usage_history WHERE cycle_ts=2000")
-        self.assertEqual(cursor.fetchone()[0], 3)
+    def test_empty_db_is_ok(self):
+        report = check_integrity(self.conn, poll_interval=600)
+        self.assertTrue(report['ok'])
 
 
 if __name__ == '__main__':

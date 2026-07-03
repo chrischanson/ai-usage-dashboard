@@ -195,30 +195,18 @@ class TestCodexParserInternals(unittest.TestCase):
             self.parser.parse()
 
 
-class TestBackwardCompatibility(unittest.TestCase):
-    """Ensure the old wrapper modules still export the expected public API."""
+class TestSourceRegistry(unittest.TestCase):
+    """All sources are polled through the registry's parser factories."""
 
-    def test_parser_exports_fetch_and_parse(self):
-        from parser import fetch_and_parse
-        result = fetch_and_parse()
-        self.assertIsInstance(result, tuple)
-        self.assertEqual(len(result), 3)
-        overview, cost_tokens, models = result
-        self.assertIsInstance(overview, dict)
-        self.assertIsInstance(cost_tokens, dict)
-        self.assertIsInstance(models, list)
+    def test_registry_covers_all_sources(self):
+        from source_registry import get_all_names
+        self.assertEqual(set(get_all_names()), {'opencode', 'agy', 'codex', 'claude'})
 
-    def test_agy_parser_exports_fetch_agy_usage(self):
-        from agy_parser import fetch_agy_usage
-        result = fetch_agy_usage()
-        self.assertIsInstance(result, tuple)
-        self.assertEqual(len(result), 3)
-
-    def test_codex_parser_exports_fetch_codex_usage(self):
-        from codex_parser import fetch_codex_usage
-        result = fetch_codex_usage()
-        self.assertIsInstance(result, tuple)
-        self.assertEqual(len(result), 3)
+    def test_registry_parsers_are_factories(self):
+        from source_registry import get_all_sources
+        for name, entry in get_all_sources().items():
+            self.assertTrue(callable(entry.parser), name)
+            self.assertTrue(hasattr(entry.parser(), 'parse'), name)
 
 
 if __name__ == '__main__':

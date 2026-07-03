@@ -1,10 +1,31 @@
-import sqlite3
+"""SQLite layer for the AI Usage Dashboard.
+
+Data model (schema v3): the database stores *raw observations only*.
+
+- usage_history / model_usage hold, per (source, cycle_ts), the lifetime
+  counters exactly as each parser reported them. Parsers read local tool
+  state (Codex's threads table, AGY's conversation DBs, opencode's stats
+  command, Claude's transcripts), which is a machine-wide lifetime record —
+  not scoped to when this dashboard started watching.
+- Everything displayed is derived at read time: the per-cycle delta is
+  max(0, raw - previous raw) and the cumulative total is the running sum of
+  those deltas. The first observation of a source contributes zero, so a
+  tool's pre-existing history never shows up as a giant new event.
+
+Storing raw readings instead of accumulated totals means a bad row corrupts
+only its own delta (not every row after it), and history can always be
+re-derived or audited against the tools themselves.
+"""
 import os
 import os.path
-import time
+import shutil
+import sqlite3
 from datetime import datetime, timezone, timedelta
 
 DB_PATH = os.getenv('USAGE_DB_PATH') or os.path.join(os.path.dirname(__file__), "usage.db")
+
+_USAGE_FIELDS = ('sessions', 'messages', 'input_tokens', 'output_tokens', 'cache_read', 'cache_write')
+_MODEL_FIELDS = ('messages', 'input_tokens', 'output_tokens', 'cache_read', 'cache_write')
 
 
 def connect(path: str) -> sqlite3.Connection:
@@ -35,11 +56,6 @@ def init_schema(conn: sqlite3.Connection) -> None:
             timestamp TEXT,
             sessions INTEGER,
             messages INTEGER,
-            days INTEGER DEFAULT 0,
-            total_cost REAL DEFAULT 0.0,
-            avg_cost_per_day REAL DEFAULT 0.0,
-            avg_tokens_per_session REAL DEFAULT 0.0,
-            median_tokens_per_session REAL DEFAULT 0.0,
             input_tokens INTEGER,
             output_tokens INTEGER,
             cache_read INTEGER,
@@ -85,31 +101,186 @@ def init_schema(conn: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS collection_status (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             source TEXT NOT NULL,
+            kind TEXT NOT NULL DEFAULT 'usage',
             cycle_ts INTEGER DEFAULT 0,
             timestamp TEXT,
             ok INTEGER NOT NULL,
             error TEXT,
             duration_ms REAL,
-            UNIQUE(source, cycle_ts)
+            UNIQUE(source, kind, cycle_ts)
         )
     ''')
 
-    # Create indexes for performance
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_usage_history_cycle_ts ON usage_history(cycle_ts)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_model_usage_cycle_ts ON model_usage(cycle_ts)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_quota_snapshots_cycle_ts ON quota_snapshots(cycle_ts)')
 
-    # Maintain indexes compatibility
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_usage_history_source_ts ON usage_history(source, timestamp)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_model_usage_source_ts ON model_usage(source, timestamp)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_quota_snapshots_source_ts ON quota_snapshots(source, timestamp)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_quota_ts ON quota_snapshots(timestamp, model_group)')
-
     cursor.execute(
         "INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)",
-        ('schema_version', '1')
+        ('schema_version', '3')
     )
 
+    conn.commit()
+    _migrate_schema(conn)
+
+
+def _migrate_schema(conn: sqlite3.Connection) -> None:
+    """Apply incremental schema migrations for existing databases."""
+    cursor = conn.cursor()
+    cursor.execute("SELECT value FROM meta WHERE key='schema_version'")
+    row = cursor.fetchone()
+    version = int(row['value']) if row else 0
+
+    if version < 2:
+        # Add 'kind' column and fix UNIQUE constraint.
+        # SQLite cannot ALTER TABLE to drop constraints, so we recreate the table.
+        cursor.execute("PRAGMA table_info(collection_status)")
+        columns = {r[1] for r in cursor.fetchall()}
+        if 'kind' not in columns:
+            cursor.execute("PRAGMA foreign_keys=OFF")
+            cursor.execute('''
+                CREATE TABLE collection_status_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    source TEXT NOT NULL,
+                    kind TEXT NOT NULL DEFAULT 'usage',
+                    cycle_ts INTEGER DEFAULT 0,
+                    timestamp TEXT,
+                    ok INTEGER NOT NULL,
+                    error TEXT,
+                    duration_ms REAL,
+                    UNIQUE(source, kind, cycle_ts)
+                )
+            ''')
+            cursor.execute('''
+                INSERT INTO collection_status_new (id, source, kind, cycle_ts, timestamp, ok, error, duration_ms)
+                SELECT id, source, 'usage', cycle_ts, timestamp, ok, error, duration_ms FROM collection_status
+            ''')
+            cursor.execute("DROP TABLE collection_status")
+            cursor.execute("ALTER TABLE collection_status_new RENAME TO collection_status")
+            cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '2')")
+        conn.commit()
+        version = 2
+
+    # v3 is detected by introspection, not by trusting the version number:
+    # any connection may have stamped meta before the migration ran (e.g. a
+    # fresh init_schema on an old file), so the presence of the v2 artifacts
+    # themselves is what triggers — and re-running on a migrated DB is a no-op.
+    cursor.execute("PRAGMA table_info(usage_history)")
+    dead_columns = 'total_cost' in {r[1] for r in cursor.fetchall()}
+    if (version < 3 or dead_columns
+            or _table_exists(cursor, 'source_baselines')
+            or _table_exists(cursor, 'model_baselines')):
+        _migrate_to_v3(conn)
+
+
+def _table_exists(cursor, name: str) -> bool:
+    cursor.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,))
+    return cursor.fetchone() is not None
+
+
+def _migrate_to_v3(conn: sqlite3.Connection) -> None:
+    """v2 stored *accumulated* totals in usage_history/model_usage, tracking
+    each parser's last raw reading in source_baselines/model_baselines. v3
+    stores the raw readings themselves and derives totals at read time.
+
+    Conversion: shift each source's stored series by a constant so its last
+    row equals the last raw reading recorded in the baselines. A uniform
+    per-source shift preserves every delta (and therefore every derived
+    total), while landing the series in raw space so the next poll's raw
+    reading continues it seamlessly. Rows written before delta tracking
+    existed were raw readings already (no baseline row -> shift of zero).
+    """
+    cursor = conn.cursor()
+
+    # Back up the database file before a destructive migration.
+    cursor.execute("PRAGMA database_list")
+    db_file = cursor.fetchone()[2]
+    if db_file and os.path.exists(db_file):
+        backup = db_file + '.pre-v3.bak'
+        if not os.path.exists(backup):
+            shutil.copy2(db_file, backup)
+
+    if _table_exists(cursor, 'source_baselines'):
+        cursor.execute("SELECT * FROM source_baselines")
+        for baseline in cursor.fetchall():
+            src = baseline['source']
+            cursor.execute(
+                "SELECT * FROM usage_history WHERE source=? ORDER BY cycle_ts DESC LIMIT 1", (src,))
+            last = cursor.fetchone()
+            if not last:
+                continue
+            sets = ', '.join(f"{f} = {f} + ?" for f in _USAGE_FIELDS)
+            offsets = [(baseline[f] or 0) - (last[f] or 0) for f in _USAGE_FIELDS]
+            cursor.execute(f"UPDATE usage_history SET {sets} WHERE source=?", offsets + [src])
+        cursor.execute("DROP TABLE source_baselines")
+
+    if _table_exists(cursor, 'model_baselines'):
+        cursor.execute("SELECT * FROM model_baselines")
+        for baseline in cursor.fetchall():
+            src, model = baseline['source'], baseline['model_name']
+            cursor.execute(
+                "SELECT * FROM model_usage WHERE source=? AND model_name=? ORDER BY cycle_ts DESC LIMIT 1",
+                (src, model))
+            last = cursor.fetchone()
+            if not last:
+                continue
+            sets = ', '.join(f"{f} = {f} + ?" for f in _MODEL_FIELDS)
+            offsets = [(baseline[f] or 0) - (last[f] or 0) for f in _MODEL_FIELDS]
+            cursor.execute(
+                f"UPDATE model_usage SET {sets} WHERE source=? AND model_name=?",
+                offsets + [src, model])
+        cursor.execute("DROP TABLE model_baselines")
+
+    # Rebuild usage_history without the long-dead derived columns
+    # (days, total_cost, avg_cost_per_day, avg_tokens_per_session, median_tokens_per_session).
+    cursor.execute("PRAGMA table_info(usage_history)")
+    columns = {r[1] for r in cursor.fetchall()}
+    if 'total_cost' in columns:
+        cursor.execute("PRAGMA foreign_keys=OFF")
+        cursor.execute('''
+            CREATE TABLE usage_history_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source TEXT NOT NULL DEFAULT 'opencode',
+                cycle_ts INTEGER DEFAULT 0,
+                timestamp TEXT,
+                sessions INTEGER,
+                messages INTEGER,
+                input_tokens INTEGER,
+                output_tokens INTEGER,
+                cache_read INTEGER,
+                cache_write INTEGER,
+                UNIQUE(source, cycle_ts)
+            )
+        ''')
+        cursor.execute('''
+            INSERT INTO usage_history_new (id, source, cycle_ts, timestamp, sessions, messages,
+                                           input_tokens, output_tokens, cache_read, cache_write)
+            SELECT id, source, cycle_ts, timestamp, sessions, messages,
+                   input_tokens, output_tokens, cache_read, cache_write
+            FROM usage_history
+        ''')
+        cursor.execute("DROP TABLE usage_history")
+        cursor.execute("ALTER TABLE usage_history_new RENAME TO usage_history")
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_usage_history_cycle_ts ON usage_history(cycle_ts)')
+        cursor.execute("PRAGMA foreign_keys=ON")
+
+    # Backfill the status-pairing invariant for legacy rows written before
+    # the write layer enforced it.
+    cursor.execute('''
+        INSERT OR IGNORE INTO collection_status (source, kind, cycle_ts, timestamp, ok, error, duration_ms)
+        SELECT source, 'usage', cycle_ts, timestamp, 1, NULL, 0.0 FROM usage_history
+    ''')
+
+    # Cycles up to this point predate raw-observation storage; integrity
+    # checks that assume clean raw data (monotonicity, model sums) skip them.
+    cursor.execute("SELECT MAX(cycle_ts) FROM usage_history")
+    newest = cursor.fetchone()[0] or 0
+    cursor.execute(
+        "INSERT OR IGNORE INTO meta (key, value) VALUES ('v3_migrated_after_cycle', ?)",
+        (str(newest),))
+
+    cursor.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '3')")
     conn.commit()
 
 
@@ -119,137 +290,54 @@ def init_db():
     conn.close()
 
 
-def record_status(conn: sqlite3.Connection, source: str, *args, **kwargs) -> None:
-    # Supports both:
-    # 1. New: record_status(conn, source, cycle_ts, ok, error, duration_ms)
-    # 2. Old: record_status(conn, source, ok, error, duration_ms)
-    if len(args) >= 1 and isinstance(args[0], bool):
-        ok = args[0]
-        error = args[1] if len(args) > 1 else None
-        duration_ms = args[2] if len(args) > 2 else 0.0
-        now_sec = int(time.time())
-        cycle_ts = (now_sec // 600) * 600
-    elif len(args) >= 3:
-        cycle_ts = args[0]
-        ok = args[1]
-        error = args[2]
-        duration_ms = args[3] if len(args) > 3 else 0.0
-    else:
-        # Fallback keyword arguments
-        cycle_ts = kwargs.get('cycle_ts')
-        ok = kwargs.get('ok', True)
-        error = kwargs.get('error') or kwargs.get('err')
-        duration_ms = kwargs.get('duration_ms', 0.0)
-        if cycle_ts is None:
-            cycle_ts = (int(time.time()) // 600) * 600
+# --- Writers (the poller is the only intended caller) ---
 
+def record_observation(conn: sqlite3.Connection, source: str, cycle_ts: int, result) -> None:
+    """Store a parser's raw reading verbatim. `result` is a ParserResult
+    (or anything with the same attributes)."""
+    _do_insert_usage(conn, source, cycle_ts,
+                     result.sessions, result.messages,
+                     result.input_tokens, result.output_tokens,
+                     result.cache_read, result.cache_write,
+                     result.models)
+
+
+def record_quota(conn: sqlite3.Connection, source: str, cycle_ts: int, data) -> None:
+    _do_insert_quota(conn, source, cycle_ts, data)
+
+
+def record_status(conn: sqlite3.Connection, source: str, kind: str, cycle_ts: int,
+                  ok: bool, error: str | None, duration_ms: float = 0.0) -> None:
     ts_str = datetime.fromtimestamp(cycle_ts, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
 
     conn.execute('''
-        INSERT OR REPLACE INTO collection_status (source, cycle_ts, timestamp, ok, error, duration_ms)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ''', (source, cycle_ts, ts_str, 1 if ok else 0, error, duration_ms))
+        INSERT OR REPLACE INTO collection_status (source, kind, cycle_ts, timestamp, ok, error, duration_ms)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ''', (source, kind, cycle_ts, ts_str, 1 if ok else 0, error, duration_ms))
     conn.commit()
 
 
-def metrics(conn: sqlite3.Connection) -> dict:
-    cursor = conn.cursor()
-    cursor.execute("SELECT DISTINCT source FROM collection_status")
-    sources = [r['source'] for r in cursor.fetchall()]
-
-    per_source = {}
-    for src in sources:
-        cursor.execute(
-            "SELECT timestamp, ok, error, duration_ms FROM collection_status "
-            "WHERE source=? ORDER BY id DESC LIMIT 1",
-            (src,)
-        )
-        row = cursor.fetchone()
-        if row:
-            per_source[src] = {
-                'last_success_at': row['timestamp'] if row['ok'] else None,
-                'last_error': None if row['ok'] else row['error'],
-                'last_duration_ms': row['duration_ms'],
-            }
-
-    cursor.execute("SELECT COUNT(*) AS cnt FROM usage_history")
-    total_polls = cursor.fetchone()['cnt']
-
-    try:
-        db_size_bytes = os.path.getsize(DB_PATH)
-    except OSError:
-        db_size_bytes = 0
-
-    return {
-        'per_source': per_source,
-        'total_polls': total_polls,
-        'db_size_bytes': db_size_bytes,
-    }
-
-
-def prune(conn: sqlite3.Connection, retention_days: int) -> None:
-    cutoff_time = datetime.now(timezone.utc) - timedelta(days=retention_days)
-    cutoff_ts = int(cutoff_time.timestamp())
-    cutoff_str = cutoff_time.strftime('%Y-%m-%d %H:%M:%S')
-
-    for table in ('usage_history', 'model_usage', 'quota_snapshots', 'collection_status'):
-        # Delete by cycle_ts first
-        conn.execute(f"DELETE FROM {table} WHERE cycle_ts < ?", (cutoff_ts,))
-        # Fallback: delete by timestamp (for backwards-compatibility unit tests that don't write cycle_ts)
-        conn.execute(f"DELETE FROM {table} WHERE timestamp < ?", (cutoff_str,))
-
-    conn.commit()
-
-
-def insert_usage(conn: sqlite3.Connection, source: str, *args, **kwargs) -> None:
-    # Supports both:
-    # 1. New: insert_usage(conn, source, cycle_ts, overview, models)
-    # 2. Old compatibility wrapper: insert_usage(overview, cost_tokens, models, source='opencode')
-    # Let's inspect the types
-    if isinstance(conn, sqlite3.Connection):
-        cycle_ts = args[0]
-        overview = args[1]
-        models = args[2]
-    else:
-        # Actually connect is called without conn. args[0]=overview, args[1]=cost_tokens, args[2]=models
-        overview = conn
-        cost_tokens = args[0] if len(args) > 0 else {}
-        models = args[1] if len(args) > 1 else []
-        source = kwargs.get('source', 'opencode')
-
-        temp_conn = connect(DB_PATH)
-        cycle_ts = (int(time.time()) // 600) * 600
-        # Map old overview & cost_tokens
-        sessions = overview.get('Sessions', 0)
-        messages = overview.get('Messages', 0)
-        input_tokens = cost_tokens.get('Input', 0)
-        output_tokens = cost_tokens.get('Output', 0)
-        cache_read = cost_tokens.get('Cache Read', 0)
-        cache_write = cost_tokens.get('Cache Write', 0)
-
-        _do_insert_usage(temp_conn, source, cycle_ts, sessions, messages, input_tokens, output_tokens, cache_read, cache_write, models)
-        temp_conn.close()
-        return
-
-    # Extract overview parameters
-    if hasattr(overview, 'sessions'):
-        sessions = getattr(overview, 'sessions', 0)
-        messages = getattr(overview, 'messages', 0)
-        input_tokens = getattr(overview, 'input_tokens', 0)
-        output_tokens = getattr(overview, 'output_tokens', 0)
-        cache_read = getattr(overview, 'cache_read', 0)
-        cache_write = getattr(overview, 'cache_write', 0)
-    elif isinstance(overview, dict):
-        sessions = overview.get('sessions', overview.get('Sessions', 0))
-        messages = overview.get('messages', overview.get('Messages', 0))
-        input_tokens = overview.get('input_tokens', overview.get('Input', 0))
-        output_tokens = overview.get('output_tokens', overview.get('Output', 0))
-        cache_read = overview.get('cache_read', overview.get('Cache Read', 0))
-        cache_write = overview.get('cache_write', overview.get('Cache Write', 0))
-    else:
-        sessions = messages = input_tokens = output_tokens = cache_read = cache_write = 0
-
-    _do_insert_usage(conn, source, cycle_ts, sessions, messages, input_tokens, output_tokens, cache_read, cache_write, models)
+def _model_to_dict(m) -> dict | None:
+    if hasattr(m, 'model_name'):
+        return {
+            'model_name': m.model_name, 'messages': m.messages,
+            'input_tokens': m.input_tokens, 'output_tokens': m.output_tokens,
+            'cache_read': m.cache_read, 'cache_write': m.cache_write, 'cost': m.cost,
+        }
+    if isinstance(m, dict):
+        name = m.get('name') or m.get('model_name')
+        if not name:
+            return None
+        return {
+            'model_name': name,
+            'messages': m.get('Messages', m.get('messages', 0)),
+            'input_tokens': m.get('Input Tokens', m.get('input_tokens', 0)),
+            'output_tokens': m.get('Output Tokens', m.get('output_tokens', 0)),
+            'cache_read': m.get('Cache Read', m.get('cache_read', 0)),
+            'cache_write': m.get('Cache Write', m.get('cache_write', 0)),
+            'cost': m.get('Cost', m.get('cost', 0.0)),
+        }
+    return None
 
 
 def _do_insert_usage(conn, source, cycle_ts, sessions, messages, input_tokens, output_tokens, cache_read, cache_write, models):
@@ -261,181 +349,171 @@ def _do_insert_usage(conn, source, cycle_ts, sessions, messages, input_tokens, o
             input_tokens, output_tokens, cache_read, cache_write
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
-        ts_str, source, cycle_ts, sessions, messages,
-        input_tokens, output_tokens, cache_read, cache_write
+        ts_str, source, cycle_ts, sessions or 0, messages or 0,
+        input_tokens or 0, output_tokens or 0, cache_read or 0, cache_write or 0
     ))
 
-    for m in models:
-        if hasattr(m, 'model_name'):
-            model_name = m.model_name
-            m_messages = m.messages
-            m_input_tokens = m.input_tokens
-            m_output_tokens = m.output_tokens
-            m_cache_read = m.cache_read
-            m_cache_write = m.cache_write
-            cost = m.cost
-        elif isinstance(m, dict):
-            model_name = m.get('name') or m.get('model_name')
-            m_messages = m.get('Messages', m.get('messages', 0))
-            m_input_tokens = m.get('Input Tokens', m.get('input_tokens', 0))
-            m_output_tokens = m.get('Output Tokens', m.get('output_tokens', 0))
-            m_cache_read = m.get('Cache Read', m.get('cache_read', 0))
-            m_cache_write = m.get('Cache Write', m.get('cache_write', 0))
-            cost = m.get('Cost', m.get('cost', 0.0))
-        else:
+    for m in models or []:
+        md = _model_to_dict(m)
+        if md is None:
             continue
-
         conn.execute('''
             INSERT OR REPLACE INTO model_usage (
                 timestamp, source, cycle_ts, model_name, messages,
                 input_tokens, output_tokens, cache_read, cache_write, cost
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
-            ts_str, source, cycle_ts, model_name, m_messages,
-            m_input_tokens, m_output_tokens, m_cache_read, m_cache_write, cost
+            ts_str, source, cycle_ts, md['model_name'], md['messages'],
+            md['input_tokens'], md['output_tokens'], md['cache_read'],
+            md['cache_write'], md['cost']
         ))
+
+    # Invariant: every usage_history write is paired with a collection_status
+    # row, enforced here (not by caller discipline) so no future caller —
+    # poller, test, or one-off script — can silently create ungoverned data.
+    # A caller with real timing info (e.g. the poller) may overwrite this
+    # afterwards via record_status(); that's an idempotent no-op otherwise.
+    conn.execute('''
+        INSERT OR REPLACE INTO collection_status (source, kind, cycle_ts, timestamp, ok, error, duration_ms)
+        VALUES (?, 'usage', ?, ?, 1, NULL, 0.0)
+    ''', (source, cycle_ts, ts_str))
 
     conn.commit()
 
 
-def latest_usage(conn: sqlite3.Connection, source: str = None, cycle_ts: int = None, include_model_deltas: bool = False) -> dict:
+# --- Read-time derivation ---
+
+def _derive_usage_rows(rows: list) -> list:
+    """Convert raw observation rows (one source, ascending cycle_ts) into
+    display rows: each _USAGE_FIELDS key becomes the cumulative total since
+    the first observation, and delta_<field> holds the per-cycle increment.
+    A raw counter decrease (tool reinstalled/reset) clamps that delta to 0
+    and self-heals on the next cycle."""
+    out = []
+    prev_raw = None
+    totals = {f: 0 for f in _USAGE_FIELDS}
+    for r in rows:
+        raw = {f: (r[f] or 0) for f in _USAGE_FIELDS}
+        d = dict(r)
+        for f in _USAGE_FIELDS:
+            delta = 0 if prev_raw is None else max(0, raw[f] - prev_raw[f])
+            totals[f] += delta
+            d[f] = totals[f]
+            d[f'delta_{f}'] = delta
+        prev_raw = raw
+        out.append(d)
+    return out
+
+
+def _derive_model_rows(model_rows: list) -> dict:
+    """Same derivation per (model_name), for one source's model_usage rows in
+    ascending cycle_ts order. Returns {cycle_ts: [derived model dicts]}."""
+    prev_raw = {}
+    totals = {}
+    by_cycle: dict = {}
+    for r in model_rows:
+        name = r['model_name']
+        raw = {f: (r[f] or 0) for f in _MODEL_FIELDS}
+        d = dict(r)
+        tot = totals.setdefault(name, {f: 0 for f in _MODEL_FIELDS})
+        prev = prev_raw.get(name)
+        for f in _MODEL_FIELDS:
+            delta = 0 if prev is None else max(0, raw[f] - prev[f])
+            tot[f] += delta
+            d[f] = tot[f]
+            d[f'delta_{f}'] = delta
+        prev_raw[name] = raw
+        by_cycle.setdefault(r['cycle_ts'], []).append(d)
+    return by_cycle
+
+
+def _derived_source_history(conn: sqlite3.Connection, source: str, with_models: bool = True) -> list:
     cursor = conn.cursor()
-    result = {}
-    sources = [source] if source is not None else ['opencode', 'agy', 'codex']
-
-    for src in sources:
-        if cycle_ts is not None:
-            cursor.execute(
-                "SELECT * FROM usage_history WHERE source=? AND cycle_ts=? LIMIT 1",
-                (src, cycle_ts)
-            )
-        else:
-            cursor.execute(
-                "SELECT * FROM usage_history WHERE source=? ORDER BY cycle_ts DESC, timestamp DESC LIMIT 1",
-                (src,)
-            )
-        row = cursor.fetchone()
-        if not row:
-            continue
-
-        row_dict = dict(row)
+    cursor.execute('SELECT * FROM usage_history WHERE source=? ORDER BY cycle_ts ASC', (source,))
+    rows = _derive_usage_rows(cursor.fetchall())
+    if rows and with_models:
         cursor.execute(
-            "SELECT * FROM model_usage WHERE source=? AND cycle_ts=? ORDER BY input_tokens DESC",
-            (src, row_dict['cycle_ts'])
-        )
-        row_dict['models'] = [dict(r) for r in cursor.fetchall()]
-
-        if include_model_deltas:
-            # Query the previous cycle_ts
-            cursor.execute(
-                "SELECT DISTINCT cycle_ts FROM usage_history WHERE source=? AND cycle_ts < ? ORDER BY cycle_ts DESC LIMIT 1",
-                (src, row_dict['cycle_ts'])
-            )
-            prev_row = cursor.fetchone()
-            if prev_row:
-                prev_ts = prev_row['cycle_ts']
-                cursor.execute(
-                    "SELECT * FROM model_usage WHERE source=? AND cycle_ts=? ORDER BY input_tokens DESC",
-                    (src, prev_ts)
-                )
-                prev_models = {m['model_name']: dict(m) for m in cursor.fetchall()}
-                deltas = []
-                for m in row_dict['models']:
-                    prev = prev_models.get(m['model_name'], {})
-                    delta = {
-                        'model_name': m['model_name'],
-                        'messages': m['messages'] - (prev.get('messages', 0) or 0),
-                        'input_tokens': m['input_tokens'] - (prev.get('input_tokens', 0) or 0),
-                        'output_tokens': m['output_tokens'] - (prev.get('output_tokens', 0) or 0),
-                        'cost': m['cost'] - (prev.get('cost', 0.0) or 0.0),
-                    }
-                    deltas.append(delta)
-                row_dict['model_deltas'] = deltas
-            else:
-                row_dict['model_deltas'] = []
-
-        if source is not None:
-            return {source: row_dict}
-        result[src] = row_dict
-
-    return result
-
-
-def history(conn: sqlite3.Connection, source: str = None, range: str = None) -> list:
-    cursor = conn.cursor()
-
-    if source is None:
-        # Aggregated history across all sources grouped by cycle_ts
-        cursor.execute('''
-            SELECT 
-                cycle_ts,
-                min(timestamp) as timestamp,
-                SUM(sessions) as sessions,
-                SUM(messages) as messages,
-                SUM(input_tokens) as input_tokens,
-                SUM(output_tokens) as output_tokens,
-                SUM(cache_read) as cache_read,
-                SUM(cache_write) as cache_write
-            FROM usage_history
-            GROUP BY cycle_ts
-            ORDER BY cycle_ts ASC
-        ''')
-        rows = [dict(r) for r in cursor.fetchall()]
-        return rows
-
-    cursor.execute('''
-        SELECT * FROM usage_history
-        WHERE source=?
-        ORDER BY cycle_ts ASC
-    ''', (source,))
-    rows = [dict(r) for r in cursor.fetchall()]
-
-    if rows:
-        # Use a JOIN instead of IN (?) to avoid hitting SQLite parameter limits
-        # as the history table grows over time.
-        cursor.execute('''
-            SELECT m.* FROM model_usage m
-            INNER JOIN usage_history h ON m.source = h.source AND m.cycle_ts = h.cycle_ts
-            WHERE m.source=?
-            ORDER BY m.cycle_ts, m.input_tokens DESC
-        ''', (source,))
-        model_rows = cursor.fetchall()
-
-        models_by_cycle = {}
-        for m in model_rows:
-            cts = m['cycle_ts']
-            if cts not in models_by_cycle:
-                models_by_cycle[cts] = []
-            models_by_cycle[cts].append(dict(m))
-
+            'SELECT * FROM model_usage WHERE source=? ORDER BY cycle_ts ASC, model_name ASC',
+            (source,))
+        models_by_cycle = _derive_model_rows(cursor.fetchall())
         for r in rows:
-            r['models'] = models_by_cycle.get(r['cycle_ts'], [])
-
+            models = models_by_cycle.get(r['cycle_ts'], [])
+            r['models'] = sorted(models, key=lambda m: m['input_tokens'], reverse=True)
     return rows
 
 
-def insert_quota(conn: sqlite3.Connection, source: str, *args, **kwargs) -> None:
-    # Supports both:
-    # 1. New: insert_quota(conn, source, cycle_ts, rows)
-    # 2. Old: insert_quota(quota_data, source='agy')
-    if isinstance(conn, sqlite3.Connection):
-        cycle_ts = args[0]
-        data = args[1]
+def history(conn: sqlite3.Connection, source: str = None) -> list:
+    if source is not None:
+        return _derived_source_history(conn, source)
+
+    # Aggregated view: derive each source, forward-fill cumulative totals
+    # across the union of cycles (a source that skipped a cycle hasn't lost
+    # usage, so its total carries forward rather than dipping to zero), then
+    # sum. Deltas only count cycles where the source actually reported.
+    from source_registry import get_all_names
+    per_source = {}
+    for src in get_all_names():
+        rows = _derived_source_history(conn, src, with_models=False)
+        if rows:
+            per_source[src] = {r['cycle_ts']: r for r in rows}
+
+    all_cycles = sorted({cts for rows in per_source.values() for cts in rows})
+    out = []
+    last_totals = {src: {f: 0 for f in _USAGE_FIELDS} for src in per_source}
+    for cts in all_cycles:
+        agg = {f: 0 for f in _USAGE_FIELDS}
+        agg_delta = {f: 0 for f in _USAGE_FIELDS}
+        for src, rows in per_source.items():
+            row = rows.get(cts)
+            if row:
+                last_totals[src] = {f: row[f] for f in _USAGE_FIELDS}
+                for f in _USAGE_FIELDS:
+                    agg_delta[f] += row[f'delta_{f}']
+            for f in _USAGE_FIELDS:
+                agg[f] += last_totals[src][f]
+        entry = {
+            'cycle_ts': cts,
+            'timestamp': datetime.fromtimestamp(cts, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
+        }
+        entry.update(agg)
+        entry.update({f'delta_{f}': agg_delta[f] for f in _USAGE_FIELDS})
+        out.append(entry)
+    return out
+
+
+def latest_usage(conn: sqlite3.Connection, source: str = None, cycle_ts: int = None, include_model_deltas: bool = False) -> dict:
+    if source is not None:
+        sources = [source]
     else:
-        quota_data = conn
-        source = kwargs.get('source', 'agy')
+        from source_registry import get_all_names
+        sources = get_all_names()
 
-        if 'error' in quota_data:
-            return
+    result = {}
+    for src in sources:
+        rows = _derived_source_history(conn, src)
+        if cycle_ts is not None:
+            rows = [r for r in rows if r['cycle_ts'] == cycle_ts]
+        if not rows:
+            continue
+        row = rows[-1]
+        if include_model_deltas:
+            # Per-model change during the latest cycle — already computed by
+            # the derivation as delta_* on each model row.
+            row['model_deltas'] = [
+                {
+                    'model_name': m['model_name'],
+                    'messages': m['delta_messages'],
+                    'input_tokens': m['delta_input_tokens'],
+                    'output_tokens': m['delta_output_tokens'],
+                    'cost': 0.0,
+                }
+                for m in row.get('models', [])
+            ]
+        result[src] = row
+    return result
 
-        temp_conn = connect(DB_PATH)
-        cycle_ts = (int(time.time()) // 600) * 600
-        _do_insert_quota(temp_conn, source, cycle_ts, quota_data)
-        temp_conn.close()
-        return
 
-    _do_insert_quota(conn, source, cycle_ts, data)
-
+# --- Quota ---
 
 def _do_insert_quota(conn, source, cycle_ts, data):
     ts_str = datetime.fromtimestamp(cycle_ts, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
@@ -446,11 +524,7 @@ def _do_insert_quota(conn, source, cycle_ts, data):
                 continue
             for subkey, subval in val.items():
                 if isinstance(subval, dict):
-                    has_deep_nesting = False
-                    for _, leaf in subval.items():
-                        if isinstance(leaf, dict):
-                            has_deep_nesting = True
-                            break
+                    has_deep_nesting = any(isinstance(leaf, dict) for leaf in subval.values())
                     if has_deep_nesting:
                         for limit_type, info in subval.items():
                             if isinstance(info, dict):
@@ -461,22 +535,16 @@ def _do_insert_quota(conn, source, cycle_ts, data):
         for r in data:
             if not isinstance(r, dict):
                 continue
-            group_name = r.get('model_group')
-            limit_type = r.get('limit_type')
-            used = r.get('used', 0.0)
-            total = r.get('total', 0.0)
-            remaining_pct = r.get('remaining_pct', 0.0)
-            refreshes_in = r.get('refreshes_in_seconds', r.get('refreshes_in', 0))
+            _save_quota_row(conn, ts_str, source, cycle_ts,
+                            r.get('model_group'), r.get('limit_type'), r)
 
-            conn.execute('''
-                INSERT OR REPLACE INTO quota_snapshots (
-                    timestamp, source, cycle_ts, model_group, limit_type,
-                    used, total, remaining_pct, refreshes_in_seconds
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                ts_str, source, cycle_ts, group_name, limit_type,
-                used, total, remaining_pct, refreshes_in
-            ))
+    # Same invariant as _do_insert_usage: pair every quota write with a
+    # collection_status row at the data layer, not by caller discipline.
+    conn.execute('''
+        INSERT OR REPLACE INTO collection_status (source, kind, cycle_ts, timestamp, ok, error, duration_ms)
+        VALUES (?, 'quota', ?, ?, 1, NULL, 0.0)
+    ''', (source, cycle_ts, ts_str))
+
     conn.commit()
 
 
@@ -500,7 +568,11 @@ def _save_quota_row(conn, ts_str, source, cycle_ts, group_name, limit_type, info
 def latest_quota(conn: sqlite3.Connection, source: str = None) -> dict:
     cursor = conn.cursor()
     result = {}
-    sources = [source] if source is not None else ['opencode', 'agy', 'codex']
+    if source is not None:
+        sources = [source]
+    else:
+        from source_registry import get_all_names
+        sources = get_all_names()
 
     for src in sources:
         cursor.execute(
@@ -523,32 +595,71 @@ def latest_quota(conn: sqlite3.Connection, source: str = None) -> dict:
                 result[src][group] = {}
             result[src][group][r['limit_type']] = dict(r)
 
-    if source is not None:
-        return result
     return result
 
 
-# --- Backward Compatibility Delegates ---
-def get_latest_usage(source=None, include_model_deltas=False):
-    conn = connect(DB_PATH)
+# --- Maintenance ---
+
+def metrics(conn: sqlite3.Connection) -> dict:
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT source FROM collection_status")
+    sources = [r['source'] for r in cursor.fetchall()]
+
+    per_source = {}
+    for src in sources:
+        cursor.execute(
+            "SELECT kind, timestamp, ok, error, duration_ms FROM collection_status "
+            "WHERE source=? ORDER BY id DESC LIMIT 2",
+            (src,)
+        )
+        rows = cursor.fetchall()
+        src_info = {}
+        for row in rows:
+            kind = row['kind']
+            src_info[kind] = {
+                'last_success_at': row['timestamp'] if row['ok'] else None,
+                'last_error': None if row['ok'] else row['error'],
+                'last_duration_ms': row['duration_ms'],
+            }
+        per_source[src] = src_info
+
+    cursor.execute("SELECT COUNT(*) AS cnt FROM usage_history")
+    total_polls = cursor.fetchone()['cnt']
+
     try:
-        return latest_usage(conn, source, include_model_deltas=include_model_deltas)
-    finally:
-        conn.close()
+        db_size_bytes = os.path.getsize(DB_PATH)
+    except OSError:
+        db_size_bytes = 0
+
+    return {
+        'per_source': per_source,
+        'total_polls': total_polls,
+        'db_size_bytes': db_size_bytes,
+    }
 
 
-def get_history_series(source='opencode'):
-    conn = connect(DB_PATH)
-    try:
-        return history(conn, source)
-    finally:
-        conn.close()
+def prune(conn: sqlite3.Connection, retention_days: int) -> None:
+    """Delete rows older than the retention window, but keep the newest
+    pre-cutoff observation per source as an anchor: the first retained
+    cycle's delta is still computed against a real prior reading instead of
+    counting as a first observation (delta 0). Derived totals therefore mean
+    "cumulative over the retention window"."""
+    cutoff_time = datetime.now(timezone.utc) - timedelta(days=retention_days)
+    cutoff_ts = int(cutoff_time.timestamp())
 
+    conn.execute('''
+        DELETE FROM usage_history WHERE cycle_ts < :cut AND cycle_ts <> (
+            SELECT MAX(cycle_ts) FROM usage_history AS h
+            WHERE h.source = usage_history.source AND h.cycle_ts < :cut
+        )
+    ''', {'cut': cutoff_ts})
+    conn.execute('''
+        DELETE FROM model_usage WHERE cycle_ts < :cut AND cycle_ts <> (
+            SELECT MAX(cycle_ts) FROM model_usage AS m
+            WHERE m.source = model_usage.source AND m.cycle_ts < :cut
+        )
+    ''', {'cut': cutoff_ts})
+    conn.execute("DELETE FROM quota_snapshots WHERE cycle_ts < ?", (cutoff_ts,))
+    conn.execute("DELETE FROM collection_status WHERE cycle_ts < ?", (cutoff_ts,))
 
-def get_latest_quota(source=None):
-    conn = connect(DB_PATH)
-    try:
-        return latest_quota(conn, source)
-    finally:
-        conn.close()
-
+    conn.commit()

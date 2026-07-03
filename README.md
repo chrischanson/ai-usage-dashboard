@@ -1,8 +1,8 @@
 # AI Usage Dashboard
 
-> **One dashboard. Three AI coding agents. Zero cloud dependency.**
+> **One dashboard. Four AI coding agents. Zero cloud dependency.**
 
-Monitor token usage, session stats, cost, and quota limits for **Antigravity (AGY)**, **OpenCode CLI**, and **Codex CLI (OpenAI)** in a single local real-time dashboard — backed by SQLite, served by FastAPI, rendered with Chart.js.
+Monitor token usage, session stats, cost, and quota limits for **Antigravity (AGY)**, **Claude (Claude Code)**, **OpenCode CLI**, and **Codex CLI (OpenAI)** in a single local real-time dashboard — backed by SQLite, served by FastAPI, rendered with Chart.js.
 
 ![Dashboard screenshot](docs/screenshot.png)
 
@@ -28,9 +28,9 @@ If you run multiple AI coding assistants, tracking quota and spend across separa
 
 - 📊 **Stacked area chart** (Total mode) and **individual line chart** (Rate mode) for token history
 - 🍩 **Donut model distribution** chart — see which models consumed the most tokens
-- 🗂️ **Per-source tabs**: All (combined), AGY, OpenCode, Codex
+- 🗂️ **Per-source tabs**: All (combined), AGY, Claude, OpenCode, Codex
 - ⏱️ **Time range filters**: 1h / 6h / 1d / 1w / 1m / 3m / all
-- 💳 **Quota bars** with live plan badge for AGY; cost display for OpenCode; monthly limit for Codex
+- 💳 **Quota bars** with live plan badge for AGY and Claude; cost display for OpenCode; monthly limit for Codex
 - 📱 **Mobile responsive** — single 640 px breakpoint
 - ♿ **Accessible** — ARIA roles, keyboard navigation, `:focus-visible`, `prefers-reduced-motion`
 - 🔒 **Secure by default** — local-only bind (`127.0.0.1`), CSP headers, no secrets logged
@@ -64,6 +64,7 @@ PYTHONPATH=. python3 -m main
 | Source | Usage | Quota |
 |---|---|---|
 | **AGY (Antigravity)** | Local conversation `.db` protobuf blobs | Cloud Code RPC + `loadCodeAssist` |
+| **Claude (Claude Code)** | Local `~/.claude/projects/**/*.jsonl` transcripts | Anthropic OAuth usage API (`~/.claude/.credentials.json`) |
 | **OpenCode CLI** | `opencode stats --models` subprocess | Same subprocess (total cost) |
 | **Codex CLI (OpenAI)** | `~/.codex/state_5.sqlite` threads | JWT plan + `logs_2.sqlite` rate-limit events |
 
@@ -128,7 +129,7 @@ Full design decisions: [DESIGN.md](DESIGN.md)
 ## Testing
 
 ```bash
-# 292-check integration suite
+# 233-check integration suite
 PYTHONPATH=backend python3 verify.py
 
 # Unit tests
@@ -144,9 +145,18 @@ backend/          FastAPI server, parsers, poller, DB layer, integrity monitor
 frontend/         Static HTML/CSS/JS dashboard (Chart.js, no framework)
 install/          systemd service + SysVinit scripts
 DESIGN.md         Architecture, data model, API spec, build order
-verify.py         Integration test suite (292 checks)
+verify.py         Integration test suite (233 checks)
 run.sh            Convenience launcher (creates venv, installs deps)
 ```
+
+---
+
+## Regenerating Screenshot
+
+If you need to regenerate the dashboard screenshot, a dedicated agent skill configuration is available in this repository under:
+`.agents/skills/generate-dashboard-screenshot/`
+
+This skill provides the workflow and tools to seed mock historical data, temporarily bypass real APIs, and take a clean screenshot of the dashboard.
 
 ---
 
