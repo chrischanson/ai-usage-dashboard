@@ -116,6 +116,58 @@ def setup_mock_codex():
     print(f"  Codex auth.json at {auth_path}")
 
 
+_FAKE_OPENCODE_OUTPUT = """\
+┌──────────────────────────────────────────────────┐
+│                       OVERVIEW                         │
+├──────────────────────────────────────────────────┤
+│Sessions                                             12 │
+│Messages                                            240 │
+└──────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────┐
+│                    COST & TOKENS                       │
+├──────────────────────────────────────────────────┤
+│Input                                              1.0K │
+│Output                                               500 │
+│Cache Read                                           2.0K │
+│Cache Write                                          100 │
+└──────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────┐
+│                      MODEL USAGE                       │
+├──────────────────────────────────────────────────┤
+│ opencode/ci-test-model                                 │
+│  Messages                                           240 │
+│  Input Tokens                                       1.0K │
+│  Output Tokens                                        500 │
+│  Cache Read                                         2.0K │
+│  Cache Write                                          100 │
+│  Cost                                             $0.0100 │
+└──────────────────────────────────────────────────┘
+"""
+
+
+def setup_mock_opencode(bin_dir):
+    """Write a fake `opencode` executable on PATH so OpenCodeParser has
+    something to shell out to in CI (there's no real opencode CLI there)."""
+    os.makedirs(bin_dir, exist_ok=True)
+    fake_bin = os.path.join(bin_dir, 'opencode')
+    with open(fake_bin, 'w') as f:
+        f.write("#!/bin/sh\ncat <<'FAKE_OPENCODE_EOF'\n")
+        f.write(_FAKE_OPENCODE_OUTPUT)
+        f.write("FAKE_OPENCODE_EOF\n")
+    os.chmod(fake_bin, 0o755)
+    print(f"  Fake opencode binary at {fake_bin}")
+
+    github_path_file = os.environ.get('GITHUB_PATH')
+    if github_path_file:
+        with open(github_path_file, 'a') as f:
+            f.write(bin_dir + '\n')
+        print(f"  Added {bin_dir} to $GITHUB_PATH for later steps")
+    else:
+        print(f"  Not running under GitHub Actions — add {bin_dir} to PATH yourself if testing locally")
+
+
 def main():
     print("Setting up mock source files for CI...")
     if os.path.exists(os.path.join(os.path.dirname(__file__), '.ci_mocks')):
@@ -123,6 +175,7 @@ def main():
 
     setup_mock_agy()
     setup_mock_codex()
+    setup_mock_opencode(os.path.join(os.path.dirname(__file__), '.ci_mocks', 'bin'))
     print("Done. Mock sources ready.")
     return 0
 

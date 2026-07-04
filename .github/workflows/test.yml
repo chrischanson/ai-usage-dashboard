@@ -45,7 +45,7 @@ jobs:
 
     - name: Run integration tests
       run: |
-        PYTHONPATH=backend python3 backend/verify.py
+        PYTHONPATH=backend python3 verify.py
 
     - name: Run unit tests
       run: |

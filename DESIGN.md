@@ -368,8 +368,9 @@ extra API calls.
 This project lives only here, as a subdirectory of the `main` monorepo (Gitea
 `origin` remote). There is no separate on-disk copy for the public GitHub
 release anymore — `~/workspace/ai-usage-dashboard-standalone` was retired on
-2026-07-04 (moved to `~/workspace/main/backups/ai-usage-dashboard-standalone-retired-2026-07-04/`)
-because it had drifted from this copy and needed manual syncing.
+2026-07-04 (it had drifted from this copy and needed manual syncing) and later
+deleted outright once its leaked PAT was revoked and nothing else in it was
+worth keeping.
 
 **Don't use `git subtree split` for this** — it carries this subdirectory's
 *full* monorepo history along with it, and that history isn't safe to publish:

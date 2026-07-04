@@ -944,9 +944,18 @@ try:
 except ImportError as e:
     fail(f'source_registry import error: {e}')
 
-# SourceUnavailable raised when source is missing
+# SourceUnavailable raised when source is missing.
+# Strip the CI mock bin dir (if any — see setup_mock_sources.py) from PATH for
+# this one check: the poller needs the fake `opencode` on PATH so real usage
+# data exists for the checks above, but this check specifically wants to
+# verify graceful degradation when the binary is genuinely absent.
 try:
     ocp = OpenCodeParser(timeout=1)
+    real_path = os.pathsep.join(
+        p for p in os.environ.get('PATH', '').split(os.pathsep) if '.ci_mocks' not in p
+    )
+    old_path = os.environ.get('PATH', '')
+    os.environ['PATH'] = real_path
     try:
         ocp.parse()
         fail('OpenCodeParser.parse() should raise SourceUnavailable when opencode not found')
@@ -954,6 +963,8 @@ try:
         ok('OpenCodeParser raises SourceUnavailable on missing binary')
     except Exception:
         pass  # Could also be FileNotFoundError wrapped
+    finally:
+        os.environ['PATH'] = old_path
 except ImportError as e:
     fail(f'SourceUnavailable test: {e}')
 
