@@ -1,4 +1,5 @@
 """Entry point for the AI Usage Dashboard."""
+import logging
 import signal
 import sys
 import uvicorn
@@ -9,6 +10,10 @@ from poller import Poller
 
 def main():
     cfg = load_config()
+    logging.basicConfig(
+        level=getattr(logging, cfg.log_level, logging.INFO),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
 
     conn = connect(cfg.db_path)
     init_schema(conn)

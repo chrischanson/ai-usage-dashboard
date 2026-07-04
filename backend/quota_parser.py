@@ -141,6 +141,12 @@ def _try_connect_rpc(port, csrf_token):
         url = f'{proto}://127.0.0.1:{port}{QUOTA_RPC_PATH}'
         ctx = None
         if proto == 'https':
+            # Verification is disabled only because the language server presents an
+            # ephemeral, self-signed loopback cert with no stable identity to check
+            # against. This is safe *only* because the target is hardcoded to
+            # 127.0.0.1 above — assert that invariant so it can't silently drift.
+            assert url.startswith('https://127.0.0.1:'), \
+                "refusing to skip TLS verification for a non-loopback target"
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE

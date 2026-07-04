@@ -23,9 +23,16 @@ Group=PROJECT_USER
 StandardOutput=journal
 StandardError=journal
 
-# Allow access to user home dirs (AGY DBs, OpenCode config, etc.)
-ProtectHome=false
-ProtectSystem=false
+# Hardening: the process holds live AI provider tokens in memory (reads
+# ~/.claude, ~/.codex, ~/.gemini), so it needs read access to the user's
+# home dir but nothing else on the system, and only write access to its
+# own project dir (usage.db/-wal/-shm live under PROJECT_DIR/backend) plus
+# the OpenCode CLI's own state/log dir, which it insists on writing to
+# every time the poller shells out to `opencode stats`.
+ProtectHome=read-only
+ProtectSystem=strict
+ReadWritePaths=PROJECT_DIR PROJECT_HOME_DIR/.local/share/opencode
+NoNewPrivileges=yes
 PrivateTmp=true
 
 [Install]

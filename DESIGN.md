@@ -281,7 +281,7 @@ parser, no extra dependency):
 | `USAGE_SUBPROCESS_TIMEOUT` | `20` | Timeout for CLI subprocess calls |
 | `USAGE_NETWORK_TIMEOUT` | `10` | Timeout for quota/network calls |
 | `USAGE_RETENTION_DAYS` | `90` | History pruning window |
-| `USAGE_HOST` | `0.0.0.0` | Bind host (`127.0.0.1` to avoid LAN exposure) |
+| `USAGE_HOST` | `0.0.0.0` | Bind host — intentionally LAN/tailnet-reachable, no auth (see Security below); set to `127.0.0.1` to restrict to the host only |
 | `USAGE_PORT` | `8000` | Bind port |
 | `USAGE_LOG_LEVEL` | `INFO` | Logging level |
 
@@ -355,6 +355,35 @@ extra API calls.
   'unsafe-inline'`. Chart.js is vendored locally so no CDN/SRI is needed.
 - Request validation: `{source}` validated against the enum; `limit` bounded.
 - Subprocess calls use argument lists (no shell).
+- **No authentication, bound to `0.0.0.0`** — this is an intentional, owner-accepted
+  posture: the dashboard is meant to be reachable from any LAN device and the
+  tailnet without a login step. There is nothing route-specific gating access;
+  anyone who can reach the host on port 8000 can read usage/quota data and
+  `/metrics`. If this host ever sits on a network you don't fully trust, put it
+  behind a reverse proxy with auth, or bind `USAGE_HOST=127.0.0.1` and reach it
+  via an SSH tunnel / `tailscale serve` instead.
+
+## Publishing to GitHub
+
+This project lives only here, as a subdirectory of the `main` monorepo (Gitea
+`origin` remote). There is no separate on-disk copy for the public GitHub
+release anymore — `~/workspace/ai-usage-dashboard-standalone` was retired on
+2026-07-04 (moved to `~/workspace/main/backups/ai-usage-dashboard-standalone-retired-2026-07-04/`)
+because it had drifted from this copy and needed manual syncing.
+
+To cut a public release, split this subdirectory's history onto a branch and
+push just that branch to the `github` remote (already configured, no token in
+the URL — set up your own credential helper or SSH key before pushing):
+
+```bash
+cd ~/workspace/main
+git subtree split --prefix=public_projects/ai-usage-dashboard -b ai-usage-dashboard-release
+git push github ai-usage-dashboard-release:main   # rewrites the public repo's history — check first
+```
+
+`git push` to `github` is a one-way door for a public repo (rewrites history
+other clones have), so review the diff before pushing rather than doing it
+reflexively on every commit.
 
 ## Operations & Deployment
 

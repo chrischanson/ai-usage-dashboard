@@ -83,9 +83,14 @@ All settings via environment variables (all have sensible defaults):
 | `USAGE_SUBPROCESS_TIMEOUT` | `20` | Timeout for CLI subprocess calls |
 | `USAGE_NETWORK_TIMEOUT` | `10` | Timeout for network/quota calls |
 | `USAGE_RETENTION_DAYS` | `90` | History pruning window |
-| `USAGE_HOST` | `127.0.0.1` | Bind address |
+| `USAGE_HOST` | `0.0.0.0` | Bind address — LAN/tailnet-reachable by default, no auth (see Security note below) |
 | `USAGE_PORT` | `8000` | Bind port |
 | `USAGE_LOG_LEVEL` | `INFO` | Logging level |
+
+**Security note:** there is no authentication on any route. This is intentional — the
+dashboard is meant to be reachable from LAN and tailnet devices without a login step. Set
+`USAGE_HOST=127.0.0.1` (and use an SSH tunnel or `tailscale serve` for remote access) if
+you'd rather not expose it, especially on an untrusted network.
 
 ---
 

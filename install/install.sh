@@ -18,6 +18,7 @@ fi
 
 PROJECT_DIR="$(realpath "$1")"
 PROJECT_USER="${2:-$USER}"
+PROJECT_HOME_DIR="$(getent passwd "$PROJECT_USER" | cut -d: -f6)"
 
 if [ ! -d "$PROJECT_DIR/backend" ]; then
     echo "Error: $PROJECT_DIR/backend does not exist. Is this the project root?"
@@ -31,7 +32,8 @@ fi
 
 if command -v systemctl &>/dev/null; then
     SERVICE_FILE="/etc/systemd/system/usage-dashboard.service"
-    sed -e "s|PROJECT_DIR|$PROJECT_DIR|g" \
+    sed -e "s|PROJECT_HOME_DIR|$PROJECT_HOME_DIR|g" \
+        -e "s|PROJECT_DIR|$PROJECT_DIR|g" \
         -e "s|PROJECT_USER|$PROJECT_USER|g" \
         "$PROJECT_DIR/install/usage-dashboard.service" > "$SERVICE_FILE"
     chmod 644 "$SERVICE_FILE"

@@ -18,6 +18,9 @@ venv/
 # Log files
 *.log
 
+# Runtime pid/log dir
+run/
+
 # IDE / Editor
 .vscode/
 .idea/

@@ -13,7 +13,12 @@ CODEX_LOGS = os.path.expanduser('~/.codex/logs_2.sqlite')
 
 
 def _get_plan_from_jwt():
-    """Extract plan type and account info from the JWT token in auth.json."""
+    """Extract plan type and account info from the JWT token in auth.json.
+
+    The signature is intentionally not verified: these claims are read for
+    display only (plan label shown on the dashboard). Never use them for
+    authorization or any other trust decision.
+    """
     if not os.path.exists(AUTH_PATH):
         return None
     try:

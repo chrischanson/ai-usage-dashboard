@@ -114,14 +114,16 @@ class TestPollerRunOnce(unittest.TestCase):
         self.assertEqual(count, 0)
 
     def test_run_once_records_parser_failure_status(self):
+        # Only the exception's type is persisted/exposed (not str(e)), so a
+        # message carrying e.g. an absolute path never reaches /metrics.
         entry = MagicMock()
-        entry.parser.return_value.parse.side_effect = RuntimeError('boom')
+        entry.parser.return_value.parse.side_effect = RuntimeError('boom /home/alice/secret')
         self._run_once_with({'codex': entry})
         row = self.conn.execute(
             "SELECT ok, error FROM collection_status WHERE source='codex' AND kind='usage'"
         ).fetchone()
         self.assertEqual(row['ok'], 0)
-        self.assertEqual(row['error'], 'boom')
+        self.assertEqual(row['error'], 'RuntimeError')
 
 
 if __name__ == '__main__':

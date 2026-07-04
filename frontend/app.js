@@ -13,6 +13,14 @@ document.addEventListener('DOMContentLoaded', () => {
     let cachedModelData = null;
     let latestCompleteTimestamp = null;
 
+    // Clamp values interpolated into inline style="width: N%" so a malformed
+    // upstream reading can't produce a non-numeric or out-of-range style value.
+    function clampPct(value) {
+        const n = Number(value);
+        if (!Number.isFinite(n)) return 0;
+        return Math.max(0, Math.min(100, n));
+    }
+
     const RANGE_LABELS = {
         '1h': ' (Last Hour)',
         '6h': ' (Last 6 Hours)',
@@ -1010,7 +1018,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     let limitsHtml = '';
                     for (const [limitType, info] of Object.entries(limits)) {
                         const label = limitType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                        const pct = info.remaining_pct || 0;
+                        const pct = clampPct(info.remaining_pct);
                         const barColor = pct > 50 ? 'green' : pct > 20 ? 'amber' : 'red';
                         const seconds = info.refreshes_in_seconds || info.refreshes_in || 0;
                         let refreshStr = '';
@@ -1066,7 +1074,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const hasLimit = rateLimit.remaining_pct !== undefined;
 
         if (hasLimit) {
-            const pct = rateLimit.remaining_pct;
+            const pct = clampPct(rateLimit.remaining_pct);
             const barColor = pct > 50 ? 'green' : pct > 20 ? 'amber' : 'red';
             const seconds = rateLimit.refreshes_in || rateLimit.refreshes_in_seconds || 0;
             let refreshStr = '';
@@ -1116,7 +1124,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const sessionGroup = data.session || {};
         const sessionLimit = sessionGroup.five_hour || {};
         if (sessionLimit.used !== undefined) {
-            const remaining = sessionLimit.remaining_pct || 0;
+            const remaining = clampPct(sessionLimit.remaining_pct);
             const barColor = remaining > 50 ? 'green' : remaining > 20 ? 'amber' : 'red';
             const seconds = sessionLimit.refreshes_in_seconds || 0;
             let refreshStr = '';
@@ -1145,7 +1153,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const weeklyGroup = data.weekly || {};
         const weeklyAll = weeklyGroup.all_models || {};
         if (weeklyAll.used !== undefined) {
-            const remaining = weeklyAll.remaining_pct || 0;
+            const remaining = clampPct(weeklyAll.remaining_pct);
             const barColor = remaining > 50 ? 'green' : remaining > 20 ? 'amber' : 'red';
             const seconds = weeklyAll.refreshes_in_seconds || 0;
             let refreshStr = '';
@@ -1176,7 +1184,7 @@ document.addEventListener('DOMContentLoaded', () => {
         for (const [modelName, info] of Object.entries(weeklyGroup)) {
             if (modelName === 'all_models' || !info || typeof info !== 'object') continue;
             if (info.used === undefined) continue;
-            const remaining = info.remaining_pct || 0;
+            const remaining = clampPct(info.remaining_pct);
             const barColor = remaining > 50 ? 'green' : remaining > 20 ? 'amber' : 'red';
             limitsHtml += `
                 <div class="quota-limit">

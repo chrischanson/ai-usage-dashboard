@@ -3,12 +3,15 @@ import os
 
 sys.path.insert(0, os.path.dirname(__file__))
 
+import logging
 import threading
 import time
 from config import Config
 from db import connect, init_schema, record_observation, record_quota, record_status, prune
 from source_registry import get_all_sources
 from util import parse_iso_seconds
+
+logger = logging.getLogger(__name__)
 
 
 class Poller:
@@ -72,7 +75,8 @@ class Poller:
                 record_status(conn, source, 'usage', cycle_ts, False,
                               'empty result', (time.time() - start) * 1000)
         except Exception as e:
-            record_status(conn, source, 'usage', cycle_ts, False, str(e),
+            logger.exception("usage poll failed for source=%s", source)
+            record_status(conn, source, 'usage', cycle_ts, False, type(e).__name__,
                           (time.time() - start) * 1000)
 
     def _poll_quota_source(self, conn, cycle_ts, source, collector):
@@ -149,14 +153,17 @@ class Poller:
                 else:
                     record_quota(conn, source, cycle_ts, quota)
             else:
+                raw_error = quota.get('error', 'empty result') if quota else 'empty result'
+                logger.warning("quota poll failed for source=%s: %s", source, raw_error)
                 record_status(conn, source, 'quota', cycle_ts, False,
-                              quota.get('error', 'empty result') if quota else 'empty result',
+                              raw_error if raw_error == 'empty result' else 'fetch failed',
                               (time.time() - start) * 1000)
                 return
             record_status(conn, source, 'quota', cycle_ts, True, None,
                           (time.time() - start) * 1000)
         except Exception as e:
-            record_status(conn, source, 'quota', cycle_ts, False, str(e),
+            logger.exception("quota poll failed for source=%s", source)
+            record_status(conn, source, 'quota', cycle_ts, False, type(e).__name__,
                           (time.time() - start) * 1000)
 
     def _collect_agy_quota(self):

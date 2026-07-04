@@ -44,7 +44,7 @@ fi
 
 # 4. Resolve destination path
 DEST_DIR="${1:-$HOME/ai-usage-dashboard}"
-DEST_DIR="$(eval echo "$DEST_DIR")" # Expand tilde if any
+DEST_DIR="${DEST_DIR/#\~/$HOME}" # Expand leading tilde, if any (no eval — DEST_DIR is user input)
 echo -e "Target destination: ${YELLOW}$DEST_DIR${NC}"
 
 if [ -d "$DEST_DIR" ]; then
