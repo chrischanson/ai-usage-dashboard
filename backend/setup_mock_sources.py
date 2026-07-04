@@ -59,6 +59,35 @@ def setup_mock_agy():
         print(f"  AGY conv DB at {db_path}")
 
 
+def setup_mock_agy_quota():
+    """Seed an AGY quota snapshot directly in the app DB.
+
+    fetch_agy_quota() needs a live local language-server RPC (CSRF token
+    from a running process's cmdline, etc.) that doesn't exist in CI, so
+    the live path always fails there. Seeding quota_snapshots directly
+    covers the same ground the poller would if that RPC existed —
+    api.py's fallback keeps DB-sourced groups when the live fetch errors.
+    """
+    import time
+    import db as dbmod
+
+    conn = dbmod.connect(dbmod.DB_PATH)
+    dbmod.init_schema(conn)
+    cycle_ts = int(time.time())
+    dbmod.record_quota(conn, 'agy', cycle_ts, {
+        'gemini_models': {
+            'weekly_limit': {'used': 20.0, 'total': 100.0, 'remaining_pct': 80.0, 'refreshes_in': 500000},
+            'five_hour_limit': {'used': 5.0, 'total': 100.0, 'remaining_pct': 95.0, 'refreshes_in': 15000},
+        },
+        'claude_gpt_models': {
+            'weekly_limit': {'used': 50.0, 'total': 100.0, 'remaining_pct': 50.0, 'refreshes_in': 100000},
+            'five_hour_limit': {'used': 0.0, 'total': 100.0, 'remaining_pct': 100.0, 'refreshes_in': 18000},
+        },
+    })
+    conn.close()
+    print(f"  AGY quota snapshot seeded in {dbmod.DB_PATH}")
+
+
 def setup_mock_codex():
     """Create Codex state DB, logs DB, and auth.json with JWT."""
     codex_dir = os.path.expanduser('~/.codex')
@@ -174,6 +203,7 @@ def main():
         shutil.rmtree(os.path.join(os.path.dirname(__file__), '.ci_mocks'))
 
     setup_mock_agy()
+    setup_mock_agy_quota()
     setup_mock_codex()
     setup_mock_opencode(os.path.join(os.path.dirname(__file__), '.ci_mocks', 'bin'))
     print("Done. Mock sources ready.")
