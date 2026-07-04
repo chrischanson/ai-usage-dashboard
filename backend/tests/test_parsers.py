@@ -81,10 +81,20 @@ class TestSourceUnavailable(unittest.TestCase):
             self.assertEqual(str(e), "test error")
 
     def test_raised_when_source_missing(self):
-        # OpenCodeParser should raise on missing binary
+        # OpenCodeParser should raise on missing binary. Strip the CI mock
+        # bin dir (see setup_mock_sources.py) from PATH for this one check —
+        # it's added globally so the *server* has usage data to report, but
+        # this test specifically wants opencode genuinely absent.
         parser = OpenCodeParser(timeout=1)
-        with self.assertRaises(SourceUnavailable):
-            parser.parse()
+        old_path = os.environ.get('PATH', '')
+        os.environ['PATH'] = os.pathsep.join(
+            p for p in old_path.split(os.pathsep) if '.ci_mocks' not in p
+        )
+        try:
+            with self.assertRaises(SourceUnavailable):
+                parser.parse()
+        finally:
+            os.environ['PATH'] = old_path
 
     def test_raised_when_agy_dbs_missing(self):
         parser = AgyParser(conv_dir='/nonexistent/path', ide_conv_dir='/nonexistent/path')
