@@ -371,19 +371,34 @@ release anymore — `~/workspace/ai-usage-dashboard-standalone` was retired on
 2026-07-04 (moved to `~/workspace/main/backups/ai-usage-dashboard-standalone-retired-2026-07-04/`)
 because it had drifted from this copy and needed manual syncing.
 
-To cut a public release, split this subdirectory's history onto a branch and
-push just that branch to the `github` remote (already configured, no token in
-the URL — set up your own credential helper or SSH key before pushing):
+**Don't use `git subtree split` for this** — it carries this subdirectory's
+*full* monorepo history along with it, and that history isn't safe to publish:
+it contains `IMPROVE.md` (references the internal Gitea address and other
+internal-only tracking docs) and, in an old commit, a real `usage.db.bak` with
+actual personal usage data that was later deleted but is still reachable via
+history. A 2026-07-04 audit confirmed no other secrets exist in this
+subdirectory's history, but those two are enough to rule out any
+history-preserving publish method.
+
+Instead, publish as a **fresh, single-commit snapshot** of the current tree,
+with internal-only files stripped, and push over SSH (`git@github.com`, key at
+`~/.ssh/keys/github_omv`, registered on the `chrischanson` GitHub account):
 
 ```bash
+SNAP=$(mktemp -d)
 cd ~/workspace/main
-git subtree split --prefix=public_projects/ai-usage-dashboard -b ai-usage-dashboard-release
-git push github ai-usage-dashboard-release:main   # rewrites the public repo's history — check first
+git archive HEAD public_projects/ai-usage-dashboard | tar -x -C "$SNAP" --strip-components=2
+rm "$SNAP/IMPROVE.md"   # internal-only — never publish this file
+cd "$SNAP"
+git init -q -b main && git add -A && git commit -q -m "Sync from internal monorepo: <summary>"
+git remote add github git@github.com:chrischanson/ai-usage-dashboard.git
+git push --force github main:main   # replaces prior history — expected every time
 ```
 
-`git push` to `github` is a one-way door for a public repo (rewrites history
-other clones have), so review the diff before pushing rather than doing it
-reflexively on every commit.
+This is a one-way door for a public repo each time (replaces history other
+clones have), so re-run the secrets/internal-reference scan on `$SNAP` before
+pushing if anything beyond routine code changes has landed since the last
+release.
 
 ## Operations & Deployment
 
