@@ -30,7 +30,8 @@ jobs:
 
     - name: Start server
       run: |
-        cd backend && PYTHONPATH=. nohup python3 -m main > /dev/null 2>&1 &
+        cd backend
+        PYTHONPATH=. nohup python3 -m main > /dev/null 2>&1 &
         echo $! > /tmp/dashboard.pid
         for i in $(seq 1 20); do
           if curl -sf http://127.0.0.1:8000/health > /dev/null 2>&1; then
