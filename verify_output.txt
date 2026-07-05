@@ -1,0 +1,420 @@
+
+[1m=== Verifying http://127.0.0.1:8000 ===[0m
+
+
+── [1] Server process ──
+  [31mFAIL[0m PID file /tmp/dashboard.pid not found
+
+── [2] Frontend HTML ──
+  [32mPASS[0m Tab label says "All"
+  [32mPASS[0m Old "Combined (All)" label removed
+  [32mPASS[0m Tab data-source="combined" present
+  [32mPASS[0m Tab data-source="agy" present
+  [32mPASS[0m Tab data-source="opencode" present
+  [32mPASS[0m Tab data-source="codex" present
+  [32mPASS[0m Time range buttons present
+  [32mPASS[0m Chart controls removed from chart container
+  [32mPASS[0m Time range button data-range="1h"
+  [32mPASS[0m Time range button data-range="6h"
+  [32mPASS[0m Time range button data-range="1d"
+  [32mPASS[0m Time range button data-range="1w"
+  [32mPASS[0m Time range button data-range="1m"
+  [32mPASS[0m Time range button data-range="3m"
+  [32mPASS[0m Time range button data-range="all"
+  [32mPASS[0m Mode toggle data-mode="total"
+  [32mPASS[0m Mode toggle data-mode="rate"
+
+── [3] Frontend JS ──
+  [32mPASS[0m Dynamic source CSS class set on quota-cards
+  [32mPASS[0m Codex plan passed to renderCodexQuota
+  [32mPASS[0m Codex badge uses dynamic plan label
+  [32mPASS[0m AGY badge uses dynamic plan label
+  [32mPASS[0m renderQuota called with currentSource
+  [32mPASS[0m fetchQuota function defined
+  [32mPASS[0m OpenCode cost rendering function
+  [32mPASS[0m Codex quota rendering function
+  [32mPASS[0m timeRange state variable
+  [32mPASS[0m mode state variable
+  [32mPASS[0m cachedHistory variable
+  [32mPASS[0m Caches history data after fetch
+  [32mPASS[0m filterByTimeRange function
+  [32mPASS[0m Rate mode plots backend-served deltas
+  [32mPASS[0m Time range button event listeners
+  [32mPASS[0m Mode toggle event listeners
+  [32mPASS[0m Chart re-renders from cache on range/mode change
+  [32mPASS[0m Y-axis begins at zero
+  [32mPASS[0m Model deltas param based on mode
+  [32mPASS[0m Model deltas stored separately from cumulative
+  [32mPASS[0m Model chart title static
+
+── [4] CSS ──
+  [32mPASS[0m .source-combined class
+  [32mPASS[0m .source-agy class
+  [32mPASS[0m Combined 5-column grid with OpenCode half-width
+  [32mPASS[0m AGY 2-column grid
+  [32mPASS[0m Responsive breakpoint at 900px
+  [32mPASS[0m Responsive breakpoint at 600px
+  [32mPASS[0m AGY badge style
+  [32mPASS[0m OpenCode badge style
+  [32mPASS[0m Codex badge style
+  [32mPASS[0m Green quota bar
+  [32mPASS[0m Amber quota bar
+  [32mPASS[0m Red quota bar
+  [32mPASS[0m Stats row layout
+  [32mPASS[0m Stats overview section
+  [32mPASS[0m Time range button style
+  [32mPASS[0m Mode toggle button style
+  [32mPASS[0m Active range button style
+  [32mPASS[0m Active mode button style
+
+── [5] API: Combined usage ──
+  [32mPASS[0m Usage: agy present
+  [32mPASS[0m Usage: opencode present
+  [32mPASS[0m Usage: codex present
+  [32mPASS[0m Usage: sessions aggregated
+  [32mPASS[0m Usage: messages aggregated
+  [32mPASS[0m Usage: input_tokens aggregated
+  [32mPASS[0m Usage: output_tokens aggregated
+
+── [6] API: Per-source usage ──
+  [32mPASS[0m Usage/agy: data present
+  [32mPASS[0m Usage/opencode: data present
+  [32mPASS[0m Usage/codex: data present
+
+── [7] API: Model deltas ──
+  [32mPASS[0m Usage/latest without deltas: agy.models has 8 items
+  [32mPASS[0m Usage/latest without deltas: opencode.models has 9 items
+  [32mPASS[0m Usage/latest without deltas: codex.models has 3 items
+  [32mPASS[0m Usage/latest with deltas: agy.model_deltas has 8 items
+  [32mPASS[0m Usage/latest with deltas: opencode.model_deltas has 9 items
+  [32mPASS[0m Usage/latest with deltas: codex.model_deltas has 3 items
+
+── [8] API: Usage history ──
+  [32mPASS[0m History/agy: 1082 data points
+  [32mPASS[0m History/opencode: 1082 data points
+  [32mPASS[0m History/codex: 1082 data points
+
+── [9] API: Combined quota ──
+  [32mPASS[0m Quota: agy present
+  [32mPASS[0m Quota: opencode present
+  [32mPASS[0m Quota: codex present
+  [32mPASS[0m Quota: AGY plan="Gemini Code Assist"
+  [32mPASS[0m Quota: AGY group "gemini_models" present
+  [32mPASS[0m Quota: AGY group "claude_gpt_models" present
+  [32mPASS[0m Quota: AGY.gemini_models.weekly_limit.used=16.668945999999995
+  [32mPASS[0m Quota: AGY.gemini_models.weekly_limit.total=100.0
+  [32mPASS[0m Quota: AGY.gemini_models.weekly_limit.remaining_pct=83.33105400000001
+  [32mPASS[0m Quota: AGY.gemini_models.weekly_limit.refreshes_in_seconds=567749
+  [32mPASS[0m Quota: AGY.gemini_models.five_hour_limit.used=0.0
+  [32mPASS[0m Quota: AGY.gemini_models.five_hour_limit.total=100.0
+  [32mPASS[0m Quota: AGY.gemini_models.five_hour_limit.remaining_pct=100.0
+  [32mPASS[0m Quota: AGY.gemini_models.five_hour_limit.refreshes_in_seconds=17896
+  [32mPASS[0m Quota: AGY.claude_gpt_models.weekly_limit.used=100.0
+  [32mPASS[0m Quota: AGY.claude_gpt_models.weekly_limit.total=100.0
+  [32mPASS[0m Quota: AGY.claude_gpt_models.weekly_limit.remaining_pct=0.0
+  [32mPASS[0m Quota: AGY.claude_gpt_models.weekly_limit.refreshes_in_seconds=152493
+  [32mPASS[0m Quota: AGY.claude_gpt_models.five_hour_limit.used=0.0
+  [32mPASS[0m Quota: AGY.claude_gpt_models.five_hour_limit.total=100.0
+  [32mPASS[0m Quota: AGY.claude_gpt_models.five_hour_limit.remaining_pct=100.0
+  [32mPASS[0m Quota: AGY.claude_gpt_models.five_hour_limit.refreshes_in_seconds=17896
+  [32mPASS[0m Quota: OpenCode cost=$5.25
+  [32mPASS[0m Quota: Codex plan="free"
+  [32mPASS[0m Quota: Codex rate_limit.remaining_pct=0.0
+  [32mPASS[0m Quota: Codex rate_limit.used=100.0
+  [32mPASS[0m Quota: Codex rate_limit.total=100.0
+  [32mPASS[0m Quota: Codex rate_limit.refreshes_in_seconds=1368424
+
+── [10] API: Per-source quota ──
+  [32mPASS[0m Quota/agy: data present
+  [32mPASS[0m Quota/opencode: data present
+  [32mPASS[0m Quota/codex: data present
+
+── [11] Codex: JWT plan extraction ──
+  [32mPASS[0m Codex: plan_type="free" from JWT
+  [32mPASS[0m Codex: 21 sessions, 30,989,442 tokens
+  [32mPASS[0m Codex: primary_used_pct=100.0 from logs
+
+── [12] AGY: plan extraction ──
+  [32mPASS[0m AGY: plan="Gemini Code Assist" from Cloud Code API
+
+── [13] Frontend load ──
+  [32mPASS[0m index.html serves correctly
+  [32mPASS[0m app.js serves correctly
+  [32mPASS[0m index.css serves correctly
+
+── [14] Regression: Sessions/Messages layout ──
+  [32mPASS[0m Sessions/Messages uses card-row flex layout
+  [32mPASS[0m total-messages is not a <p> (uses card-row)
+
+── [15] Regression: XSS prevention ──
+  [32mPASS[0m escapeHtml function defined
+  [32mPASS[0m XSS: AGY plan badge escaped
+  [32mPASS[0m XSS: Codex plan badge escaped
+  [32mPASS[0m XSS: Quota limit label escaped
+  [32mPASS[0m XSS: Model name escaped
+  [32mPASS[0m XSS: Group label escaped
+
+── [16] Regression: Stale cache on tab switch ──
+  [32mPASS[0m Caches cleared on tab switch
+
+── [17] Regression: Date parsing ──
+  [32mPASS[0m parseTs helper defined
+  [32mPASS[0m parseTs converts to ISO format
+  [32mPASS[0m Mobile 24-hour time format
+
+── [18] Regression: Mobile responsive ──
+  [32mPASS[0m Mobile breakpoint at 640px
+  [32mPASS[0m Mobile: card-row CSS defined
+  [32mPASS[0m Mobile: card-sep CSS defined
+  [32mPASS[0m Mobile: Tabs horizontally scrollable on mobile
+  [32mPASS[0m Mobile: Charts section mobile override
+
+── [19] Regression: Header layout ──
+  [32mPASS[0m Time range buttons in HTML
+  [32mPASS[0m No subtitle in header
+
+── [20] Regression: Codex billing API handling ──
+  [32mPASS[0m Codex plan reads from plan_type OR plan
+  [32mPASS[0m Codex billing API path stored in DB
+  [32mPASS[0m Codex billing API path in combined quota
+
+── [21] Regression: Consistent field names ──
+  [32mPASS[0m Backend uses refreshes_in_seconds
+  [32mPASS[0m Frontend uses refreshes_in_seconds
+
+── [22] Regression: JSON parse error isolation ──
+  [32mPASS[0m Combined history JSON parse isolated per source
+
+── [23] Regression: Chart quality ──
+  [32mPASS[0m Chart uses original tension 0.4
+  [32mPASS[0m No point hover radius (original)
+  [32mPASS[0m No forced border width (original)
+  [32mPASS[0m Model chart is doughnut type
+
+── [24] Regression: Chart sizing ──
+  [32mPASS[0m Charts use natural aspect ratio
+
+── [25] Regression: Combined chart timestamp matching ──
+  [32mPASS[0m Combined chart uses forward-fill timestamp matching
+  [32mPASS[0m Combined chart has MS_TOLERANCE tolerance window
+  [32mPASS[0m No exact timestamp === match in combined chart
+  [32mPASS[0m buildFilledLookup returns null when outside tolerance window
+
+── [26] Regression: Model panel respects time range ──
+  [32mPASS[0m computeModelsFromHistory function exists
+  [32mPASS[0m refreshModels function exists
+  [32mPASS[0m Backend: history endpoint includes model data
+
+── [27] M1: config.py ──
+  [32mPASS[0m config.py exists
+  [32mPASS[0m config.py has Config dataclass and load_config()
+  [32mPASS[0m Config has db_path and poll_interval fields
+  [32mPASS[0m load_config() returns Config with correct defaults
+  [32mPASS[0m load_config() rejects non-integer USAGE_POLL_INTERVAL
+  [32mPASS[0m load_config() rejects invalid USAGE_LOG_LEVEL
+
+── [28] M1: db.py new functions ──
+  [32mPASS[0m db.py exists
+  [32mPASS[0m db.py exports connect(), init_schema(), record_status(), metrics(), prune()
+  [32mPASS[0m connect() returns a connection
+  [32mPASS[0m WAL pragma set in connect()
+  [32mPASS[0m synchronous=NORMAL pragma set
+  [32mPASS[0m foreign_keys=ON pragma set
+  [32mPASS[0m row_factory set to sqlite3.Row
+  [32mPASS[0m init_schema() creates collection_status table
+  [32mPASS[0m init_schema() creates meta table
+  [32mPASS[0m meta has schema_version=3
+  [32mPASS[0m record_status() inserts row correctly
+  [32mPASS[0m record_status() stores error text on failure
+  [32mPASS[0m prune() removes old rows but keeps one anchor per source
+  [32mPASS[0m metrics() returns dict with per_source, total_polls, db_size_bytes
+  [32mPASS[0m metrics() includes per-source data
+  [32mPASS[0m init_db() backward compatible: all tables created
+
+── [29] M2: Parser Contract ──
+  [32mPASS[0m parsers/ package directory exists
+  [32mPASS[0m parsers/__init__.py exists
+  [32mPASS[0m parsers.base exports Parser, ParserResult, ModelUsage, SourceUnavailable
+  [32mPASS[0m Parser is an ABC
+  [32mPASS[0m Parser.parse() is abstract
+  [32mPASS[0m SourceUnavailable extends Exception
+  [32mPASS[0m ParserResult has field "sessions"
+  [32mPASS[0m ParserResult has field "messages"
+  [32mPASS[0m ParserResult has field "input_tokens"
+  [32mPASS[0m ParserResult has field "output_tokens"
+  [32mPASS[0m ParserResult has field "cache_read"
+  [32mPASS[0m ParserResult has field "cache_write"
+  [32mPASS[0m ParserResult has field "models"
+  [32mPASS[0m ModelUsage has field "model_name"
+  [32mPASS[0m ModelUsage has field "messages"
+  [32mPASS[0m ModelUsage has field "input_tokens"
+  [32mPASS[0m ModelUsage has field "output_tokens"
+  [32mPASS[0m ModelUsage has field "cache_read"
+  [32mPASS[0m ModelUsage has field "cache_write"
+  [32mPASS[0m ModelUsage has field "cost"
+  [32mPASS[0m OpenCodeParser implements Parser
+  [32mPASS[0m OpenCodeParser has callable parse()
+  [32mPASS[0m AgyParser implements Parser
+  [32mPASS[0m AgyParser has callable parse()
+  [32mPASS[0m CodexParser implements Parser
+  [32mPASS[0m CodexParser has callable parse()
+  [32mPASS[0m parsers/__init__ re-exports all public symbols
+  [32mPASS[0m source_registry lists opencode, agy, codex, claude
+  [32mPASS[0m every registry entry has a callable parser factory
+  [32mPASS[0m OpenCodeParser raises SourceUnavailable on missing binary
+
+── [30] M3: Quota Module ──
+  [32mPASS[0m quota.py exists
+  [32mPASS[0m collect() has correct signature: (source: str, cfg: config.Config) -> dict | None
+  [32mPASS[0m collect('agy', cfg) returns dict or None
+  [32mPASS[0m collect('opencode', cfg) returns dict or None
+  [32mPASS[0m collect('codex', cfg) returns dict or None
+  [32mPASS[0m collect('unknown', cfg) raises ValueError
+
+── [31] M4: Poller Module ──
+  [32mPASS[0m poller.py exists
+  [32mPASS[0m poller.py has Poller class
+  [32mPASS[0m Poller.run_once() exists and is callable
+  [32mPASS[0m Poller.start() exists and is callable
+  [32mPASS[0m Poller.stop() exists and is callable
+  [32mPASS[0m Poller.stop() sets the stop event
+
+── [32] M5: API Module ──
+  [32mPASS[0m api.py exists
+  [32mPASS[0m api.py exports create_app() and error_response()
+  [32mPASS[0m create_app() returns a FastAPI instance
+  [32mPASS[0m Route: /health
+  [32mPASS[0m Route: /ready
+  [32mPASS[0m Route: /metrics
+  [32mPASS[0m Route: /api/usage/latest
+  [32mPASS[0m Route: /api/usage/{source}/latest
+  [32mPASS[0m Route: /api/usage/{source}/history
+  [32mPASS[0m Route: /api/usage/history
+  [32mPASS[0m Route: /api/quota/latest
+  [32mPASS[0m Route: /api/quota/{source}/latest
+  [32mPASS[0m Route: /
+  [32mPASS[0m Route: /static mounted
+  [32mPASS[0m error_response() returns JSONResponse with correct status
+  [32mPASS[0m 404 error handler registered
+  [32mPASS[0m 500 error handler registered
+
+── [33] M5: app.py is thin ──
+  [32mPASS[0m app.py is thin (3 non-comment lines)
+  [32mPASS[0m app.py imports create_app from .api
+  [32mPASS[0m app.py calls create_app()
+  [32mPASS[0m app.py contains no route definitions (all delegated to api.py)
+
+── [34] M6: Entry Point ──
+  [32mPASS[0m main.py exists
+  [32mPASS[0m main.py imports load_config from config
+  [32mPASS[0m main.py imports connect and init_schema from db
+  [32mPASS[0m main.py imports Poller from poller
+  [32mPASS[0m main.py calls uvicorn.run()
+  [32mPASS[0m main.py references api:create_app
+  [32mPASS[0m main.py uses factory=True
+  [32mPASS[0m main.py uses cfg.host
+  [32mPASS[0m main.py uses cfg.port
+  [32mPASS[0m main.py handles SIGTERM
+  [32mPASS[0m main.py handles SIGINT
+  [32mPASS[0m main.py starts the poller
+  [32mPASS[0m main.py stops the poller on shutdown
+  [32mPASS[0m main.py has a main() function
+  [32mPASS[0m main.py has __main__ guard
+
+── [35] M7+M8: Frontend Shell + UX + A11y ──
+  [32mPASS[0m HTML: role="tablist" on tabs container
+  [32mPASS[0m HTML: role="tab" on tab buttons
+  [32mPASS[0m HTML: aria-selected on tabs
+  [32mPASS[0m HTML: aria-live region for dynamic content
+  [32mPASS[0m HTML: role="tabpanel" on main content
+  [32mPASS[0m HTML: role="group" on button groups
+  [32mPASS[0m HTML: aria-label on interactive elements
+  [32mPASS[0m HTML: role="alert" on error banner
+  [32mPASS[0m CSS: :focus-visible focus ring
+  [32mPASS[0m CSS: .visually-hidden utility class
+  [32mPASS[0m CSS: @media prefers-reduced-motion
+  [32mPASS[0m CSS: .skeleton shimmer animation
+  [32mPASS[0m CSS: .error-banner styles
+  [32mPASS[0m CSS: .empty-state styles
+  [32mPASS[0m CSS: mobile breakpoint at 640px
+  [32mPASS[0m CSS: touch targets ≥44px
+  [32mPASS[0m CSS: stale indicator styles
+  [32mPASS[0m CSS: offline indicator styles
+  [32mPASS[0m JS: error display function
+  [32mPASS[0m JS: error dismiss / retry
+  [32mPASS[0m JS: offline detection
+  [32mPASS[0m JS: empty state rendering
+  [32mPASS[0m JS: stale data detection
+  [32mPASS[0m JS: keyboard navigation on tabs
+  [32mPASS[0m JS: updates aria-selected on tab switch
+  [32mPASS[0m JS: loading skeleton management
+
+── [36] M9: Hardening ──
+  [32mPASS[0m CSP header present: default-src + style-src
+  [32mPASS[0m Config: default host is 127.0.0.1 (local-bind)
+  [32mPASS[0m /metrics returns JSON dict
+  [32mPASS[0m No secrets logged in codex_quota.py
+  [32mPASS[0m Config: retention_days present
+
+── [37] Claude Parser ──
+  [32mPASS[0m parsers/claude.py exists
+  [32mPASS[0m ClaudeParser implements Parser
+  [32mPASS[0m ClaudeParser has callable parse()
+  [32mPASS[0m ClaudeParser raises SourceUnavailable on missing dir
+
+── [38] Claude Quota ──
+  [32mPASS[0m claude_quota.py exists
+  [32mPASS[0m fetch_claude_quota() is callable
+  [32mPASS[0m fetch_claude_quota() returns dict
+
+── [39] Source Registry ──
+  [32mPASS[0m source_registry.py exists
+  [32mPASS[0m Source registry: opencode registered
+  [32mPASS[0m Source registry: is_valid_source(opencode) = True
+  [32mPASS[0m Source registry: agy registered
+  [32mPASS[0m Source registry: is_valid_source(agy) = True
+  [32mPASS[0m Source registry: codex registered
+  [32mPASS[0m Source registry: is_valid_source(codex) = True
+  [32mPASS[0m Source registry: claude registered
+  [32mPASS[0m Source registry: is_valid_source(claude) = True
+  [32mPASS[0m Source registry: is_valid_source("nonexistent") = False
+
+── [40] R2: collection_status kind column ──
+  [32mPASS[0m db.py: collection_status has kind column
+  [32mPASS[0m db.py: collection_status UNIQUE includes kind
+
+── [41] R3: prune called in poller ──
+  [32mPASS[0m poller.py: prune() called
+
+── [42] R6: TTL cache for quota ──
+  [32mPASS[0m api.py: TTL cache present
+  [32mPASS[0m api.py: _get_cached_quota function present
+
+── [43] R7: Dynamic source routes ──
+  [32mPASS[0m api.py: dynamic usage/{source}/latest route
+  [32mPASS[0m api.py: dynamic usage/{source}/history route
+  [32mPASS[0m api.py: dynamic quota/{source}/latest route
+  [32mPASS[0m api.py: source_unknown error response
+
+── [44] Claude in frontend ──
+  [32mPASS[0m HTML: Claude tab present
+  [32mPASS[0m HTML: tab-claude id present
+  [32mPASS[0m JS: Claude source handled
+  [32mPASS[0m JS: renderClaudeQuota function present
+  [32mPASS[0m JS: Claude badge class used
+  [32mPASS[0m CSS: .badge-claude style
+  [32mPASS[0m CSS: Claude tab active style
+
+── [45] R5: Honest status on empty result ──
+  [32mPASS[0m poller.py: records "empty result" status
+
+── [46] R9: Config error message ──
+  [32mPASS[0m config.py: error message uses ", ".join()
+
+── [47] Schema version 3 ──
+  [32mPASS[0m db.py: schema_version set to 3
+  [32mPASS[0m db.py: _migrate_schema function present
+
+[1m=== Results: 318 passed, 1 failed ===[0m
+
+  [31mPID file /tmp/dashboard.pid not found[0m
