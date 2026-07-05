@@ -65,6 +65,18 @@ class TestCheckIntegrity(unittest.TestCase):
         self.assertFalse(report['ok'])
         self.assertTrue(report['checks']['stale'])
 
+    def test_one_stale_source_fails_even_if_others_are_fresh(self):
+        now_cycle = (int(time.time()) // 600) * 600
+        # codex went dark hours ago; opencode is still reporting every cycle.
+        _insert_raw(self.conn, 'codex', now_cycle - 6000, 1000)
+        _insert_raw(self.conn, 'opencode', now_cycle - 600, 2000)
+        _insert_raw(self.conn, 'opencode', now_cycle, 2500)
+        report = check_integrity(self.conn, poll_interval=600)
+        self.assertFalse(report['checks']['stale'])  # global newest is recent
+        self.assertFalse(report['ok'])
+        self.assertIn('codex', report['checks']['stale_sources'])
+        self.assertNotIn('opencode', report['checks']['stale_sources'])
+
     def test_empty_db_is_ok(self):
         report = check_integrity(self.conn, poll_interval=600)
         self.assertTrue(report['ok'])

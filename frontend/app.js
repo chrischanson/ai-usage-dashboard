@@ -413,14 +413,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 const resp = await fetch(`/api/usage/${currentSource}/history`);
                 if (!resp.ok) throw new Error('HTTP ' + resp.status);
                 let data = await resp.json();
-                if (data && data.length > 0) {
-                    if (latestCompleteTimestamp) {
-                        data = data.filter(d => parseTs(d.timestamp) <= parseTs(latestCompleteTimestamp));
-                    }
-                    cachedHistory = data;
-                } else {
-                    cachedHistory = [];
-                }
+                // Note: latestCompleteTimestamp is a combined-view concept (the
+                // last cycle where every source reported, so the summed total
+                // isn't understated by a lagging source) and must not be
+                // applied here — this is a single source's own chart, so it
+                // should show all of that source's own data regardless of
+                // whether any other source reported at the same instant. A
+                // stalled source used to freeze every other source's view at
+                // its last-good timestamp until it recovered.
+                cachedHistory = (data && data.length > 0) ? data : [];
                 renderHistoryChart(cachedHistory);
             }
         } catch (e) {

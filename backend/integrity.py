@@ -102,7 +102,10 @@ def check_integrity(conn: sqlite3.Connection, poll_interval: int = 600) -> dict:
             f"{m['source']} cycle {m['cycle_ts']}: model tokens sum to "
             f"{m['model_total']} but source row says {m['source_total']}")
 
-    # 4. Staleness: the newest observation should be recent.
+    # 4. Staleness: the newest observation should be recent. Checked both
+    # globally and per source — the global check alone goes blind the
+    # moment any other source is still polling fine, so a single source
+    # (e.g. codex) can go dark for hours without ever tripping it.
     cursor.execute("SELECT MAX(cycle_ts) FROM usage_history")
     newest = cursor.fetchone()[0]
     stale = bool(newest) and (time.time() - newest) > 2 * poll_interval
@@ -112,8 +115,21 @@ def check_integrity(conn: sqlite3.Connection, poll_interval: int = 600) -> dict:
         warnings.append(
             f"newest observation is cycle {newest}, older than 2x the poll interval")
 
+    stale_sources = {}
+    cursor.execute("SELECT DISTINCT source FROM usage_history")
+    for (src,) in [tuple(r) for r in cursor.fetchall()]:
+        cursor.execute("SELECT MAX(cycle_ts) FROM usage_history WHERE source=?", (src,))
+        src_newest = cursor.fetchone()[0]
+        if bool(src_newest) and (time.time() - src_newest) > 2 * poll_interval:
+            stale_sources[src] = src_newest
+    checks['stale_sources'] = stale_sources
+    for src, src_newest in stale_sources.items():
+        warnings.append(
+            f"{src} newest observation is cycle {src_newest}, older than 2x the "
+            "poll interval (other sources may still be reporting fine)")
+
     return {
-        'ok': unpaired == 0 and not stale,
+        'ok': unpaired == 0 and not stale and not stale_sources,
         'warnings': warnings,
         'checks': checks,
     }
