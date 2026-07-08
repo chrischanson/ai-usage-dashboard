@@ -1057,6 +1057,20 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // OpenCode and Codex are both one-line cards -- side by side with a
+        // multi-meter card, the grid stretches them to match its height and
+        // they end up half-empty. Stack the two of them in a shared column
+        // instead, so the column's total height is comparable to a full card.
+        let compactColumn = null;
+        function getCompactColumn() {
+            if (!compactColumn) {
+                compactColumn = document.createElement('div');
+                compactColumn.className = 'quota-column';
+                container.appendChild(compactColumn);
+            }
+            return compactColumn;
+        }
+
         for (const [src, quotaData] of Object.entries(data)) {
             if (!quotaData || Object.keys(quotaData).length === 0) continue;
 
@@ -1064,14 +1078,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 const group = quotaData.opencode;
                 if (group) {
                     const cost = group.total_cost || {};
-                    renderOpenCodeCost(container, cost);
+                    renderOpenCodeCost(getCompactColumn(), cost);
                 }
             } else if (src === 'codex') {
                 const group = quotaData.openai;
                 if (group) {
                     const rateLimit = group.rate_limit || {};
                     const plan = quotaData._plan || 'free';
-                    renderCodexQuota(container, rateLimit, plan);
+                    renderCodexQuota(getCompactColumn(), rateLimit, plan);
                 }
             } else if (src === 'claude') {
                 renderClaudeQuota(container, quotaData);
