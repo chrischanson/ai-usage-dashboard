@@ -473,9 +473,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (target === 'overview') {
             setCard('total-sessions', '--');
             setCard('total-messages', '--');
-            setCard('input-tokens', 'No data available');
+            setCard('input-tokens', '--');
             setCard('output-tokens', '--');
             setCard('cache-reads', '--');
+            setCard('total-cost', '--');
         } else if (target === 'models') {
             const tbody = document.getElementById('models-tbody');
             if (tbody) {
@@ -1026,6 +1027,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // One compact meter: label + value on one line, the bar on the next.
+    // Refresh/reset timing rides the bar's native title tooltip instead of
+    // a third always-visible line -- it's secondary detail, not something
+    // that needs scanning at a glance across every limit.
+    function renderMeterRow(label, valueText, pct, barColor, refreshStr) {
+        const titleAttr = refreshStr ? ` title="${escapeHtml(refreshStr)}"` : '';
+        return `
+            <div class="quota-limit">
+                <div class="quota-limit-header">
+                    <span class="quota-limit-label">${escapeHtml(label)}</span>
+                    <span class="quota-limit-value">${valueText}</span>
+                </div>
+                <div class="quota-bar-bg"${titleAttr}>
+                    <div class="quota-bar-fill ${barColor}" style="width: ${pct}%"></div>
+                </div>
+            </div>
+        `;
+    }
+
     function renderQuota(data, source) {
         const container = document.getElementById('quota-cards');
         const titleEl = document.getElementById('quota-title');
@@ -1076,18 +1096,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 refreshStr = `Refreshes in ${Math.round(seconds / 3600)} hr`;
                             }
                         }
-                        limitsHtml += `
-                            <div class="quota-limit">
-                                <div class="quota-limit-header">
-                                    <span class="quota-limit-label">${escapeHtml(label)}</span>
-                                    <span class="quota-limit-value">${pct.toFixed(1)}%</span>
-                                </div>
-                                <div class="quota-bar-bg">
-                                    <div class="quota-bar-fill ${barColor}" style="width: ${pct}%"></div>
-                                </div>
-                                <div class="quota-refresh">${refreshStr}</div>
-                            </div>
-                        `;
+                        limitsHtml += renderMeterRow(label, `${pct.toFixed(1)}%`, pct, barColor, refreshStr);
                     }
                     const planBadge = src === 'agy' ? ` <span class="badge badge-agy">${escapeHtml(agyPlan)}</span>` : '';
                     card.innerHTML = `<h3>${escapeHtml(groupLabel)}${planBadge}</h3>${limitsHtml}`;
@@ -1135,16 +1144,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             card.innerHTML = `
                 <h3>Codex <span class="badge badge-codex">${escapeHtml(planLabel)}</span></h3>
-                <div class="quota-limit">
-                    <div class="quota-limit-header">
-                        <span class="quota-limit-label">Monthly Limit (30d)</span>
-                        <span class="quota-limit-value">${pct.toFixed(1)}% remaining</span>
-                    </div>
-                    <div class="quota-bar-bg">
-                        <div class="quota-bar-fill ${barColor}" style="width: ${pct}%"></div>
-                    </div>
-                    <div class="quota-refresh">${refreshStr}</div>
-                </div>
+                ${renderMeterRow('Monthly Limit (30d)', `${pct.toFixed(1)}% remaining`, pct, barColor, refreshStr)}
             `;
         } else {
             card.innerHTML = `
@@ -1184,18 +1184,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     refreshStr = `Resets in ${Math.round(seconds / 60)} min`;
                 }
             }
-            limitsHtml += `
-                <div class="quota-limit">
-                    <div class="quota-limit-header">
-                        <span class="quota-limit-label">Weekly (All Models)</span>
-                        <span class="quota-limit-value">${remaining.toFixed(1)}% left</span>
-                    </div>
-                    <div class="quota-bar-bg">
-                        <div class="quota-bar-fill ${barColor}" style="width: ${remaining}%"></div>
-                    </div>
-                    <div class="quota-refresh">${refreshStr}</div>
-                </div>
-            `;
+            limitsHtml += renderMeterRow('Weekly (All Models)', `${remaining.toFixed(1)}% left`, remaining, barColor, refreshStr);
         }
 
         // Per-model weekly limits
@@ -1204,17 +1193,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (info.used === undefined) continue;
             const remaining = clampPct(info.remaining_pct);
             const barColor = remaining > 50 ? 'green' : remaining > 20 ? 'amber' : 'red';
-            limitsHtml += `
-                <div class="quota-limit">
-                    <div class="quota-limit-header">
-                        <span class="quota-limit-label">Weekly: ${escapeHtml(modelName)}</span>
-                        <span class="quota-limit-value">${remaining.toFixed(1)}% left</span>
-                    </div>
-                    <div class="quota-bar-bg">
-                        <div class="quota-bar-fill ${barColor}" style="width: ${remaining}%"></div>
-                    </div>
-                </div>
-            `;
+            limitsHtml += renderMeterRow(`Weekly: ${modelName}`, `${remaining.toFixed(1)}% left`, remaining, barColor, '');
         }
 
         // Session (5h) limit — shown last, after weekly and per-model weekly
@@ -1232,18 +1211,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     refreshStr = `Resets in ${Math.round(seconds / 3600)} hr`;
                 }
             }
-            limitsHtml += `
-                <div class="quota-limit">
-                    <div class="quota-limit-header">
-                        <span class="quota-limit-label">Session (5h)</span>
-                        <span class="quota-limit-value">${remaining.toFixed(1)}% left</span>
-                    </div>
-                    <div class="quota-bar-bg">
-                        <div class="quota-bar-fill ${barColor}" style="width: ${remaining}%"></div>
-                    </div>
-                    <div class="quota-refresh">${refreshStr}</div>
-                </div>
-            `;
+            limitsHtml += renderMeterRow('Session (5h)', `${remaining.toFixed(1)}% left`, remaining, barColor, refreshStr);
         }
 
         card.innerHTML = `

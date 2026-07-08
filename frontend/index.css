@@ -560,30 +560,16 @@ header h1 {
     opacity: 0.6;
 }
 
+/* Cards size themselves to their content (220-320px) and wrap as needed,
+   instead of a fixed column count per source -- a 5-column template meant
+   for the combined view was also being forced onto single-source cards
+   sharing the same half-width panel, squeezing every meter into a narrow,
+   tall column. auto-fit reacts to the container's real width, not the
+   viewport, so it stays correct whether there's 1 card or 5. */
 .quota-cards {
     display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 320px));
     gap: 1rem;
-}
-
-.quota-cards.source-combined {
-    grid-template-columns: 0.5fr 1fr 1fr 1fr 1fr;
-}
-
-@media (max-width: 900px) {
-    .quota-cards.source-combined { grid-template-columns: repeat(2, 1fr); }
-}
-
-.quota-cards.source-agy {
-    grid-template-columns: repeat(2, 1fr);
-}
-
-.quota-cards {
-    grid-template-columns: 1fr;
-}
-
-@media (max-width: 600px) {
-    .quota-cards.source-combined,
-    .quota-cards.source-agy { grid-template-columns: 1fr; }
 }
 
 .quota-group {
@@ -633,6 +619,10 @@ header h1 {
     overflow: hidden;
 }
 
+.quota-bar-bg[title] {
+    cursor: help;
+}
+
 .quota-bar-fill {
     height: 100%;
     border-radius: 3px;
@@ -643,13 +633,6 @@ header h1 {
 .quota-bar-fill.amber  { background: var(--accent-amber); }
 .quota-bar-fill.red    { background: #ef4444; }
 .quota-bar-fill.purple { background: var(--accent-purple); }
-
-.quota-refresh {
-    font-size: 0.65rem;
-    color: var(--text-secondary);
-    margin-top: 0.25rem;
-    opacity: 0.7;
-}
 
 /* ── Error Banner ── */
 .error-banner {
@@ -929,11 +912,6 @@ header h1 {
     .mode-btn {
         font-size: 0.65rem;
         padding: 0.3rem 0.45rem;
-    }
-
-    .quota-cards.source-combined,
-    .quota-cards.source-agy {
-        grid-template-columns: 1fr;
     }
 
     .quota-group {
