@@ -1033,6 +1033,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // that needs scanning at a glance across every limit.
     function renderMeterRow(label, valueText, pct, barColor, refreshStr) {
         const titleAttr = refreshStr ? ` title="${escapeHtml(refreshStr)}"` : '';
+        const refreshLine = refreshStr ? `<div class="quota-refresh">${escapeHtml(refreshStr)}</div>` : '';
         return `
             <div class="quota-limit">
                 <div class="quota-limit-header">
@@ -1042,6 +1043,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="quota-bar-bg"${titleAttr}>
                     <div class="quota-bar-fill ${barColor}" style="width: ${pct}%"></div>
                 </div>
+                ${refreshLine}
             </div>
         `;
     }

@@ -649,6 +649,13 @@ header h1 {
 .quota-bar-fill.red    { background: #ef4444; }
 .quota-bar-fill.purple { background: var(--accent-purple); }
 
+.quota-refresh {
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+    opacity: 0.7;
+}
+
 /* ── Error Banner ── */
 .error-banner {
     display: flex;
