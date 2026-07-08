@@ -21,6 +21,12 @@ class CodexParser(Parser):
             raise SourceUnavailable(f"Codex state DB not found at {self.state_db}")
 
         try:
+            # mode=ro alone isn't enough: this DB is WAL-mode, and SQLite needs
+            # read-write access to its -shm sidecar to open it at all, even for
+            # reads. The systemd unit grants that via ReadWritePaths on ~/.codex
+            # (see install/usage-dashboard.service) rather than using immutable=1
+            # here, which would skip the -wal file entirely and silently miss
+            # any codex activity not yet checkpointed into the main db file.
             conn = sqlite3.connect(f'file:{self.state_db}?mode=ro', uri=True)
             rows = conn.execute('''
                 SELECT model, COUNT(*) as sessions,
@@ -46,6 +52,12 @@ class CodexParser(Parser):
         if not rows:
             raise SourceUnavailable("No Codex usage data found")
 
+        # output_tokens is hardcoded to 0, not left unimplemented: threads.tokens_used
+        # is the only token counter Codex's local state DB exposes (checked the
+        # columns directly), and logs_2.sqlite only holds operational tracing spans
+        # (rpc method names, no numeric usage bodies) -- there's no local source for
+        # a real input/output split, so total_tokens goes into input_tokens instead
+        # of guessing a split.
         result = ParserResult(
             sessions=total_sessions,
             messages=total_sessions,

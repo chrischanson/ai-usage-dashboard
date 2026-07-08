@@ -55,6 +55,12 @@
             <button id="dismiss-btn" class="dismiss-btn" aria-label="Dismiss error">&times;</button>
         </div>
 
+        <!-- Data Integrity Banner -->
+        <div id="integrity-banner" class="integrity-banner" role="status" hidden>
+            <span id="integrity-message"></span>
+            <button id="integrity-dismiss-btn" class="dismiss-btn" aria-label="Dismiss warning">&times;</button>
+        </div>
+
         <main id="panel-main" role="tabpanel">
             <!-- Overview + Quota Row -->
             <div class="stats-row">
@@ -80,6 +86,10 @@
                         <div class="card glass" id="card-output">
                             <h3>Output Tokens</h3>
                             <p id="output-tokens" class="skeleton skeleton-text"><span class="visually-hidden">Loading</span></p>
+                        </div>
+                        <div class="card glass" id="card-cost">
+                            <h3>Total Cost</h3>
+                            <p id="total-cost" class="skeleton skeleton-text"><span class="visually-hidden">Loading</span></p>
                         </div>
                     </div>
                 </div>

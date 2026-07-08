@@ -148,6 +148,46 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- Data integrity banner ---
+    const integrityBanner = document.getElementById('integrity-banner');
+    const integrityMsg = document.getElementById('integrity-message');
+    const integrityDismissBtn = document.getElementById('integrity-dismiss-btn');
+
+    function showIntegrityWarning(warnings) {
+        if (!integrityBanner || !integrityMsg || !warnings || !warnings.length) return;
+        const extra = warnings.length > 1 ? ` (+${warnings.length - 1} more)` : '';
+        integrityMsg.textContent = 'Data integrity: ' + warnings[0] + extra;
+        integrityBanner.hidden = false;
+    }
+
+    function hideIntegrityWarning() {
+        if (!integrityBanner) return;
+        integrityBanner.hidden = true;
+    }
+
+    if (integrityDismissBtn) {
+        integrityDismissBtn.addEventListener('click', () => {
+            hideIntegrityWarning();
+        });
+    }
+
+    async function fetchIntegrity() {
+        try {
+            const resp = await fetch('/metrics');
+            if (!resp.ok) return;
+            const data = await resp.json();
+            const integrity = data && data.integrity;
+            if (integrity && integrity.ok === false) {
+                showIntegrityWarning(integrity.warnings || []);
+            } else {
+                hideIntegrityWarning();
+            }
+        } catch (e) {
+            // Integrity checks are best-effort; a failed fetch here shouldn't
+            // block or clutter the main error banner used for usage data.
+        }
+    }
+
     // --- Status indicator ---
     const statusText = document.getElementById('status-text');
     const statusDot = document.querySelector('.dot');
@@ -277,7 +317,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function refresh() {
         if (offline) return;
         hideError();
-        await Promise.all([fetchLatest(), fetchHistory(), fetchQuota()]);
+        await Promise.all([fetchLatest(), fetchHistory(), fetchQuota(), fetchIntegrity()]);
         if (timeRange !== 'all' && cachedHistory) {
             const overview = computeOverviewFromHistory(cachedHistory, timeRange);
             if (overview) renderOverview(overview);
@@ -441,6 +481,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (tbody) {
                 tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="empty-state-icon">&#128202;</div><p>No data collected yet. Polling runs every 10 minutes.</p></td></tr>';
             }
+            setCard('total-cost', '--');
         }
     }
 
@@ -457,8 +498,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!tbody) return;
         if (!models || !models.length) {
             tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="empty-state-icon">&#128202;</div><p>No model usage data available.</p></td></tr>';
+            setCard('total-cost', '--');
             return;
         }
+
+        const totalCost = models.reduce((sum, m) => sum + (m.cost || 0), 0);
+        setCard('total-cost', formatCost(totalCost));
 
         const palette = COLORS[currentSource].donut;
         const grandTotal = models.reduce((sum, m) => sum + (m.input_tokens || 0) + (m.output_tokens || 0), 0);
@@ -639,6 +684,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     messages: Math.max(0, (m.messages || 0) - (prev.messages || 0)),
                     input_tokens: Math.max(0, (m.input_tokens || 0) - (prev.input_tokens || 0)),
                     output_tokens: Math.max(0, (m.output_tokens || 0) - (prev.output_tokens || 0)),
+                    cost: Math.max(0, (m.cost || 0) - (prev.cost || 0)),
                 };
                 if (dm.messages > 0 || dm.input_tokens > 0 || dm.output_tokens > 0) {
                     deltas.push(dm);
@@ -1121,35 +1167,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let limitsHtml = '';
 
-        // Session (5h) limit
-        const sessionGroup = data.session || {};
-        const sessionLimit = sessionGroup.five_hour || {};
-        if (sessionLimit.used !== undefined) {
-            const remaining = clampPct(sessionLimit.remaining_pct);
-            const barColor = remaining > 50 ? 'green' : remaining > 20 ? 'amber' : 'red';
-            const seconds = sessionLimit.refreshes_in_seconds || 0;
-            let refreshStr = '';
-            if (seconds > 0) {
-                if (seconds < 3600) {
-                    refreshStr = `Resets in ${Math.round(seconds / 60)} min`;
-                } else {
-                    refreshStr = `Resets in ${Math.round(seconds / 3600)} hr`;
-                }
-            }
-            limitsHtml += `
-                <div class="quota-limit">
-                    <div class="quota-limit-header">
-                        <span class="quota-limit-label">Session (5h)</span>
-                        <span class="quota-limit-value">${remaining.toFixed(1)}% left</span>
-                    </div>
-                    <div class="quota-bar-bg">
-                        <div class="quota-bar-fill ${barColor}" style="width: ${remaining}%"></div>
-                    </div>
-                    <div class="quota-refresh">${refreshStr}</div>
-                </div>
-            `;
-        }
-
         // Weekly limit
         const weeklyGroup = data.weekly || {};
         const weeklyAll = weeklyGroup.all_models || {};
@@ -1196,6 +1213,35 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="quota-bar-bg">
                         <div class="quota-bar-fill ${barColor}" style="width: ${remaining}%"></div>
                     </div>
+                </div>
+            `;
+        }
+
+        // Session (5h) limit — shown last, after weekly and per-model weekly
+        const sessionGroup = data.session || {};
+        const sessionLimit = sessionGroup.five_hour || {};
+        if (sessionLimit.used !== undefined) {
+            const remaining = clampPct(sessionLimit.remaining_pct);
+            const barColor = remaining > 50 ? 'green' : remaining > 20 ? 'amber' : 'red';
+            const seconds = sessionLimit.refreshes_in_seconds || 0;
+            let refreshStr = '';
+            if (seconds > 0) {
+                if (seconds < 3600) {
+                    refreshStr = `Resets in ${Math.round(seconds / 60)} min`;
+                } else {
+                    refreshStr = `Resets in ${Math.round(seconds / 3600)} hr`;
+                }
+            }
+            limitsHtml += `
+                <div class="quota-limit">
+                    <div class="quota-limit-header">
+                        <span class="quota-limit-label">Session (5h)</span>
+                        <span class="quota-limit-value">${remaining.toFixed(1)}% left</span>
+                    </div>
+                    <div class="quota-bar-bg">
+                        <div class="quota-bar-fill ${barColor}" style="width: ${remaining}%"></div>
+                    </div>
+                    <div class="quota-refresh">${refreshStr}</div>
                 </div>
             `;
         }

@@ -53,7 +53,10 @@ def _parse_logs_for_limits():
     if not os.path.exists(CODEX_LOGS):
         return None
     try:
-        conn = sqlite3.connect(CODEX_LOGS)
+        # mode=ro: these DBs are WAL-mode and need read-write access to their
+        # -shm sidecar to open at all; the systemd unit grants that via
+        # ReadWritePaths on ~/.codex (see install/usage-dashboard.service).
+        conn = sqlite3.connect(f'file:{CODEX_LOGS}?mode=ro', uri=True)
         cursor = conn.execute(
             "SELECT feedback_log_body FROM logs WHERE feedback_log_body LIKE '%codex.rate_limits%' ORDER BY id DESC LIMIT 1"
         )
@@ -101,7 +104,8 @@ def _get_token_stats():
     if not os.path.exists(CODEX_DB):
         return None
     try:
-        conn = sqlite3.connect(CODEX_DB)
+        # mode=ro: see _parse_logs_for_limits above.
+        conn = sqlite3.connect(f'file:{CODEX_DB}?mode=ro', uri=True)
         cursor = conn.cursor()
         try:
             cursor.execute("SELECT model, tokens_used FROM threads")

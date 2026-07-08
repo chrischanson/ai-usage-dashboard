@@ -28,10 +28,14 @@ StandardError=journal
 # home dir but nothing else on the system, and only write access to its
 # own project dir (usage.db/-wal/-shm live under PROJECT_DIR/backend) plus
 # the OpenCode CLI's own state/log dir, which it insists on writing to
-# every time the poller shells out to `opencode stats`.
+# every time the poller shells out to `opencode stats`, plus ~/.codex:
+# state_5.sqlite is WAL-mode, and SQLite needs read-write access to its
+# -shm sidecar file to open *any* connection to it, including mode=ro ones
+# -- under ProtectHome=read-only that open fails with "unable to open
+# database file" even though nothing is actually being written there.
 ProtectHome=read-only
 ProtectSystem=strict
-ReadWritePaths=PROJECT_DIR PROJECT_HOME_DIR/.local/share/opencode
+ReadWritePaths=PROJECT_DIR PROJECT_HOME_DIR/.local/share/opencode PROJECT_HOME_DIR/.codex
 NoNewPrivileges=yes
 PrivateTmp=true
 

@@ -9,6 +9,7 @@ import os
 from collections import defaultdict
 
 from .base import Parser, ParserResult, ModelUsage, SourceUnavailable
+from pricing import estimate_claude_cost
 
 CLAUDE_HOME = os.path.expanduser('~/.claude')
 _CLAUDE_PROJECTS_DIR = os.path.join(CLAUDE_HOME, 'projects')
@@ -119,7 +120,9 @@ class ClaudeParser(Parser):
                     output_tokens=data['output_tokens'],
                     cache_read=data['cache_read'],
                     cache_write=data['cache_write'],
-                    cost=0.0,
+                    cost=estimate_claude_cost(
+                        model, data['input_tokens'], data['output_tokens'],
+                        data['cache_read'], data['cache_write']),
                 )
                 for model, data in sorted(
                     model_totals.items(),

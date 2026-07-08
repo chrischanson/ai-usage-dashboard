@@ -714,6 +714,30 @@ header h1 {
     color: var(--text-primary);
 }
 
+/* ── Data Integrity Banner ── */
+.integrity-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 0.75rem;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.85rem;
+    color: var(--accent-amber);
+    animation: slideDown 0.25s ease;
+}
+
+.integrity-banner[hidden] {
+    display: none;
+}
+
+#integrity-message {
+    flex: 1;
+    min-width: 0;
+}
+
 /* ── Stale Badge ── */
 #status-text.stale {
     color: var(--accent-amber);
