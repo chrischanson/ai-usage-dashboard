@@ -6,6 +6,7 @@ extracts per-model token usage from gen_metadata protobuf blobs.
 import sqlite3
 import glob
 import os
+import unicodedata
 
 from .base import Parser, ParserResult, ModelUsage, SourceUnavailable
 
@@ -87,14 +88,20 @@ class AgyParser(Parser):
                     length, pos = AgyParser._read_varint(data, pos)
                     payload = data[pos:pos + length]
                     pos += length
+                    is_text = False
                     try:
                         text = payload.decode('utf-8')
-                        results.setdefault(key, []).append(text)
+                        # Check if it looks like a valid text string (no control characters except tab, newline, carriage return)
+                        if not any(unicodedata.category(c).startswith('C') and c not in '\t\n\r' for c in text):
+                            results.setdefault(key, []).append(text)
+                            is_text = True
                     except Exception:
-                        if depth < 3:
-                            sub = AgyParser._scan_fields(payload, depth + 1, prefix=f'{key}.')
-                            for k, v in sub.items():
-                                results.setdefault(k, []).extend(v)
+                        pass
+
+                    if not is_text and depth < 3:
+                        sub = AgyParser._scan_fields(payload, depth + 1, prefix=f'{key}.')
+                        for k, v in sub.items():
+                            results.setdefault(k, []).extend(v)
                 elif wtype == 1:
                     pos += 8
                 elif wtype == 5:

@@ -372,6 +372,8 @@ class TestAgyParserCaching(unittest.TestCase):
         # New blob (different length) -> mtime/size fingerprint changes.
         _write_agy_db(self.db_path, input_tokens=5000, output_tokens=900,
                        cache_read=75, model='claude-opus')
+        st = os.stat(self.db_path)
+        os.utime(self.db_path, (st.st_atime, st.st_mtime + 5))
 
         with mock.patch.object(AgyParser, '_extract_conv_usage',
                                 wraps=AgyParser._extract_conv_usage) as spy:

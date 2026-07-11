@@ -1122,7 +1122,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (group) {
                     const rateLimit = group.rate_limit || {};
                     const plan = quotaData._plan || 'free';
-                    renderCodexQuota(getCompactColumn(), rateLimit, plan);
+                    const container = getCompactColumn();
+                    renderCodexQuota(container, rateLimit, plan);
                 }
             } else if (src === 'claude') {
                 renderClaudeQuota(container, quotaData);

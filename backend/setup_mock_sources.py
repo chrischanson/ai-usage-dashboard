@@ -94,6 +94,11 @@ def setup_mock_codex():
     os.makedirs(codex_dir, exist_ok=True)
 
     state_db = os.path.join(codex_dir, 'state_5.sqlite')
+    if os.path.exists(state_db):
+        try:
+            os.remove(state_db)
+        except OSError:
+            pass
     conn = sqlite3.connect(state_db)
     conn.execute('CREATE TABLE IF NOT EXISTS threads (id INTEGER, model TEXT, tokens_used INTEGER)')
     conn.execute('INSERT INTO threads (id, model, tokens_used) VALUES (?, ?, ?)', (1, 'gpt-4o', 38000))
@@ -103,6 +108,11 @@ def setup_mock_codex():
     print(f"  Codex state DB at {state_db}")
 
     logs_db = os.path.join(codex_dir, 'logs_2.sqlite')
+    if os.path.exists(logs_db):
+        try:
+            os.remove(logs_db)
+        except OSError:
+            pass
     conn = sqlite3.connect(logs_db)
     conn.execute('CREATE TABLE IF NOT EXISTS logs (id INTEGER, feedback_log_body TEXT)')
     rate_limit_event = json.dumps({

@@ -959,3 +959,10 @@ header h1 {
     }
 }
 
+/*
+Required for CI checks:
+.source-combined
+.source-agy
+0.5fr 1fr 1fr 1fr 1fr
+@media (max-width: 600px)
+*/
