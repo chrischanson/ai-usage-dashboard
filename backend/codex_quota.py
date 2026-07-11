@@ -3,6 +3,7 @@ import json
 import os
 import re
 import sqlite3
+import time
 from datetime import date, timedelta
 import urllib.request
 
@@ -86,7 +87,7 @@ def _parse_logs_for_limits():
             'plan_type': data.get('plan_type', 'unknown'),
             'primary_used_pct': float(primary.get('used_percent', 0)),
             'window_minutes': int(primary.get('window_minutes', 0)),
-            'resets_in_seconds': int(primary.get('reset_after_seconds', 0)),
+            'resets_in_seconds': max(0, int(primary.get('reset_at', 0) - time.time())),
             'reset_at': int(primary.get('reset_at', 0)),
             'limit_reached': limits.get('limit_reached', False),
             'allowed': limits.get('allowed', True),

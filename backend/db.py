@@ -383,63 +383,121 @@ def _do_insert_usage(conn, source, cycle_ts, sessions, messages, input_tokens, o
 
 # --- Read-time derivation ---
 
-def _derive_usage_rows(rows: list) -> list:
+def _derive_usage_rows(rows: list, last_only: bool = False) -> list:
     """Convert raw observation rows (one source, ascending cycle_ts) into
     display rows: each _USAGE_FIELDS key becomes the cumulative total since
     the first observation, and delta_<field> holds the per-cycle increment.
     A raw counter decrease (tool reinstalled/reset) clamps that delta to 0
-    and self-heals on the next cycle."""
+    and self-heals on the next cycle.
+
+    The running totals inherently need the full series (the clamp means the
+    total is not just last - first), but with last_only=True only the final
+    row is materialized as a dict — earlier rows contribute their deltas and
+    nothing else."""
     out = []
     prev_raw = None
     totals = {f: 0 for f in _USAGE_FIELDS}
-    for r in rows:
+    last_index = len(rows) - 1
+    for i, r in enumerate(rows):
         raw = {f: (r[f] or 0) for f in _USAGE_FIELDS}
-        d = dict(r)
+        deltas = {}
         for f in _USAGE_FIELDS:
             delta = 0 if prev_raw is None else max(0, raw[f] - prev_raw[f])
             totals[f] += delta
-            d[f] = totals[f]
-            d[f'delta_{f}'] = delta
+            deltas[f] = delta
         prev_raw = raw
+        if last_only and i != last_index:
+            continue
+        d = dict(r)
+        for f in _USAGE_FIELDS:
+            d[f] = totals[f]
+            d[f'delta_{f}'] = deltas[f]
         out.append(d)
     return out
 
 
-def _derive_model_rows(model_rows: list) -> dict:
+def _derive_model_rows(model_rows: list, only_cycle: int = None) -> dict:
     """Same derivation per (model_name), for one source's model_usage rows in
-    ascending cycle_ts order. Returns {cycle_ts: [derived model dicts]}."""
+    ascending cycle_ts order. Returns {cycle_ts: [derived model dicts]};
+    with only_cycle set, only that cycle's dicts are built (the walk still
+    covers every row, which the running totals require)."""
     prev_raw = {}
     totals = {}
     by_cycle: dict = {}
     for r in model_rows:
         name = r['model_name']
         raw = {f: (r[f] or 0) for f in _MODEL_FIELDS}
-        d = dict(r)
         tot = totals.setdefault(name, {f: 0 for f in _MODEL_FIELDS})
         prev = prev_raw.get(name)
+        deltas = {}
         for f in _MODEL_FIELDS:
             delta = 0 if prev is None else max(0, raw[f] - prev[f])
             tot[f] += delta
-            d[f] = tot[f]
-            d[f'delta_{f}'] = delta
+            deltas[f] = delta
         prev_raw[name] = raw
+        if only_cycle is not None and r['cycle_ts'] != only_cycle:
+            continue
+        d = dict(r)
+        for f in _MODEL_FIELDS:
+            d[f] = tot[f]
+            d[f'delta_{f}'] = deltas[f]
         by_cycle.setdefault(r['cycle_ts'], []).append(d)
     return by_cycle
 
 
-def _derived_source_history(conn: sqlite3.Connection, source: str, with_models: bool = True) -> list:
+def _derived_source_history(conn: sqlite3.Connection, source: str, with_models: bool = True,
+                            latest_only: bool = False) -> list:
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM usage_history WHERE source=? ORDER BY cycle_ts ASC', (source,))
-    rows = _derive_usage_rows(cursor.fetchall())
+    rows = _derive_usage_rows(cursor.fetchall(), last_only=latest_only)
     if rows and with_models:
         cursor.execute(
             'SELECT * FROM model_usage WHERE source=? ORDER BY cycle_ts ASC, model_name ASC',
             (source,))
-        models_by_cycle = _derive_model_rows(cursor.fetchall())
+        only_cycle = rows[-1]['cycle_ts'] if latest_only else None
+        models_by_cycle = _derive_model_rows(cursor.fetchall(), only_cycle=only_cycle)
         for r in rows:
             models = models_by_cycle.get(r['cycle_ts'], [])
             r['models'] = sorted(models, key=lambda m: m['input_tokens'], reverse=True)
     return rows
+
+
+# latest_usage() is hit on every dashboard refresh but its answer only
+# changes when the poller writes (every poll_interval). Cache the derived
+# latest row per (db file, source), validated against a cheap fingerprint:
+# row counts catch inserts and prune deletions; the newest raw row catches a
+# same-cycle INSERT OR REPLACE (poller restart within one interval), which
+# leaves count and MAX(cycle_ts) unchanged. In-memory databases are never
+# cached — distinct :memory: connections are indistinguishable by name.
+_latest_cache: dict = {}
+
+
+def _latest_source_row(conn: sqlite3.Connection, source: str):
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA database_list")
+    db_file = cursor.fetchone()[2]
+
+    cursor.execute("SELECT COUNT(*) FROM usage_history WHERE source=?", (source,))
+    usage_count = cursor.fetchone()[0]
+    if not usage_count:
+        return None
+    cursor.execute("SELECT COUNT(*) FROM model_usage WHERE source=?", (source,))
+    model_count = cursor.fetchone()[0]
+    cursor.execute(
+        "SELECT * FROM usage_history WHERE source=? ORDER BY cycle_ts DESC LIMIT 1", (source,))
+    fingerprint = (usage_count, model_count, tuple(cursor.fetchone()))
+
+    cache_key = (db_file, source) if db_file else None
+    if cache_key:
+        hit = _latest_cache.get(cache_key)
+        if hit and hit[0] == fingerprint:
+            return hit[1]
+
+    rows = _derived_source_history(conn, source, latest_only=True)
+    row = rows[-1] if rows else None
+    if cache_key:
+        _latest_cache[cache_key] = (fingerprint, row)
+    return row
 
 
 def history(conn: sqlite3.Connection, source: str = None) -> list:
@@ -490,12 +548,19 @@ def latest_usage(conn: sqlite3.Connection, source: str = None, cycle_ts: int = N
 
     result = {}
     for src in sources:
-        rows = _derived_source_history(conn, src)
-        if cycle_ts is not None:
-            rows = [r for r in rows if r['cycle_ts'] == cycle_ts]
-        if not rows:
+        if cycle_ts is None:
+            row = _latest_source_row(conn, src)
+        else:
+            # Historical lookup: needs that cycle's derived row, so no
+            # shortcut past the full materialization.
+            rows = [r for r in _derived_source_history(conn, src)
+                    if r['cycle_ts'] == cycle_ts]
+            row = rows[-1] if rows else None
+        if row is None:
             continue
-        row = rows[-1]
+        # Cached rows are shared across calls; hand out a copy so callers
+        # (including the model_deltas augmentation below) never mutate them.
+        row = dict(row)
         if include_model_deltas:
             # Per-model change during the latest cycle — already computed by
             # the derivation as delta_* on each model row.
