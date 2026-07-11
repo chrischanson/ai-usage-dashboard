@@ -28,7 +28,10 @@ class _SourceEntry:
 
 def _make_opencode_parser():
     from parsers.opencode import OpenCodeParser
-    return OpenCodeParser()
+    from config import load_config
+    # Route the process-wide subprocess_timeout config through instead of
+    # relying on OpenCodeParser's own hardcoded default.
+    return OpenCodeParser(timeout=load_config().subprocess_timeout)
 
 
 def _make_agy_parser():
@@ -53,7 +56,8 @@ def _opencode_quota():
 
 def _agy_quota():
     from quota_parser import fetch_agy_quota
-    return fetch_agy_quota()
+    from config import load_config
+    return fetch_agy_quota(network_timeout=load_config().network_timeout)
 
 
 def _codex_quota():

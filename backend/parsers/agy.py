@@ -15,6 +15,42 @@ AGY_IDE_CONV_DIR = os.path.expanduser('~/.gemini/antigravity-ide/conversations')
 _MODEL_KEYWORDS = ['gemini', 'claude', 'flash', 'pro', 'sonnet', 'opus',
                    'gpt', 'ultra', 'haiku', 'mistral', 'llama']
 
+# source_registry builds a brand-new AgyParser every poll cycle (see
+# _make_agy_parser), so this cache has to live at module scope to survive
+# between cycles. Keyed by (conv_dir, ide_conv_dir) so tests pointed at
+# temp dirs never share entries with each other or with the real dirs,
+# then by db path -> (fingerprint, usage-dict-or-None).
+_DB_CACHE: dict = {}
+
+
+def _sidecar_fingerprint(path: str):
+    # Returns None when the sidecar doesn't exist, which is itself part of
+    # the fingerprint: a WAL file appearing/disappearing must invalidate
+    # the cache even though the main .db file's (mtime, size) is unchanged.
+    try:
+        st = os.stat(path)
+        return (st.st_mtime, st.st_size)
+    except OSError:
+        return None
+
+
+def _db_fingerprint(db_path: str):
+    """(mtime, size) of the main file plus its -wal/-shm sidecars.
+
+    SQLite in WAL mode appends new rows to the -wal file without touching
+    the main file's mtime/size, so fingerprinting the main file alone would
+    make freshly-written conversations look unchanged forever.
+    """
+    try:
+        st = os.stat(db_path)
+    except OSError:
+        return None
+    return (
+        (st.st_mtime, st.st_size),
+        _sidecar_fingerprint(db_path + '-wal'),
+        _sidecar_fingerprint(db_path + '-shm'),
+    )
+
 
 class AgyParser(Parser):
     def __init__(self, conv_dir: str = AGY_CONV_DIR, ide_conv_dir: str = AGY_IDE_CONV_DIR):
@@ -137,11 +173,26 @@ class AgyParser(Parser):
         if not db_files:
             raise SourceUnavailable("No AGY conversation databases found")
 
+        cache_key = (self.conv_dir, self.ide_conv_dir)
+        db_cache = _DB_CACHE.setdefault(cache_key, {})
+
+        # Drop entries for conversations that no longer exist so the cache
+        # doesn't grow unboundedly as old .db files get cleaned up.
+        for stale_path in set(db_cache) - set(db_files):
+            del db_cache[stale_path]
+
+        for db_path in db_files:
+            fingerprint = _db_fingerprint(db_path)
+            cached = db_cache.get(db_path)
+            if cached is not None and cached[0] == fingerprint:
+                continue
+            db_cache[db_path] = (fingerprint, self._extract_conv_usage(db_path))
+
         model_totals: dict[str, dict] = {}
         sessions = 0
 
         for db_path in db_files:
-            usage = self._extract_conv_usage(db_path)
+            usage = db_cache[db_path][1]
             if not usage:
                 continue
             sessions += 1

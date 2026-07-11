@@ -7,6 +7,14 @@ document.addEventListener('DOMContentLoaded', () => {
     let cachedHistory = null;
     let cachedLatestOverview = null;
     let lastFetchTime = 0;
+    // History gating: the backend poller only writes new data every 10
+    // minutes, but refresh() runs every 60s. Skip the (expensive, 4x
+    // 90-day series) history refetch unless the cheap /latest response
+    // shows the data actually advanced.
+    let lastHistoryCycleTs = null;
+    let lastHistoryFetchTime = 0;
+    let latestObservedCycleTs = null;
+    const HISTORY_STALE_MS = 15 * 60 * 1000; // escape hatch: force a refetch this long after the last one regardless
     let offline = !navigator.onLine;
     let sortColumn = 'total';
     let sortDirection = 'desc';
@@ -317,7 +325,23 @@ document.addEventListener('DOMContentLoaded', () => {
     async function refresh() {
         if (offline) return;
         hideError();
-        await Promise.all([fetchLatest(), fetchHistory(), fetchQuota(), fetchIntegrity()]);
+        // fetchLatest is cheap and carries cycle_ts, so await it first to
+        // decide whether the (expensive) history series actually changed
+        // before firing it off alongside the other concurrent fetches.
+        const latestOk = await fetchLatest();
+        const now = Date.now();
+        const needHistory = !cachedHistory
+            || !latestOk
+            || latestObservedCycleTs == null
+            || latestObservedCycleTs !== lastHistoryCycleTs
+            || (now - lastHistoryFetchTime) > HISTORY_STALE_MS;
+        const pending = [fetchQuota(), fetchIntegrity()];
+        if (needHistory) pending.push(fetchHistory());
+        await Promise.all(pending);
+        if (needHistory) {
+            lastHistoryCycleTs = latestObservedCycleTs;
+            lastHistoryFetchTime = now;
+        }
         if (timeRange !== 'all' && cachedHistory) {
             const overview = computeOverviewFromHistory(cachedHistory, timeRange);
             if (overview) renderOverview(overview);
@@ -341,6 +365,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const opencode = raw.opencode || {};
                 const codex = raw.codex || {};
                 const claude = raw.claude || {};
+
+                // Newest poll cycle across all four sources — used by refresh()
+                // to decide whether the history series actually has new data.
+                latestObservedCycleTs = [agy.cycle_ts, opencode.cycle_ts, codex.cycle_ts, claude.cycle_ts]
+                    .filter(v => v != null)
+                    .reduce((max, v) => (max == null || v > max) ? v : max, null);
 
                 data = {
                     sessions: (agy.sessions || 0) + (opencode.sessions || 0) + (codex.sessions || 0) + (claude.sessions || 0),
@@ -373,22 +403,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 data = await resp.json();
                 data._modelDeltas = data.model_deltas || [];
                 data.models = data.models || [];
+                latestObservedCycleTs = (data && data.cycle_ts != null) ? data.cycle_ts : null;
             }
 
             if (!data || Object.keys(data).length === 0) {
                 cachedLatestOverview = null;
                 renderEmptyState('overview');
                 if (modelChartInstance) { modelChartInstance.destroy(); modelChartInstance = null; }
-                return;
+                return true;
             }
             cachedLatestOverview = data;
             renderOverview(data);
+            return true;
         } catch (e) {
             console.error('fetchLatest error:', e);
             if (!cachedLatestOverview) {
                 renderEmptyState('overview');
             }
             showError('Failed to load latest usage data. ' + (e.message || ''));
+            // Unknown cycle_ts on failure — refresh() must treat this as "may
+            // have changed" and fetch history anyway rather than freeze the charts.
+            return false;
         }
     }
 

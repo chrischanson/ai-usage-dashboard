@@ -14,6 +14,15 @@ from pricing import estimate_claude_cost
 CLAUDE_HOME = os.path.expanduser('~/.claude')
 _CLAUDE_PROJECTS_DIR = os.path.join(CLAUDE_HOME, 'projects')
 
+# source_registry builds a brand-new ClaudeParser every poll cycle (see
+# _make_claude_parser), so an instance-level cache would be reset each
+# cycle and never save any work. This lives at module scope instead, keyed
+# by projects_dir so tests using distinct temp dirs never share entries,
+# and per-directory by file path -> (fingerprint, events). fingerprint is
+# (mtime, size); events is the list of already-filtered usage tuples
+# extracted from that file the last time it was read.
+_FILE_CACHE: dict = {}
+
 
 class ClaudeParser(Parser):
     def __init__(self, projects_dir: str = None):
@@ -21,6 +30,61 @@ class ClaudeParser(Parser):
             'USAGE_CLAUDE_DIR',
             os.environ.get('CLAUDE_HOME', _CLAUDE_PROJECTS_DIR)
         )
+
+    @staticmethod
+    def _extract_file_events(path: str) -> list:
+        """Parse one transcript file into filtered usage tuples.
+
+        Only assistant messages with a msg_id, non-empty usage, and nonzero
+        tokens are kept — matching the filters `parse()` used to apply
+        inline. Cross-file dedup is intentionally NOT applied here; it
+        needs a global seen-set built fresh each parse() call, so it's
+        done once over all files' cached events, not per file.
+        """
+        events = []
+        try:
+            with open(path, 'r', encoding='utf-8', errors='replace') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+
+                    if entry.get('type') != 'assistant':
+                        continue
+
+                    message = entry.get('message', {})
+                    msg_id = message.get('id')
+                    if not msg_id:
+                        continue
+                    request_id = entry.get('requestId', '')
+
+                    usage = message.get('usage', {})
+                    if not usage:
+                        continue
+
+                    model = message.get('model', 'unknown')
+                    input_tokens = usage.get('input_tokens', 0) or 0
+                    output_tokens = usage.get('output_tokens', 0) or 0
+                    cache_read = usage.get('cache_read_input_tokens', 0) or 0
+                    cache_write = usage.get('cache_creation_input_tokens', 0) or 0
+
+                    if input_tokens == 0 and output_tokens == 0:
+                        continue
+
+                    events.append((
+                        (msg_id, request_id), model,
+                        input_tokens, output_tokens, cache_read, cache_write,
+                    ))
+        except (OSError, PermissionError):
+            # Whatever was appended before the failure is kept, same as the
+            # old inline loop which mutated shared totals line-by-line and
+            # simply stopped on error rather than discarding prior lines.
+            pass
+        return events
 
     def parse(self) -> ParserResult:
         if not os.path.isdir(self.projects_dir):
@@ -31,6 +95,25 @@ class ClaudeParser(Parser):
         jsonl_files = glob.glob(os.path.join(self.projects_dir, '**', '*.jsonl'), recursive=True)
         if not jsonl_files:
             raise SourceUnavailable("No Claude transcript files found")
+
+        file_cache = _FILE_CACHE.setdefault(self.projects_dir, {})
+
+        # Drop entries for files that vanished since the last cycle so the
+        # cache doesn't grow unboundedly across renamed/deleted sessions.
+        for stale_path in set(file_cache) - set(jsonl_files):
+            del file_cache[stale_path]
+
+        for path in jsonl_files:
+            try:
+                st = os.stat(path)
+            except OSError:
+                file_cache.pop(path, None)
+                continue
+            fingerprint = (st.st_mtime, st.st_size)
+            cached = file_cache.get(path)
+            if cached is not None and cached[0] == fingerprint:
+                continue
+            file_cache[path] = (fingerprint, self._extract_file_events(path))
 
         model_totals = defaultdict(lambda: {
             'messages': 0,
@@ -44,58 +127,26 @@ class ClaudeParser(Parser):
         sessions = len(jsonl_files)
         seen_message_ids = set()
 
-        for jsonl_path in jsonl_files:
-            try:
-                with open(jsonl_path, 'r', encoding='utf-8', errors='replace') as f:
-                    for line in f:
-                        line = line.strip()
-                        if not line:
-                            continue
-                        try:
-                            entry = json.loads(line)
-                        except json.JSONDecodeError:
-                            continue
+        # Sorted path order makes cross-file dedup winners deterministic.
+        # The old code depended on glob()'s filesystem-dependent order,
+        # which was never a documented guarantee — sorting is a strict
+        # improvement and doesn't change which *set* of messages counts,
+        # only (in the rare cross-file duplicate case) which physical copy
+        # is picked, and duplicates share identical usage numbers anyway.
+        for path in sorted(file_cache):
+            _, events = file_cache[path]
+            for dedup_key, model, input_tokens, output_tokens, cache_read, cache_write in events:
+                if dedup_key in seen_message_ids:
+                    continue
+                seen_message_ids.add(dedup_key)
 
-                        msg_type = entry.get('type')
-                        if msg_type != 'assistant':
-                            continue
-
-                        message = entry.get('message', {})
-                        msg_id = message.get('id')
-                        request_id = entry.get('requestId', '')
-
-                        if not msg_id:
-                            continue
-
-                        dedup_key = (msg_id, request_id)
-                        if dedup_key in seen_message_ids:
-                            continue
-                        seen_message_ids.add(dedup_key)
-
-                        usage = message.get('usage', {})
-                        if not usage:
-                            continue
-
-                        model = message.get('model', 'unknown')
-
-                        input_tokens = usage.get('input_tokens', 0) or 0
-                        output_tokens = usage.get('output_tokens', 0) or 0
-                        cache_read = usage.get('cache_read_input_tokens', 0) or 0
-                        cache_write = usage.get('cache_creation_input_tokens', 0) or 0
-
-                        if input_tokens == 0 and output_tokens == 0:
-                            continue
-
-                        mt = model_totals[model]
-                        mt['messages'] += 1
-                        mt['input_tokens'] += input_tokens
-                        mt['output_tokens'] += output_tokens
-                        mt['cache_read'] += cache_read
-                        mt['cache_write'] += cache_write
-                        total_messages += 1
-
-            except (OSError, PermissionError):
-                continue
+                mt = model_totals[model]
+                mt['messages'] += 1
+                mt['input_tokens'] += input_tokens
+                mt['output_tokens'] += output_tokens
+                mt['cache_read'] += cache_read
+                mt['cache_write'] += cache_write
+                total_messages += 1
 
         if not model_totals:
             raise SourceUnavailable("No Claude usage data found in transcripts")

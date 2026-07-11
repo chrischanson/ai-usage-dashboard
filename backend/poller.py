@@ -3,6 +3,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(__file__))
 
+import fcntl
 import logging
 import threading
 import time
@@ -17,11 +18,16 @@ logger = logging.getLogger(__name__)
 class Poller:
     """The only writer of usage data. Each cycle it stores every parser's
     raw reading verbatim (see db.record_observation) — all delta/total logic
-    happens at read time in db.py."""
+    happens at read time in db.py.
+
+    start() takes an exclusive flock on a lockfile next to the DB so that a
+    second Poller against the same db_path (e.g. a second app instance, or
+    uvicorn workers>1) never runs alongside this one and double-writes."""
 
     def __init__(self, cfg: Config):
         self.cfg = cfg
         self._stop = threading.Event()
+        self._lock_fd = None
 
     def run_once(self, conn) -> None:
         now_sec = int(time.time())
@@ -43,14 +49,56 @@ class Poller:
         prune(conn, self.cfg.retention_days)
 
     def start(self) -> None:
+        if not self._acquire_lock():
+            logger.warning(
+                "another poller already holds the lock for db_path=%s; "
+                "not starting the polling thread here (this process will "
+                "still serve the API off the existing DB)", self.cfg.db_path)
+            return
+
         conn = connect(self.cfg.db_path)
         init_schema(conn)
         conn.close()
         t = threading.Thread(target=self._loop, daemon=True)
         t.start()
 
+    def _acquire_lock(self) -> bool:
+        """Exclusive, non-blocking guard: at most one poller may write a
+        given DB at a time. Fails open (returns True with no lock held) for
+        ':memory:' DBs and any environment where the lockfile can't even be
+        created — an unguarded poller is safer than refusing to start the
+        whole app over a lockfile problem in, e.g., a read-only tmp test dir."""
+        db_path = self.cfg.db_path
+        if db_path == ':memory:':
+            return True
+        lock_path = db_path + '.poller.lock'
+        try:
+            fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o644)
+        except OSError as e:
+            logger.warning(
+                "could not create poller lockfile %s (%s); starting "
+                "without the single-poller guard", lock_path, e)
+            return True
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            os.close(fd)
+            return False
+        self._lock_fd = fd
+        return True
+
     def stop(self) -> None:
         self._stop.set()
+        if self._lock_fd is not None:
+            try:
+                fcntl.flock(self._lock_fd, fcntl.LOCK_UN)
+            except OSError:
+                pass
+            try:
+                os.close(self._lock_fd)
+            except OSError:
+                pass
+            self._lock_fd = None
 
     def _loop(self):
         while not self._stop.is_set():
@@ -168,7 +216,7 @@ class Poller:
 
     def _collect_agy_quota(self):
         from quota_parser import fetch_agy_quota
-        return fetch_agy_quota()
+        return fetch_agy_quota(network_timeout=self.cfg.network_timeout)
 
     def _collect_opencode_cost(self):
         from opencode_quota import fetch_opencode_cost

@@ -14,11 +14,12 @@ import re
 import subprocess
 import urllib.request
 import ssl
-import socket
 from datetime import datetime, timezone
 
-# Set socket timeout globally to avoid hangs
-socket.setdefaulttimeout(3)
+# No socket.setdefaulttimeout() here: that was a process-global side effect
+# that capped every socket opened anywhere in the process (including
+# unrelated code) just because this module got imported. Every network call
+# below sets its own explicit per-call timeout instead.
 
 CLOUD_CODE_ENDPOINT = 'https://daily-cloudcode-pa.googleapis.com'
 QUOTA_RPC_PATH = '/exa.language_server_pb.LanguageServerService/RetrieveUserQuotaSummary'
@@ -134,7 +135,7 @@ def _parse_iso_time(t_str):
         return 0
 
 
-def _try_connect_rpc(port, csrf_token):
+def _try_connect_rpc(port, csrf_token, timeout=3):
     """Try to call the RetrieveUserQuotaSummary RPC on the given port."""
     # Try HTTP first, then HTTPS if needed
     for proto in ('http', 'https'):
@@ -160,14 +161,14 @@ def _try_connect_rpc(port, csrf_token):
             },
         )
         try:
-            with urllib.request.urlopen(req, timeout=3, context=ctx) as resp:
+            with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
                 return json.loads(resp.read().decode('utf-8'))
         except Exception:
             continue
     raise Exception(f"Failed to connect to RPC on port {port}")
 
 
-def _detect_agy_plan():
+def _detect_agy_plan(timeout=5):
     """Get the AGY plan name from the Cloud Code API's loadCodeAssist endpoint."""
     try:
         token_path = os.path.expanduser('~/.gemini/antigravity-cli/antigravity-oauth-token')
@@ -183,7 +184,7 @@ def _detect_agy_plan():
                 'Authorization': f'Bearer {access_token}',
                 'Content-Type': 'application/json',
             })
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             body = json.loads(resp.read().decode())
 
         # If a paidTier is present, the user has a paid plan available
@@ -203,9 +204,14 @@ def _detect_agy_plan():
         return 'Gemini Code Assist'
 
 
-def fetch_agy_quota():
+def fetch_agy_quota(network_timeout=None):
     """
     Fetch remaining quota from AGY and format it for database storage.
+
+    network_timeout: seconds for each HTTP call, normally Config.network_timeout
+    (USAGE_NETWORK_TIMEOUT). None keeps this module's own historical per-call
+    defaults (3s for the RPC probe, 5s for plan detection) for callers that
+    don't pass config through.
 
     Returns dict like:
       gemini_models: {
@@ -217,7 +223,10 @@ def fetch_agy_quota():
           five_hour_limit: {used, total, remaining_pct, refreshes_in}
       }
     """
-    plan = _detect_agy_plan()
+    plan_kwargs = {} if network_timeout is None else {'timeout': network_timeout}
+    rpc_kwargs = {} if network_timeout is None else {'timeout': network_timeout}
+
+    plan = _detect_agy_plan(**plan_kwargs)
     csrf_token = _detect_csrf_token()
     if not csrf_token:
         return {'error': 'Language server process or CSRF token not found', 'plan': plan}
@@ -225,7 +234,7 @@ def fetch_agy_quota():
     raw_data = None
     for port in _detect_language_server_ports():
         try:
-            raw_data = _try_connect_rpc(port, csrf_token)
+            raw_data = _try_connect_rpc(port, csrf_token, **rpc_kwargs)
             if raw_data:
                 break
         except Exception:

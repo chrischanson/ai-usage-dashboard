@@ -1,5 +1,6 @@
 """FastAPI app factory for the AI Usage Dashboard."""
 import os
+import threading
 import time
 from fastapi import FastAPI, Query
 from fastapi.staticfiles import StaticFiles
@@ -41,20 +42,46 @@ def _agy_quota_to_api(raw: dict) -> dict:
 _quota_cache: dict = {}
 _QUOTA_TTL_SECONDS = 60
 
+# Endpoints are sync `def` routes, so FastAPI runs each request in a
+# threadpool worker -> concurrent requests are real concurrent threads, not
+# coroutines on one loop, and a plain threading.Lock is the right primitive.
+# One lock per source (not a single global lock) so refreshing 'codex' never
+# blocks a concurrent request for 'claude'.
+_quota_locks: dict = {}
+_quota_locks_guard = threading.Lock()
+
+
+def _lock_for(source: str) -> threading.Lock:
+    with _quota_locks_guard:
+        lock = _quota_locks.get(source)
+        if lock is None:
+            lock = _quota_locks[source] = threading.Lock()
+        return lock
+
 
 def _get_cached_quota(source: str, fetcher):
     now = time.time()
     cached = _quota_cache.get(source)
     if cached and (now - cached[0]) < _QUOTA_TTL_SECONDS:
         return cached[1]
-    try:
-        raw = fetcher()
-    except Exception:
-        raw = None
-    if raw is None:
-        raw = {'error': 'fetch failed'}
-    _quota_cache[source] = (now, raw)
-    return raw
+
+    # Cache stampede guard: on expiry, every concurrent request for this
+    # source would otherwise run the (slow: subprocess/network) fetcher and
+    # block for tens of seconds. Only the first thread through the lock
+    # fetches; the rest wait and then re-read the now-fresh cache.
+    lock = _lock_for(source)
+    with lock:
+        cached = _quota_cache.get(source)
+        if cached and (time.time() - cached[0]) < _QUOTA_TTL_SECONDS:
+            return cached[1]
+        try:
+            raw = fetcher()
+        except Exception:
+            raw = None
+        if raw is None:
+            raw = {'error': 'fetch failed'}
+        _quota_cache[source] = (time.time(), raw)
+        return raw
 
 
 _VALID_SOURCES = set(get_all_names())
@@ -62,6 +89,19 @@ _VALID_SOURCES = set(get_all_names())
 
 def create_app() -> FastAPI:
     app = FastAPI()
+
+    # Schema creation belongs at startup, not per-request: init_schema runs
+    # five CREATE TABLE IF NOT EXISTS, a PRAGMA introspection, a meta INSERT
+    # OR IGNORE and a commit, which would otherwise turn every /ready and
+    # /metrics hit into a writer contending with the poller's write lock.
+    # main.py already does this before serving, but tests (and any other
+    # embedder of create_app) construct the app directly, so do it once here
+    # too rather than relying on the caller.
+    conn = _db_connect(DB_PATH)
+    try:
+        init_schema(conn)
+    finally:
+        conn.close()
 
     @app.middleware("http")
     async def add_csp_header(request, call_next):
@@ -317,7 +357,6 @@ def create_app() -> FastAPI:
     @app.get("/ready")
     def ready():
         conn = _db_connect(DB_PATH)
-        init_schema(conn)
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) as cnt FROM collection_status WHERE ok=1")
         row = cursor.fetchone()
@@ -331,7 +370,6 @@ def create_app() -> FastAPI:
         from integrity import check_integrity
         from config import load_config
         conn = _db_connect(DB_PATH)
-        init_schema(conn)
         result = metrics(conn)
         result['integrity'] = check_integrity(conn, load_config().poll_interval)
         conn.close()

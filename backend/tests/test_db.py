@@ -7,8 +7,8 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from db import (init_schema, record_observation, history, latest_usage, prune,
-                _USAGE_FIELDS)
+from db import (init_schema, record_observation, record_status, history, latest_usage,
+                metrics, prune, _USAGE_FIELDS)
 from parsers.base import ParserResult, ModelUsage
 
 
@@ -118,6 +118,47 @@ class PruneTest(unittest.TestCase):
         # Derived delta of the retained recent row is measured from the anchor.
         rows = history(self.conn, 'codex')
         self.assertEqual(rows[-1]['delta_input_tokens'], 1000)
+
+
+class MetricsTest(unittest.TestCase):
+    def setUp(self):
+        self.conn = sqlite3.connect(':memory:')
+        self.conn.row_factory = sqlite3.Row
+        init_schema(self.conn)
+
+    def tearDown(self):
+        self.conn.close()
+
+    def test_last_success_at_survives_a_later_failure(self):
+        # Newest attempt failed, but an earlier attempt succeeded: the report
+        # must still surface when the source last actually succeeded, not
+        # None just because the most recent poll errored out.
+        record_status(self.conn, 'codex', 'usage', 1000, ok=True, error=None, duration_ms=5.0)
+        record_status(self.conn, 'codex', 'usage', 1600, ok=False, error='boom', duration_ms=1.0)
+        result = metrics(self.conn)
+        info = result['per_source']['codex']['usage']
+        self.assertEqual(info['last_success_at'], '1970-01-01 00:16:40')
+        self.assertEqual(info['last_error'], 'boom')
+        self.assertEqual(info['last_duration_ms'], 1.0)
+
+    def test_consecutive_same_kind_rows_dont_hide_other_kind(self):
+        # Two consecutive 'usage' rows must not push the only 'quota' row out
+        # of an "ORDER BY id DESC LIMIT 2" style window.
+        record_status(self.conn, 'agy', 'quota', 900, ok=True, error=None, duration_ms=2.0)
+        record_status(self.conn, 'agy', 'usage', 1000, ok=True, error=None, duration_ms=3.0)
+        record_status(self.conn, 'agy', 'usage', 1600, ok=True, error=None, duration_ms=4.0)
+        result = metrics(self.conn)
+        src_info = result['per_source']['agy']
+        self.assertIn('quota', src_info)
+        self.assertIn('usage', src_info)
+        self.assertEqual(src_info['quota']['last_success_at'], '1970-01-01 00:15:00')
+        self.assertEqual(src_info['usage']['last_duration_ms'], 4.0)
+
+    def test_no_success_yet_reports_none(self):
+        record_status(self.conn, 'codex', 'usage', 1000, ok=False, error='nope', duration_ms=0.5)
+        info = metrics(self.conn)['per_source']['codex']['usage']
+        self.assertIsNone(info['last_success_at'])
+        self.assertEqual(info['last_error'], 'nope')
 
 
 if __name__ == '__main__':

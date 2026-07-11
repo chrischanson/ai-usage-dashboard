@@ -31,3 +31,7 @@ run/
 
 # Local sync script
 sync.sh
+
+# Private docs
+IMPROVE.md
+

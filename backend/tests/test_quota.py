@@ -126,5 +126,38 @@ class TestCollectDispatchesToCorrectInternal(unittest.TestCase):
             mock_fn.assert_called_once()
 
 
+class TestAgyNetworkTimeoutWiring(unittest.TestCase):
+    """quota_parser.fetch_agy_quota's network_timeout kwarg (fed by
+    Config.network_timeout / USAGE_NETWORK_TIMEOUT in source_registry.py and
+    poller.py) must actually reach the per-call urlopen timeouts, not just
+    be accepted and dropped."""
+
+    def test_network_timeout_reaches_rpc_and_plan_calls(self):
+        from unittest.mock import patch
+        import quota_parser
+
+        with patch.object(quota_parser, '_detect_agy_plan', return_value='X') as mock_plan, \
+             patch.object(quota_parser, '_detect_csrf_token', return_value='tok'), \
+             patch.object(quota_parser, '_detect_language_server_ports', return_value=[1234]), \
+             patch.object(quota_parser, '_try_connect_rpc', side_effect=Exception('stop')) as mock_rpc:
+            quota_parser.fetch_agy_quota(network_timeout=42)
+            mock_plan.assert_called_once_with(timeout=42)
+            mock_rpc.assert_called_once_with(1234, 'tok', timeout=42)
+
+    def test_no_timeout_arg_preserves_historical_defaults(self):
+        # Callers that don't pass network_timeout (back-compat) must not
+        # have their effective per-call timeout changed by this wiring.
+        from unittest.mock import patch
+        import quota_parser
+
+        with patch.object(quota_parser, '_detect_agy_plan', return_value='X') as mock_plan, \
+             patch.object(quota_parser, '_detect_csrf_token', return_value='tok'), \
+             patch.object(quota_parser, '_detect_language_server_ports', return_value=[1234]), \
+             patch.object(quota_parser, '_try_connect_rpc', side_effect=Exception('stop')) as mock_rpc:
+            quota_parser.fetch_agy_quota()
+            mock_plan.assert_called_once_with()
+            mock_rpc.assert_called_once_with(1234, 'tok')
+
+
 if __name__ == '__main__':
     unittest.main()

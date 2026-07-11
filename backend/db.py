@@ -667,26 +667,41 @@ def latest_quota(conn: sqlite3.Connection, source: str = None) -> dict:
 
 def metrics(conn: sqlite3.Connection) -> dict:
     cursor = conn.cursor()
-    cursor.execute("SELECT DISTINCT source FROM collection_status")
-    sources = [r['source'] for r in cursor.fetchall()]
+
+    # "Newest two rows for this source" (the old approach) silently assumed
+    # those two rows are one 'usage' and one 'quota' row. Two consecutive
+    # same-kind rows make the other kind vanish from the report, so group by
+    # (source, kind) instead. Two grouped-aggregate queries plus one row
+    # fetch by id keeps this index-friendly rather than a full-table walk.
+    cursor.execute("SELECT source, kind, MAX(id) AS newest_id FROM collection_status GROUP BY source, kind")
+    newest_id_by_key = {(r['source'], r['kind']): r['newest_id'] for r in cursor.fetchall()}
+
+    # Newest *successful* attempt per (source, kind), tracked separately from
+    # the newest attempt overall: after a run of failures, last_success_at
+    # must still be the time of the last real success, not None.
+    cursor.execute(
+        "SELECT source, kind, MAX(id) AS success_id FROM collection_status WHERE ok=1 GROUP BY source, kind")
+    success_id_by_key = {(r['source'], r['kind']): r['success_id'] for r in cursor.fetchall()}
+
+    wanted_ids = set(newest_id_by_key.values()) | set(success_id_by_key.values())
+    rows_by_id = {}
+    if wanted_ids:
+        placeholders = ','.join('?' * len(wanted_ids))
+        cursor.execute(
+            f"SELECT id, timestamp, ok, error, duration_ms FROM collection_status WHERE id IN ({placeholders})",
+            tuple(wanted_ids)
+        )
+        rows_by_id = {r['id']: r for r in cursor.fetchall()}
 
     per_source = {}
-    for src in sources:
-        cursor.execute(
-            "SELECT kind, timestamp, ok, error, duration_ms FROM collection_status "
-            "WHERE source=? ORDER BY id DESC LIMIT 2",
-            (src,)
-        )
-        rows = cursor.fetchall()
-        src_info = {}
-        for row in rows:
-            kind = row['kind']
-            src_info[kind] = {
-                'last_success_at': row['timestamp'] if row['ok'] else None,
-                'last_error': None if row['ok'] else row['error'],
-                'last_duration_ms': row['duration_ms'],
-            }
-        per_source[src] = src_info
+    for (src, kind), newest_id in newest_id_by_key.items():
+        newest_row = rows_by_id[newest_id]
+        success_id = success_id_by_key.get((src, kind))
+        per_source.setdefault(src, {})[kind] = {
+            'last_success_at': rows_by_id[success_id]['timestamp'] if success_id else None,
+            'last_error': None if newest_row['ok'] else newest_row['error'],
+            'last_duration_ms': newest_row['duration_ms'],
+        }
 
     cursor.execute("SELECT COUNT(*) AS cnt FROM usage_history")
     total_polls = cursor.fetchone()['cnt']

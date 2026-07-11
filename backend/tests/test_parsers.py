@@ -2,11 +2,18 @@
 import unittest
 import os
 import sys
+import json
+import shutil
+import sqlite3
+import tempfile
+from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from parsers.base import Parser, ParserResult, ModelUsage, SourceUnavailable
-from parsers import OpenCodeParser, AgyParser, CodexParser
+from parsers import OpenCodeParser, AgyParser, CodexParser, ClaudeParser
+from parsers.agy import _db_fingerprint
+from setup_mock_sources import build_agy_protobuf
 
 
 class TestModelUsage(unittest.TestCase):
@@ -203,6 +210,252 @@ class TestCodexParserInternals(unittest.TestCase):
     def test_raises_on_missing_db(self):
         with self.assertRaises(SourceUnavailable):
             self.parser.parse()
+
+
+def _claude_assistant_line(msg_id, request_id, input_tokens, output_tokens,
+                            model='claude-3-5-sonnet-20241022'):
+    return {
+        'type': 'assistant',
+        'requestId': request_id,
+        'message': {
+            'id': msg_id,
+            'model': model,
+            'usage': {
+                'input_tokens': input_tokens,
+                'output_tokens': output_tokens,
+            },
+        },
+    }
+
+
+class TestClaudeParserCaching(unittest.TestCase):
+    """ClaudeParser is rebuilt from scratch every poll cycle (see
+    source_registry._make_claude_parser), so its per-file cache has to
+    live at module scope keyed by projects_dir. These tests use a fresh
+    tempdir per test, so they never collide with each other or with a
+    real ~/.claude/projects cache entry."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.session_path = os.path.join(self.tmpdir, 'session1.jsonl')
+        self._write(self.session_path, [_claude_assistant_line('msg-1', 'req-1', 100, 50)])
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    @staticmethod
+    def _write(path, entries, mode='w'):
+        with open(path, mode) as f:
+            for entry in entries:
+                f.write(json.dumps(entry) + '\n')
+
+    def test_unchanged_file_not_reread(self):
+        parser = ClaudeParser(projects_dir=self.tmpdir)
+        result1 = parser.parse()
+
+        with mock.patch.object(ClaudeParser, '_extract_file_events',
+                                wraps=ClaudeParser._extract_file_events) as spy:
+            result2 = parser.parse()
+            spy.assert_not_called()
+
+        self.assertEqual(result1.input_tokens, result2.input_tokens)
+        self.assertEqual(result1.messages, result2.messages)
+        self.assertEqual(result2.input_tokens, 100)
+        self.assertEqual(result2.sessions, 1)
+
+    def test_modified_file_is_reread_and_result_updates(self):
+        other_path = os.path.join(self.tmpdir, 'session2.jsonl')
+        self._write(other_path, [_claude_assistant_line('msg-2', 'req-2', 10, 5)])
+
+        parser = ClaudeParser(projects_dir=self.tmpdir)
+        result1 = parser.parse()
+        self.assertEqual(result1.input_tokens, 110)
+        self.assertEqual(result1.messages, 2)
+
+        # Only session1.jsonl changes; session2.jsonl must be served from cache.
+        self._write(self.session_path, [_claude_assistant_line('msg-3', 'req-3', 20, 8)], mode='a')
+
+        with mock.patch.object(ClaudeParser, '_extract_file_events',
+                                wraps=ClaudeParser._extract_file_events) as spy:
+            result2 = parser.parse()
+            reread_paths = [call.args[0] for call in spy.call_args_list]
+            self.assertEqual(reread_paths, [self.session_path])
+
+        self.assertEqual(result2.input_tokens, 130)
+        self.assertEqual(result2.messages, 3)
+        self.assertEqual(result2.sessions, 2)
+
+    def test_cross_file_dedup_holds_when_only_one_file_changes(self):
+        # Same (msg.id, requestId) duplicated across two files, e.g. a
+        # resumed/forked session — must count once no matter which of the
+        # two files' cache entries happens to be fresh.
+        dup_entry = _claude_assistant_line('msg-dup', 'req-dup', 500, 200)
+        path_a = os.path.join(self.tmpdir, 'a.jsonl')
+        path_b = os.path.join(self.tmpdir, 'b.jsonl')
+        self._write(path_a, [dup_entry])
+        self._write(path_b, [dup_entry])
+
+        parser = ClaudeParser(projects_dir=self.tmpdir)
+        result1 = parser.parse()
+        # session1 (100) + the duplicate counted once (500)
+        self.assertEqual(result1.input_tokens, 600)
+        self.assertEqual(result1.messages, 2)
+
+        # Only b.jsonl changes; a.jsonl (holding the other half of the
+        # duplicate) is served from cache and must not cause double counting.
+        self._write(path_b, [_claude_assistant_line('msg-4', 'req-4', 7, 3)], mode='a')
+
+        result2 = parser.parse()
+        self.assertEqual(result2.input_tokens, 607)
+        self.assertEqual(result2.messages, 3)
+
+    def test_deleted_file_drops_from_cache_and_totals(self):
+        parser = ClaudeParser(projects_dir=self.tmpdir)
+        parser.parse()
+
+        os.remove(self.session_path)
+        other_path = os.path.join(self.tmpdir, 'session2.jsonl')
+        self._write(other_path, [_claude_assistant_line('msg-2', 'req-2', 10, 5)])
+
+        result = parser.parse()
+        self.assertEqual(result.input_tokens, 10)
+        self.assertEqual(result.sessions, 1)
+
+
+def _write_agy_db(path, input_tokens, output_tokens, cache_read, model, idx=0):
+    conn = sqlite3.connect(path)
+    conn.execute('CREATE TABLE IF NOT EXISTS gen_metadata (idx INTEGER, data BLOB)')
+    blob = build_agy_protobuf(input_tokens=input_tokens, output_tokens=output_tokens,
+                               cache_read=cache_read, model_name=model)
+    conn.execute('INSERT INTO gen_metadata (idx, data) VALUES (?, ?)', (idx, blob))
+    conn.commit()
+    conn.close()
+
+
+class TestAgyParserCaching(unittest.TestCase):
+    """Same rebuild-every-cycle situation as ClaudeParser (see
+    source_registry._make_agy_parser); AgyParser's cache also has to be
+    module-scoped, keyed by (conv_dir, ide_conv_dir) so temp-dir-backed
+    tests stay isolated from each other."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.conv_dir = os.path.join(self.tmpdir, 'conv')
+        self.ide_dir = os.path.join(self.tmpdir, 'ide')
+        os.makedirs(self.conv_dir)
+        os.makedirs(self.ide_dir)
+        self.db_path = os.path.join(self.conv_dir, 'conv1.db')
+        _write_agy_db(self.db_path, input_tokens=1000, output_tokens=200,
+                       cache_read=50, model='claude-sonnet')
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_unchanged_db_not_rescanned(self):
+        parser = AgyParser(conv_dir=self.conv_dir, ide_conv_dir=self.ide_dir)
+        result1 = parser.parse()
+
+        with mock.patch.object(AgyParser, '_extract_conv_usage',
+                                wraps=AgyParser._extract_conv_usage) as spy:
+            result2 = parser.parse()
+            spy.assert_not_called()
+
+        self.assertEqual(result1.input_tokens, result2.input_tokens)
+        self.assertEqual(result1.sessions, result2.sessions)
+        self.assertEqual(result2.input_tokens, 1000)
+
+    def test_modified_db_is_rescanned_and_result_updates(self):
+        parser = AgyParser(conv_dir=self.conv_dir, ide_conv_dir=self.ide_dir)
+        result1 = parser.parse()
+        self.assertEqual(result1.input_tokens, 1000)
+
+        # New blob (different length) -> mtime/size fingerprint changes.
+        _write_agy_db(self.db_path, input_tokens=5000, output_tokens=900,
+                       cache_read=75, model='claude-opus')
+
+        with mock.patch.object(AgyParser, '_extract_conv_usage',
+                                wraps=AgyParser._extract_conv_usage) as spy:
+            result2 = parser.parse()
+            spy.assert_called_once_with(self.db_path)
+
+        self.assertEqual(result2.input_tokens, 5000)
+
+    def test_db_fingerprint_tracks_wal_and_shm_sidecars(self):
+        # Appends in WAL mode land in -wal without touching the main
+        # file's mtime/size, so the fingerprint must change anyway —
+        # otherwise a growing live conversation would look frozen forever.
+        fp_before = _db_fingerprint(self.db_path)
+
+        wal_path = self.db_path + '-wal'
+        with open(wal_path, 'wb') as f:
+            f.write(b'\x00' * 32)
+        fp_with_wal = _db_fingerprint(self.db_path)
+        self.assertNotEqual(fp_before, fp_with_wal)
+
+        shm_path = self.db_path + '-shm'
+        with open(shm_path, 'wb') as f:
+            f.write(b'\x00' * 16)
+        fp_with_shm = _db_fingerprint(self.db_path)
+        self.assertNotEqual(fp_with_wal, fp_with_shm)
+
+        os.remove(wal_path)
+        os.remove(shm_path)
+        fp_removed = _db_fingerprint(self.db_path)
+        self.assertEqual(fp_removed, fp_before)
+
+    def test_wal_only_append_invalidates_cache_without_touching_main_file(self):
+        # End-to-end version of the fingerprint test above: a live writer
+        # connection appends a second row via WAL; the main .db file's
+        # mtime/size must stay identical while the -wal sidecar carries
+        # the new data, and AgyParser must still pick it up.
+        wal_db = os.path.join(self.conv_dir, 'wal_conv.db')
+        writer = sqlite3.connect(wal_db)
+        try:
+            writer.execute('PRAGMA journal_mode=WAL')
+            writer.execute('CREATE TABLE IF NOT EXISTS gen_metadata (idx INTEGER, data BLOB)')
+            blob1 = build_agy_protobuf(input_tokens=1000, output_tokens=200,
+                                        cache_read=0, model_name='claude-sonnet')
+            writer.execute('INSERT INTO gen_metadata (idx, data) VALUES (0, ?)', (blob1,))
+            writer.commit()
+
+            parser = AgyParser(conv_dir=self.conv_dir, ide_conv_dir=self.ide_dir)
+            result1 = parser.parse()
+            self.assertEqual(result1.input_tokens, 1000 + 1000)  # + setUp's conv1.db
+
+            stat_before = os.stat(wal_db)
+
+            blob2 = build_agy_protobuf(input_tokens=9000, output_tokens=800,
+                                        cache_read=0, model_name='claude-sonnet')
+            writer.execute('INSERT INTO gen_metadata (idx, data) VALUES (1, ?)', (blob2,))
+            writer.commit()
+
+            stat_after = os.stat(wal_db)
+            self.assertEqual(
+                (stat_before.st_mtime, stat_before.st_size),
+                (stat_after.st_mtime, stat_after.st_size),
+                "test setup assumption broken: main file changed, no longer exercises WAL-only growth",
+            )
+            self.assertTrue(os.path.exists(wal_db + '-wal'))
+
+            result2 = parser.parse()
+            # wal_conv.db's usage grows from 1000 to 9000 (max per row, not
+            # summed); conv1.db from setUp is unchanged at 1000.
+            self.assertEqual(result2.input_tokens, 9000 + 1000)
+        finally:
+            writer.close()
+
+    def test_deleted_db_drops_from_cache_and_totals(self):
+        parser = AgyParser(conv_dir=self.conv_dir, ide_conv_dir=self.ide_dir)
+        parser.parse()
+
+        os.remove(self.db_path)
+        other_path = os.path.join(self.conv_dir, 'conv2.db')
+        _write_agy_db(other_path, input_tokens=42, output_tokens=7,
+                       cache_read=0, model='claude-haiku')
+
+        result = parser.parse()
+        self.assertEqual(result.input_tokens, 42)
+        self.assertEqual(result.sessions, 1)
 
 
 class TestSourceRegistry(unittest.TestCase):
