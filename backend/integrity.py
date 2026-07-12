@@ -69,10 +69,16 @@ def check_integrity(conn: sqlite3.Connection, poll_interval: int = 600, since_cy
     checks['raw_checks_after_cycle'] = migrated_after
     scan_floor = max(migrated_after, since_cycle)
 
-    # 1. Monotonicity: raw lifetime counters should never decrease. A
-    # decrease means the tool's local state was reset/reinstalled — the
-    # read-time derivation clamps that cycle's delta to 0, so this is a
-    # warning (data is explainable), not a corruption.
+    # 1. Monotonicity: raw lifetime counters should never decrease. The write
+    # path (db._do_insert_usage) already absorbs a hard drop — a counter
+    # falling below half its previous reading, i.e. tool state reset or
+    # reinstalled — by carrying the old baseline forward, so a decrease that
+    # still made it into storage means either a gentler decline than that
+    # threshold (a windowed source's on-disk data shrinking a few percent,
+    # e.g. agy's conversation dir aging out old files) or a row written
+    # outside the normal write path. Either way the read-time derivation
+    # clamps that cycle's delta to 0, so this is a warning (data is
+    # explainable), not a corruption.
     #
     # LAG() over cycle_ts, partitioned by source, does the "compare to the
     # previous row" walk inside SQLite instead of one Python loop per source

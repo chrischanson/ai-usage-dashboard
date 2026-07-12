@@ -3,13 +3,16 @@ import unittest
 import os
 import sys
 import sqlite3
+import json
+import tempfile
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from db import (init_schema, record_observation, record_status, history, latest_usage,
-                metrics, prune, _USAGE_FIELDS)
+                metrics, prune, rebase_reset_history, _USAGE_FIELDS, _MODEL_REBASE_FIELDS)
 from parsers.base import ParserResult, ModelUsage
+from integrity import check_integrity
 
 
 def _result(input_tokens, output_tokens=0, sessions=1, messages=1, models=None):
@@ -47,13 +50,102 @@ class DerivationTest(unittest.TestCase):
         self.assertEqual([r['input_tokens'] for r in rows], [0, 500, 1500])
         self.assertEqual([r['delta_input_tokens'] for r in rows], [0, 500, 1000])
 
-    def test_counter_reset_clamps_to_zero(self):
+    def test_hard_reset_rebases_at_write_time(self):
+        # A drop below half the previous reading is tool-state loss, not a
+        # real decrease: the write path carries the old baseline forward, so
+        # the stored series (and its derived deltas) stay cumulative through
+        # the reset instead of clamping to 0.
         record_observation(self.conn, 'codex', 1000, _result(5000))
         record_observation(self.conn, 'codex', 1600, _result(6000))
-        record_observation(self.conn, 'codex', 2200, _result(100))   # reset
-        record_observation(self.conn, 'codex', 2800, _result(400))   # resumes
+        record_observation(self.conn, 'codex', 2200, _result(100))   # hard drop -> rebased
+        record_observation(self.conn, 'codex', 2800, _result(400))   # resumes from new baseline
+        stored = [r['input_tokens'] for r in self.conn.execute(
+            "SELECT input_tokens FROM usage_history WHERE source='codex' ORDER BY cycle_ts").fetchall()]
+        self.assertEqual(stored, [5000, 6000, 6100, 6400])
+        rows = history(self.conn, 'codex')
+        self.assertEqual([r['input_tokens'] for r in rows], [0, 1000, 1100, 1400])
+        self.assertEqual([r['delta_input_tokens'] for r in rows], [0, 1000, 100, 300])
+
+    def test_external_write_decrease_still_clamps_at_read_time(self):
+        # The write-side rebase only guards record_observation's own callers
+        # (the poller). A decrease that reaches storage some other way (a
+        # direct SQL write, a bug, a restored backup) must still have its
+        # delta clamped to 0 at read time -- this is the same fixture shape
+        # as the old clamp test, now written directly to bypass the rebase.
+        def _raw_insert(cycle_ts, input_tokens):
+            ts = datetime.fromtimestamp(cycle_ts, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+            self.conn.execute(
+                "INSERT INTO usage_history (source, cycle_ts, timestamp, sessions, messages, "
+                "input_tokens, output_tokens) VALUES ('codex', ?, ?, 1, 1, ?, 0)",
+                (cycle_ts, ts, input_tokens))
+
+        for cts, tok in [(1000, 5000), (1600, 6000), (2200, 100), (2800, 400)]:
+            _raw_insert(cts, tok)
+        self.conn.commit()
         rows = history(self.conn, 'codex')
         self.assertEqual([r['input_tokens'] for r in rows], [0, 1000, 1000, 1300])
+        self.assertEqual([r['delta_input_tokens'] for r in rows], [0, 1000, 0, 300])
+
+    def test_hard_reset_offset_persists_across_connections(self):
+        # The offset that absorbs a hard reset is meta-table state, not
+        # in-memory bookkeeping: it must survive the writing connection
+        # closing and a later poll landing on a fresh connection.
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'usage.db')
+            conn1 = sqlite3.connect(path)
+            conn1.row_factory = sqlite3.Row
+            init_schema(conn1)
+            record_observation(conn1, 'codex', 1000, _result(30_000_000))
+            record_observation(conn1, 'codex', 1600, _result(500_000))  # hard drop
+            offsets_row = conn1.execute(
+                "SELECT value FROM meta WHERE key='reset_offsets:codex'").fetchone()
+            self.assertIsNotNone(offsets_row)
+            self.assertEqual(json.loads(offsets_row['value'])['source']['input_tokens'], 30_000_000)
+            conn1.close()
+
+            conn2 = sqlite3.connect(path)
+            conn2.row_factory = sqlite3.Row
+            record_observation(conn2, 'codex', 2200, _result(500_100))
+            stored = [r['input_tokens'] for r in conn2.execute(
+                "SELECT input_tokens FROM usage_history WHERE source='codex' ORDER BY cycle_ts"
+            ).fetchall()]
+            conn2.close()
+        self.assertEqual(stored, [30_000_000, 30_500_000, 30_500_100])
+
+    def test_ghost_model_rows_keep_per_cycle_sums_matching_after_reset(self):
+        # When the source resets and a model the tool used to report
+        # vanishes with it, a frozen "ghost" row must keep being written for
+        # that model every cycle so the per-cycle model-token sum keeps
+        # matching the rebased source row (integrity check #3).
+        old_model = [ModelUsage('gpt-5.5', messages=16, input_tokens=28_000_000)]
+        record_observation(self.conn, 'codex', 1000, _result(28_000_000, sessions=16, messages=16, models=old_model))
+        # Hard reset: sessions/messages/tokens all collapse, and gpt-5.5 is
+        # gone from the parser's own view starting next cycle. gpt-4o's own
+        # reading grows in step with the overview so the sums line up
+        # exactly (matching the source data's own internal consistency).
+        record_observation(self.conn, 'codex', 1600, _result(
+            38_000, sessions=1, messages=1,
+            models=[ModelUsage('gpt-4o', messages=1, input_tokens=38_000)]))
+        record_observation(self.conn, 'codex', 2200, _result(
+            40_000, sessions=1, messages=2,
+            models=[ModelUsage('gpt-4o', messages=2, input_tokens=40_000)]))
+
+        for cycle_ts in (1600, 2200):
+            source_row = self.conn.execute(
+                "SELECT * FROM usage_history WHERE source='codex' AND cycle_ts=?", (cycle_ts,)).fetchone()
+            model_total = self.conn.execute(
+                "SELECT SUM(input_tokens) FROM model_usage WHERE source='codex' AND cycle_ts=?",
+                (cycle_ts,)).fetchone()[0]
+            self.assertEqual(model_total, source_row['input_tokens'])
+            ghost = self.conn.execute(
+                "SELECT * FROM model_usage WHERE source='codex' AND cycle_ts=? AND model_name='gpt-5.5'",
+                (cycle_ts,)).fetchone()
+            self.assertIsNotNone(ghost)
+            self.assertEqual(ghost['input_tokens'], 28_000_000)
+
+        report = check_integrity(self.conn, poll_interval=600)
+        codex_mismatches = [m for m in report['checks']['model_sum_mismatches'] if m['source'] == 'codex']
+        self.assertEqual(codex_mismatches, [])
 
     def test_model_derivation(self):
         m1 = [ModelUsage('gpt-5', messages=10, input_tokens=1000)]
@@ -93,6 +185,109 @@ class DerivationTest(unittest.TestCase):
         ).fetchone()
         self.assertIsNotNone(row)
         self.assertEqual(row['ok'], 1)
+
+
+class RebaseResetHistoryTest(unittest.TestCase):
+    """rebase_reset_history replays *historical* rows that were written
+    before offset tracking existed -- i.e. genuinely raw at every cycle,
+    never previously adjusted. These fixtures go in directly via SQL (not
+    record_observation) to reproduce that shape, including the one wrinkle
+    real codex data had: a poller restart landing mid-reset left the reset
+    cycle's model_usage holding the union of the old and new model rows
+    (both survive an INSERT OR REPLACE keyed on (source, cycle_ts,
+    model_name) since the model_name differs)."""
+
+    def setUp(self):
+        self.conn = sqlite3.connect(':memory:')
+        self.conn.row_factory = sqlite3.Row
+        init_schema(self.conn)
+        import time
+        now_cycle = (int(time.time()) // 600) * 600
+        self.c1, self.c2, self.c3, self.c4, self.c5 = (
+            now_cycle - 2400, now_cycle - 1800, now_cycle - 1200, now_cycle - 600, now_cycle)
+
+    def tearDown(self):
+        self.conn.close()
+
+    def _usage(self, cycle_ts, sessions, messages, input_tokens):
+        ts = datetime.fromtimestamp(cycle_ts, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+        self.conn.execute(
+            "INSERT INTO usage_history (source, cycle_ts, timestamp, sessions, messages, "
+            "input_tokens, output_tokens) VALUES ('codex', ?, ?, ?, ?, ?, 0)",
+            (cycle_ts, ts, sessions, messages, input_tokens))
+        record_status(self.conn, 'codex', 'usage', cycle_ts, True, None)
+
+    def _model(self, cycle_ts, model_name, messages, input_tokens):
+        ts = datetime.fromtimestamp(cycle_ts, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+        self.conn.execute(
+            "INSERT INTO model_usage (source, cycle_ts, timestamp, model_name, messages, "
+            "input_tokens, output_tokens, cache_read, cache_write, cost) "
+            "VALUES ('codex', ?, ?, ?, ?, ?, 0, 0, 0, 0)",
+            (cycle_ts, ts, model_name, messages, input_tokens))
+
+    def test_replay_reproduces_real_reset_shape(self):
+        # c1, c2: steady growth, single model.
+        self._usage(self.c1, 10, 10, 1_000_000)
+        self._model(self.c1, 'modelA', 10, 1_000_000)
+        self._usage(self.c2, 20, 20, 2_000_000)
+        self._model(self.c2, 'modelA', 20, 2_000_000)
+        # c3: the reset cycle. Source counters collapse; model_usage holds
+        # the union (stale modelA row still present + brand-new modelB).
+        self._usage(self.c3, 2, 2, 50_000)
+        self._model(self.c3, 'modelA', 20, 2_000_000)
+        self._model(self.c3, 'modelB', 2, 50_000)
+        # c4, c5: modelA has genuinely dropped out of the parser's view.
+        self._usage(self.c4, 3, 3, 60_000)
+        self._model(self.c4, 'modelB', 3, 60_000)
+        self._usage(self.c5, 4, 4, 70_000)
+        self._model(self.c5, 'modelB', 4, 70_000)
+        self.conn.commit()
+
+        summary = rebase_reset_history(self.conn, 'codex')
+        self.assertEqual(summary['source_resets'], 1)
+        self.assertEqual(summary['rows_rebased'], 3)
+        self.assertEqual(summary['model_rows_rebased'], 0)
+        self.assertEqual(summary['ghost_rows_added'], 2)
+        self.assertEqual(summary['ghost_models'], ['modelA'])
+
+        stored = {r['cycle_ts']: r for r in self.conn.execute(
+            "SELECT * FROM usage_history WHERE source='codex' ORDER BY cycle_ts")}
+        self.assertEqual((stored[self.c1]['sessions'], stored[self.c1]['messages'],
+                          stored[self.c1]['input_tokens']), (10, 10, 1_000_000))
+        self.assertEqual((stored[self.c2]['sessions'], stored[self.c2]['messages'],
+                          stored[self.c2]['input_tokens']), (20, 20, 2_000_000))
+        self.assertEqual((stored[self.c3]['sessions'], stored[self.c3]['messages'],
+                          stored[self.c3]['input_tokens']), (22, 22, 2_050_000))
+        self.assertEqual((stored[self.c4]['sessions'], stored[self.c4]['messages'],
+                          stored[self.c4]['input_tokens']), (23, 23, 2_060_000))
+        self.assertEqual((stored[self.c5]['sessions'], stored[self.c5]['messages'],
+                          stored[self.c5]['input_tokens']), (24, 24, 2_070_000))
+
+        # Ghost rows for modelA start the cycle *after* the reset cycle (the
+        # reset cycle itself already sums correctly via the union row).
+        ghost_c4 = self.conn.execute(
+            "SELECT * FROM model_usage WHERE source='codex' AND cycle_ts=? AND model_name='modelA'",
+            (self.c4,)).fetchone()
+        ghost_c5 = self.conn.execute(
+            "SELECT * FROM model_usage WHERE source='codex' AND cycle_ts=? AND model_name='modelA'",
+            (self.c5,)).fetchone()
+        for ghost in (ghost_c4, ghost_c5):
+            self.assertIsNotNone(ghost)
+            self.assertEqual(ghost['messages'], 20)
+            self.assertEqual(ghost['input_tokens'], 2_000_000)
+
+        offsets_row = self.conn.execute(
+            "SELECT value FROM meta WHERE key='reset_offsets:codex'").fetchone()
+        offsets = json.loads(offsets_row['value'])
+        self.assertEqual(offsets['source'], {'sessions': 20, 'messages': 20, 'input_tokens': 2_000_000})
+        self.assertEqual(offsets['models']['modelA']['messages'], 20)
+        self.assertEqual(offsets['models']['modelA']['input_tokens'], 2_000_000)
+
+        report = check_integrity(self.conn, poll_interval=600)
+        codex_resets = [r for r in report['checks']['counter_resets'] if r['source'] == 'codex']
+        codex_mismatches = [m for m in report['checks']['model_sum_mismatches'] if m['source'] == 'codex']
+        self.assertEqual(codex_resets, [])
+        self.assertEqual(codex_mismatches, [])
 
 
 class PruneTest(unittest.TestCase):

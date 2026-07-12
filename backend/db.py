@@ -15,7 +15,18 @@ Data model (schema v3): the database stores *raw observations only*.
 Storing raw readings instead of accumulated totals means a bad row corrupts
 only its own delta (not every row after it), and history can always be
 re-derived or audited against the tools themselves.
+
+One amendment to "exactly as reported": the counters these parsers read are
+files on disk, and wiping/archiving those files (e.g. codex sessions moved
+to ~/.codex/archived_sessions) collapses the tool's own numbers even though
+no usage un-happened. The write path treats a hard drop (a counter falling
+below half its previous reading) as such a state loss and carries the old
+baseline forward via a per-source offset persisted in meta, so the stored
+series stays cumulative across tool resets. Gentle declines (agy's
+conversation dir shrinking a few percent as old files age out) are below
+the threshold and still stored verbatim — the read-time clamp handles them.
 """
+import json
 import os
 import os.path
 import shutil
@@ -284,6 +295,130 @@ def _migrate_to_v3(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def rebase_reset_history(conn: sqlite3.Connection, source: str) -> dict:
+    """One-time repair: replay one source's stored history through the same
+    reset-rebase rule _do_insert_usage now applies at write time, rewriting
+    rows in place and leaving the accumulated offsets in meta so the next
+    live write continues the rebased series seamlessly.
+
+    Only rows after the v3 migration floor are touched (earlier rows are
+    migrated display data, not raw readings). Run with the poller stopped —
+    a raw write landing mid-replay would be skipped by it.
+
+    Ghost promotion is deferred by one cycle: a poller restart can leave a
+    reset cycle holding the union of pre- and post-reset model rows (same
+    bucket written twice via INSERT OR REPLACE), so "missing at the reset
+    cycle itself" is unreliable; a model is frozen when it is still absent
+    at the first cycle after the reset."""
+    cursor = conn.cursor()
+    cursor.execute("SELECT value FROM meta WHERE key='v3_migrated_after_cycle'")
+    row = cursor.fetchone()
+    floor = int(row[0]) if row else 0
+
+    offsets = _load_reset_offsets(conn, source)
+    src_off, model_off = offsets['source'], offsets['models']
+
+    cursor.execute(
+        'SELECT * FROM usage_history WHERE source=? AND cycle_ts>=? ORDER BY cycle_ts ASC',
+        (source, floor))
+    rows = cursor.fetchall()
+    cursor.execute(
+        'SELECT * FROM model_usage WHERE source=? AND cycle_ts>=? ORDER BY cycle_ts ASC',
+        (source, floor))
+    models_by_cycle: dict = {}
+    for r in cursor.fetchall():
+        models_by_cycle.setdefault(r['cycle_ts'], {})[r['model_name']] = r
+
+    summary = {'source_resets': 0, 'rows_rebased': 0, 'model_rows_rebased': 0,
+               'ghost_rows_added': 0, 'ghost_models': []}
+    # Unlike _do_insert_usage (which re-reads the previous row from the DB on
+    # every call, so it always sees a value some earlier call already baked
+    # an offset into), this walks one static snapshot fetched up front: none
+    # of these historical rows have ever had an offset applied. So resets are
+    # detected by comparing literal stored readings to each other (exactly
+    # like integrity.py's monotonicity check does), and the running offset
+    # is only ever added when writing a row back — never subtracted back out
+    # of a reading to "recover" a raw value that was never adjusted to begin
+    # with.
+    prev_stored = None
+    last_model_stored: dict = {}
+    pending_ghosts: dict = {}
+    for idx, r in enumerate(rows):
+        cycle = r['cycle_ts']
+        stored = {f: (r[f] or 0) for f in _USAGE_FIELDS}
+        cur_models = models_by_cycle.get(cycle, {})
+
+        for name, ghost in list(pending_ghosts.items()):
+            if name not in cur_models:
+                model_off[name] = ghost
+                summary['ghost_models'].append(name)
+            del pending_ghosts[name]
+
+        source_reset = False
+        if prev_stored is not None:
+            for f in _USAGE_FIELDS:
+                if _is_reset(stored[f], prev_stored[f]):
+                    src_off[f] = src_off.get(f, 0) + prev_stored[f]
+                    source_reset = True
+        if source_reset:
+            summary['source_resets'] += 1
+            prev_cycle_models = models_by_cycle.get(
+                rows[idx - 1]['cycle_ts'], {}) if idx else {}
+            for name, prev_row in prev_cycle_models.items():
+                # Freeze at the last *stored* value (offset already baked
+                # in), not the raw reading — a model that already carried
+                # its own offset from an earlier reset must keep it.
+                pending_ghosts[name] = {f: (prev_row[f] or 0) for f in _MODEL_REBASE_FIELDS}
+        if any(src_off.get(f, 0) for f in _USAGE_FIELDS):
+            sets = ', '.join(f'{f}=?' for f in _USAGE_FIELDS)
+            conn.execute(
+                f'UPDATE usage_history SET {sets} WHERE id=?',
+                tuple(stored[f] + src_off.get(f, 0) for f in _USAGE_FIELDS) + (r['id'],))
+            summary['rows_rebased'] += 1
+
+        for name, mr in cur_models.items():
+            off = model_off.get(name, {})
+            m_stored = {f: (mr[f] or 0) for f in _MODEL_REBASE_FIELDS}
+            prev_m = last_model_stored.get(name)
+            if prev_m is not None:
+                for f in _MODEL_REBASE_FIELDS:
+                    if _is_reset(m_stored[f], prev_m[f]):
+                        off[f] = off.get(f, 0) + prev_m[f]
+                        model_off[name] = off
+            if any(off.get(f, 0) for f in _MODEL_REBASE_FIELDS):
+                sets = ', '.join(f'{f}=?' for f in _MODEL_REBASE_FIELDS)
+                conn.execute(
+                    f'UPDATE model_usage SET {sets} WHERE id=?',
+                    tuple(m_stored[f] + off.get(f, 0) for f in _MODEL_REBASE_FIELDS) + (mr['id'],))
+                summary['model_rows_rebased'] += 1
+            last_model_stored[name] = m_stored
+
+        for name, off in model_off.items():
+            if name in cur_models:
+                continue
+            conn.execute('''
+                INSERT OR IGNORE INTO model_usage (
+                    timestamp, source, cycle_ts, model_name, messages,
+                    input_tokens, output_tokens, cache_read, cache_write, cost
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (r['timestamp'], source, cycle, name) + tuple(
+                off.get(f, 0) for f in _MODEL_REBASE_FIELDS))
+            summary['ghost_rows_added'] += 1
+            # A ghost cycle contributes zero raw usage for this model (same
+            # as a live ghost row _do_insert_usage would read back), so a
+            # model that later reappears is compared against 0, not its
+            # stale pre-ghost reading — otherwise a genuine resumed count
+            # would misfire as another reset.
+            last_model_stored[name] = {f: 0 for f in _MODEL_REBASE_FIELDS}
+
+        prev_stored = stored
+
+    if src_off or model_off:
+        _save_reset_offsets(conn, source, offsets)
+    conn.commit()
+    return summary
+
+
 def init_db():
     conn = connect(DB_PATH)
     init_schema(conn)
@@ -293,8 +428,10 @@ def init_db():
 # --- Writers (the poller is the only intended caller) ---
 
 def record_observation(conn: sqlite3.Connection, source: str, cycle_ts: int, result) -> None:
-    """Store a parser's raw reading verbatim. `result` is a ParserResult
-    (or anything with the same attributes)."""
+    """Store a parser's reading. `result` is a ParserResult (or anything
+    with the same attributes). Readings are stored verbatim except across a
+    tool-state reset (see the module docstring), where the pre-reset
+    baseline is carried forward so the stored series stays cumulative."""
     _do_insert_usage(conn, source, cycle_ts,
                      result.sessions, result.messages,
                      result.input_tokens, result.output_tokens,
@@ -340,33 +477,122 @@ def _model_to_dict(m) -> dict | None:
     return None
 
 
+# A counter falling below this fraction of its previous reading is treated
+# as tool state loss (reinstall, sessions archived/deleted) rather than the
+# normal jitter of a windowed source, whose on-disk data shrinks by a few
+# percent as old files age out.
+_RESET_DROP_RATIO = 0.5
+
+_MODEL_REBASE_FIELDS = _MODEL_FIELDS + ('cost',)
+
+
+def _is_reset(raw, last_raw) -> bool:
+    return last_raw > 0 and raw < last_raw * _RESET_DROP_RATIO
+
+
+def _load_reset_offsets(conn, source: str) -> dict:
+    """Per-source rebase state persisted in meta: {'source': {field: offset},
+    'models': {model_name: {field: offset}}}. An offset is the cumulative
+    count a tool had reached before wiping its own state; stored values are
+    the tool's current reading plus the offset. A model entry whose model no
+    longer appears in the parse doubles as a frozen ('ghost') row — see
+    _do_insert_usage."""
+    row = conn.execute(
+        "SELECT value FROM meta WHERE key=?", (f'reset_offsets:{source}',)).fetchone()
+    data = json.loads(row['value']) if row else {}
+    data.setdefault('source', {})
+    data.setdefault('models', {})
+    return data
+
+
+def _save_reset_offsets(conn, source: str, offsets: dict) -> None:
+    conn.execute(
+        "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+        (f'reset_offsets:{source}', json.dumps(offsets)))
+
+
 def _do_insert_usage(conn, source, cycle_ts, sessions, messages, input_tokens, output_tokens, cache_read, cache_write, models):
     ts_str = datetime.fromtimestamp(cycle_ts, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+    raw = dict(zip(_USAGE_FIELDS, (
+        sessions or 0, messages or 0, input_tokens or 0,
+        output_tokens or 0, cache_read or 0, cache_write or 0)))
+
+    # Reset rebase: compare against the last *earlier* cycle (a same-cycle
+    # INSERT OR REPLACE rewrite must not compare a reading against itself).
+    # last stored - offset recovers the tool's own previous reading.
+    offsets = _load_reset_offsets(conn, source)
+    src_off = offsets['source']
+    prev = conn.execute(
+        'SELECT * FROM usage_history WHERE source=? AND cycle_ts<? '
+        'ORDER BY cycle_ts DESC LIMIT 1', (source, cycle_ts)).fetchone()
+    source_reset = False
+    if prev is not None:
+        for f in _USAGE_FIELDS:
+            last_raw = (prev[f] or 0) - src_off.get(f, 0)
+            if _is_reset(raw[f], last_raw):
+                src_off[f] = src_off.get(f, 0) + last_raw
+                source_reset = True
 
     conn.execute('''
         INSERT OR REPLACE INTO usage_history (
             timestamp, source, cycle_ts, sessions, messages,
             input_tokens, output_tokens, cache_read, cache_write
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (
-        ts_str, source, cycle_ts, sessions or 0, messages or 0,
-        input_tokens or 0, output_tokens or 0, cache_read or 0, cache_write or 0
-    ))
+    ''', (ts_str, source, cycle_ts) + tuple(
+        raw[f] + src_off.get(f, 0) for f in _USAGE_FIELDS))
 
+    parsed = {}
     for m in models or []:
         md = _model_to_dict(m)
-        if md is None:
+        if md is not None:
+            parsed[md['model_name']] = md
+
+    model_off = offsets['models']
+    if source_reset and prev is not None:
+        # Models the tool reported last cycle but no longer knows about were
+        # wiped with the rest of its state; freeze each at its last stored
+        # value so per-cycle model sums keep matching the rebased source row.
+        for r in conn.execute(
+                'SELECT * FROM model_usage WHERE source=? AND cycle_ts=?',
+                (source, prev['cycle_ts'])):
+            if r['model_name'] not in parsed:
+                model_off[r['model_name']] = {
+                    f: (r[f] or 0) for f in _MODEL_REBASE_FIELDS}
+
+    for name, md in parsed.items():
+        off = model_off.get(name, {})
+        prev_m = conn.execute(
+            'SELECT * FROM model_usage WHERE source=? AND model_name=? AND cycle_ts<? '
+            'ORDER BY cycle_ts DESC LIMIT 1', (source, name, cycle_ts)).fetchone()
+        if prev_m is not None:
+            for f in _MODEL_REBASE_FIELDS:
+                last_raw = (prev_m[f] or 0) - off.get(f, 0)
+                if _is_reset(md[f] or 0, last_raw):
+                    off[f] = off.get(f, 0) + last_raw
+                    model_off[name] = off
+        conn.execute('''
+            INSERT OR REPLACE INTO model_usage (
+                timestamp, source, cycle_ts, model_name, messages,
+                input_tokens, output_tokens, cache_read, cache_write, cost
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (ts_str, source, cycle_ts, name) + tuple(
+            (md[f] or 0) + off.get(f, 0) for f in _MODEL_REBASE_FIELDS))
+
+    # Ghost rows: a model frozen at a reset keeps one row per cycle so it
+    # stays in the per-model breakdown and in the model-sum invariant.
+    for name, off in model_off.items():
+        if name in parsed:
             continue
         conn.execute('''
             INSERT OR REPLACE INTO model_usage (
                 timestamp, source, cycle_ts, model_name, messages,
                 input_tokens, output_tokens, cache_read, cache_write, cost
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            ts_str, source, cycle_ts, md['model_name'], md['messages'],
-            md['input_tokens'], md['output_tokens'], md['cache_read'],
-            md['cache_write'], md['cost']
-        ))
+        ''', (ts_str, source, cycle_ts, name) + tuple(
+            off.get(f, 0) for f in _MODEL_REBASE_FIELDS))
+
+    if src_off or model_off:
+        _save_reset_offsets(conn, source, offsets)
 
     # Invariant: every usage_history write is paired with a collection_status
     # row, enforced here (not by caller discipline) so no future caller —

@@ -19,6 +19,22 @@ def _insert_raw(conn, source, cycle_ts, input_tokens, output_tokens=0):
     ))
 
 
+def _insert_raw_external(conn, source, cycle_ts, input_tokens, output_tokens=0):
+    """Bypass the write layer to fabricate a monotonicity decrease directly.
+    record_observation now rebases any hard drop (a counter falling below
+    half its previous reading) at write time, so a fixture that means to
+    exercise check_integrity's monotonicity finding on a *stored* decrease
+    (an external write, not a live poll -- see the write-path comment in
+    db.py) must insert straight into usage_history instead; going through
+    record_observation would just absorb the drop and never store it."""
+    ts_str = '2026-01-01 00:00:00'
+    conn.execute(
+        "INSERT INTO usage_history (source, cycle_ts, timestamp, sessions, messages, "
+        "input_tokens, output_tokens) VALUES (?, ?, ?, 1, 1, ?, ?)",
+        (source, cycle_ts, ts_str, input_tokens, output_tokens))
+    record_status(conn, source, 'usage', cycle_ts, True, None)
+
+
 class TestCheckIntegrity(unittest.TestCase):
     def setUp(self):
         self.conn = sqlite3.connect(':memory:')
@@ -39,14 +55,33 @@ class TestCheckIntegrity(unittest.TestCase):
         self.assertEqual(report['checks']['rows_missing_status'], 0)
 
     def test_counter_reset_is_warned_not_fatal(self):
+        # A hard drop like this is exactly what the write path now rebases
+        # away, so it's fabricated via a direct write (as if from outside
+        # the poller) to still exercise this finding.
         now_cycle = (int(time.time()) // 600) * 600
-        _insert_raw(self.conn, 'codex', now_cycle - 600, 5000)
-        _insert_raw(self.conn, 'codex', now_cycle, 100)  # tool state reset
+        _insert_raw_external(self.conn, 'codex', now_cycle - 600, 5000)
+        _insert_raw_external(self.conn, 'codex', now_cycle, 100)  # tool state reset
         report = check_integrity(self.conn, poll_interval=600)
         self.assertTrue(report['ok'])
         resets = report['checks']['counter_resets']
         self.assertTrue(any(r['source'] == 'codex' and r['field'] == 'input_tokens' for r in resets))
         self.assertTrue(report['warnings'])
+
+    def test_gentle_decline_stored_verbatim_still_warns(self):
+        # A decline below the hard-reset threshold (a windowed source's
+        # on-disk data shrinking a few percent, e.g. agy's conversation dir
+        # aging out old files) must NOT be rebased at write time -- it's
+        # stored exactly as reported, and check_integrity still flags it.
+        now_cycle = (int(time.time()) // 600) * 600
+        _insert_raw(self.conn, 'agy', now_cycle - 600, 1000)
+        _insert_raw(self.conn, 'agy', now_cycle, 900)  # gentle decline, not a reset
+        stored = [r['input_tokens'] for r in self.conn.execute(
+            "SELECT input_tokens FROM usage_history WHERE source='agy' ORDER BY cycle_ts").fetchall()]
+        self.assertEqual(stored, [1000, 900])  # verbatim, no rebase offset added
+        report = check_integrity(self.conn, poll_interval=600)
+        resets = report['checks']['counter_resets']
+        self.assertTrue(any(r['source'] == 'agy' and r['field'] == 'input_tokens'
+                            and r['previous'] == 1000 and r['value'] == 900 for r in resets))
 
     def test_missing_status_row_fails(self):
         # Bypass the write layer to simulate an ungoverned external write.
@@ -113,10 +148,10 @@ class TestCheckIntegrity(unittest.TestCase):
         now_cycle = (int(time.time()) // 600) * 600
         old_a, old_b = now_cycle - 10000, now_cycle - 9400
         recent_a, recent_b = now_cycle - 600, now_cycle
-        _insert_raw(self.conn, 'codex', old_a, 5000)       # baseline
-        _insert_raw(self.conn, 'codex', old_b, 100)        # reset vs old_a
-        _insert_raw(self.conn, 'codex', recent_a, 200)
-        _insert_raw(self.conn, 'codex', recent_b, 300)
+        _insert_raw_external(self.conn, 'codex', old_a, 5000)       # baseline
+        _insert_raw_external(self.conn, 'codex', old_b, 100)        # reset vs old_a
+        _insert_raw_external(self.conn, 'codex', recent_a, 200)
+        _insert_raw_external(self.conn, 'codex', recent_b, 300)
 
         full = check_integrity(self.conn, poll_interval=600)
         full_cycles = {r['cycle_ts'] for r in full['checks']['counter_resets']}

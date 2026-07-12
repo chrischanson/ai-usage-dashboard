@@ -16,9 +16,12 @@ logger = logging.getLogger(__name__)
 
 
 class Poller:
-    """The only writer of usage data. Each cycle it stores every parser's
-    raw reading verbatim (see db.record_observation) — all delta/total logic
-    happens at read time in db.py.
+    """The only writer of usage data. Each cycle it hands every parser's
+    reading to db.record_observation, which stores it verbatim unless the
+    reading looks like tool-state loss (a counter dropping below half its
+    previous value), in which case the previous baseline is carried forward
+    so the stored series stays cumulative across the reset — see the db.py
+    module docstring. All delta/total logic still happens at read time.
 
     start() takes an exclusive flock on a lockfile next to the DB so that a
     second Poller against the same db_path (e.g. a second app instance, or
