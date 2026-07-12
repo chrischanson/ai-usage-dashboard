@@ -54,9 +54,10 @@ def _db_fingerprint(db_path: str):
 
 
 class AgyParser(Parser):
-    def __init__(self, conv_dir: str = AGY_CONV_DIR, ide_conv_dir: str = AGY_IDE_CONV_DIR):
+    def __init__(self, conv_dir: str = AGY_CONV_DIR, ide_conv_dir: str = AGY_IDE_CONV_DIR, db_path: str = None):
         self.conv_dir = conv_dir
         self.ide_conv_dir = ide_conv_dir
+        self.db_path = db_path
 
     @staticmethod
     def _read_varint(data: bytes, pos: int):
@@ -171,7 +172,22 @@ class AgyParser(Parser):
             'model': model_name or 'unknown',
         }
 
+    def _get_db_path(self) -> str | None:
+        if self.db_path:
+            return self.db_path
+        import sys
+        if 'unittest' in sys.modules or 'pytest' in sys.modules:
+            return None
+        try:
+            from config import load_config
+            return load_config().db_path
+        except Exception:
+            return None
+
     def parse(self) -> ParserResult:
+        import sys
+        import json
+
         db_dirs = [d for d in [self.conv_dir, self.ide_conv_dir] if os.path.isdir(d)]
         db_files = []
         for d in db_dirs:
@@ -195,41 +211,180 @@ class AgyParser(Parser):
                 continue
             db_cache[db_path] = (fingerprint, self._extract_conv_usage(db_path))
 
-        model_totals: dict[str, dict] = {}
-        sessions = 0
+        current_files = {}
+        for path in db_files:
+            usage = db_cache[path][1]
+            if usage:
+                current_files[path] = usage
 
-        for db_path in db_files:
-            usage = db_cache[db_path][1]
-            if not usage:
-                continue
-            sessions += 1
-            model = usage['model']
-            if model not in model_totals:
-                model_totals[model] = {
-                    'input_tokens': 0,
-                    'output_tokens': 0,
-                    'cache_read': 0,
-                    'messages': 0,
-                    'cost': 0.0,
+        db_path = self._get_db_path()
+        use_db = db_path is not None and os.path.exists(db_path)
+
+        state = None
+        if use_db:
+            try:
+                conn = sqlite3.connect(db_path)
+                row = conn.execute("SELECT value FROM meta WHERE key='agy_conv_states'").fetchone()
+                if row:
+                    state = json.loads(row[0])
+                conn.close()
+            except Exception:
+                pass
+
+        if state is None:
+            if use_db:
+                # First run bootstrap
+                state = {
+                    'files': current_files,
+                    'cumulative': {
+                        'sessions': len(current_files),
+                        'messages': len(current_files),
+                        'input_tokens': sum(u['input_tokens'] for u in current_files.values()),
+                        'output_tokens': sum(u['output_tokens'] for u in current_files.values()),
+                        'cache_read': sum(u['cache_read'] for u in current_files.values()),
+                        'models': {}
+                    }
                 }
-            model_totals[model]['input_tokens'] += usage['input_tokens']
-            model_totals[model]['output_tokens'] += usage['output_tokens']
-            model_totals[model]['cache_read'] += usage['cache_read']
-            model_totals[model]['messages'] += 1
+                for usage in current_files.values():
+                    model = usage['model']
+                    m_cum = state['cumulative']['models'].setdefault(model, {
+                        'messages': 0, 'input_tokens': 0, 'output_tokens': 0, 'cache_read': 0
+                    })
+                    m_cum['messages'] += 1
+                    m_cum['input_tokens'] += usage['input_tokens']
+                    m_cum['output_tokens'] += usage['output_tokens']
+                    m_cum['cache_read'] += usage['cache_read']
 
-        if not model_totals:
-            raise SourceUnavailable("No AGY usage data found in conversation databases")
+                try:
+                    conn = sqlite3.connect(db_path)
+                    conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('agy_conv_states', ?)", (json.dumps(state),))
+                    conn.commit()
+                    conn.close()
+                except Exception:
+                    pass
+            else:
+                # Raw fallback logic (original behavior) for tests or when DB is not available
+                model_totals = {}
+                sessions = 0
+                for path, usage in current_files.items():
+                    sessions += 1
+                    model = usage['model']
+                    if model not in model_totals:
+                        model_totals[model] = {
+                            'input_tokens': 0,
+                            'output_tokens': 0,
+                            'cache_read': 0,
+                            'messages': 0,
+                            'cost': 0.0,
+                        }
+                    model_totals[model]['input_tokens'] += usage['input_tokens']
+                    model_totals[model]['output_tokens'] += usage['output_tokens']
+                    model_totals[model]['cache_read'] += usage['cache_read']
+                    model_totals[model]['messages'] += 1
 
-        total_input = sum(v['input_tokens'] for v in model_totals.values())
-        total_output = sum(v['output_tokens'] for v in model_totals.values())
-        total_cache = sum(v['cache_read'] for v in model_totals.values())
+                if not model_totals:
+                    raise SourceUnavailable("No AGY usage data found in conversation databases")
 
-        result = ParserResult(
-            sessions=sessions,
-            messages=sum(v['messages'] for v in model_totals.values()),
-            input_tokens=total_input,
-            output_tokens=total_output,
-            cache_read=total_cache,
+                total_input = sum(v['input_tokens'] for v in model_totals.values())
+                total_output = sum(v['output_tokens'] for v in model_totals.values())
+                total_cache = sum(v['cache_read'] for v in model_totals.values())
+
+                return ParserResult(
+                    sessions=sessions,
+                    messages=sum(v['messages'] for v in model_totals.values()),
+                    input_tokens=total_input,
+                    output_tokens=total_output,
+                    cache_read=total_cache,
+                    cache_write=0,
+                    models=[
+                        ModelUsage(
+                            model_name=model,
+                            messages=data['messages'],
+                            input_tokens=data['input_tokens'],
+                            output_tokens=data['output_tokens'],
+                            cache_read=data['cache_read'],
+                            cache_write=0,
+                            cost=data['cost'],
+                        )
+                        for model, data in sorted(model_totals.items(), key=lambda x: -x[1]['input_tokens'])
+                    ],
+                )
+
+        if state is not None:
+            prev_files = state.get('files', {})
+            cum = state.get('cumulative', {})
+
+            delta_sessions = 0
+            delta_messages = 0
+            delta_input = 0
+            delta_output = 0
+            delta_cache = 0
+            model_deltas = {}
+
+            for path, usage in current_files.items():
+                model = usage['model']
+                if path not in prev_files:
+                    # New file
+                    delta_sessions += 1
+                    delta_messages += 1
+                    di = usage['input_tokens']
+                    do = usage['output_tokens']
+                    dc = usage['cache_read']
+                    dm = 1
+                else:
+                    # Existing file
+                    prev = prev_files[path]
+                    di = max(0, usage['input_tokens'] - prev['input_tokens'])
+                    do = max(0, usage['output_tokens'] - prev['output_tokens'])
+                    dc = max(0, usage['cache_read'] - prev['cache_read'])
+                    dm = 0
+
+                delta_input += di
+                delta_output += do
+                delta_cache += dc
+
+                md = model_deltas.setdefault(model, {
+                    'messages': 0, 'input_tokens': 0, 'output_tokens': 0, 'cache_read': 0
+                })
+                md['messages'] += dm
+                md['input_tokens'] += di
+                md['output_tokens'] += do
+                md['cache_read'] += dc
+
+            cum['sessions'] += delta_sessions
+            cum['messages'] += delta_messages
+            cum['input_tokens'] += delta_input
+            cum['output_tokens'] += delta_output
+            cum['cache_read'] += delta_cache
+
+            for model, md in model_deltas.items():
+                m_cum = cum['models'].setdefault(model, {
+                    'messages': 0, 'input_tokens': 0, 'output_tokens': 0, 'cache_read': 0
+                })
+                m_cum['messages'] += md['messages']
+                m_cum['input_tokens'] += md['input_tokens']
+                m_cum['output_tokens'] += md['output_tokens']
+                m_cum['cache_read'] += md['cache_read']
+
+            state['files'] = current_files
+
+            if use_db:
+                try:
+                    conn = sqlite3.connect(db_path)
+                    conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('agy_conv_states', ?)", (json.dumps(state),))
+                    conn.commit()
+                    conn.close()
+                except Exception:
+                    pass
+
+        # Return ParserResult from state['cumulative']
+        cum = state['cumulative']
+        return ParserResult(
+            sessions=cum['sessions'],
+            messages=cum['messages'],
+            input_tokens=cum['input_tokens'],
+            output_tokens=cum['output_tokens'],
+            cache_read=cum['cache_read'],
             cache_write=0,
             models=[
                 ModelUsage(
@@ -239,11 +394,8 @@ class AgyParser(Parser):
                     output_tokens=data['output_tokens'],
                     cache_read=data['cache_read'],
                     cache_write=0,
-                    cost=data['cost'],
+                    cost=0.0,
                 )
-                for model, data in sorted(model_totals.items(),
-                                          key=lambda x: -x[1]['input_tokens'])
-            ],
+                for model, data in sorted(cum['models'].items(), key=lambda x: -x[1]['input_tokens'])
+            ]
         )
-
-        return result

@@ -460,6 +460,65 @@ class TestAgyParserCaching(unittest.TestCase):
         self.assertEqual(result.sessions, 1)
 
 
+class TestAgyParserCumulative(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        self.tmp_dir = tempfile.mkdtemp()
+        self.conv_dir = os.path.join(self.tmp_dir, 'conv')
+        self.ide_dir = os.path.join(self.tmp_dir, 'ide')
+        os.makedirs(self.conv_dir)
+        os.makedirs(self.ide_dir)
+        
+        self.db_fd, self.db_path = tempfile.mkstemp(suffix='.db')
+        os.close(self.db_fd)
+        
+        from db import init_schema
+        self.conn = sqlite3.connect(self.db_path)
+        self.conn.row_factory = sqlite3.Row
+        init_schema(self.conn)
+        self.conn.close()
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp_dir)
+        if os.path.exists(self.db_path):
+            os.remove(self.db_path)
+
+    def test_cumulative_delta_tracking(self):
+        conv1 = os.path.join(self.conv_dir, 'conv1.db')
+        _write_agy_db(conv1, input_tokens=100, output_tokens=20, cache_read=0, model='claude-sonnet')
+        
+        parser = AgyParser(conv_dir=self.conv_dir, ide_conv_dir=self.ide_dir, db_path=self.db_path)
+        res1 = parser.parse()
+        self.assertEqual(res1.input_tokens, 100)
+        self.assertEqual(res1.sessions, 1)
+        self.assertEqual(res1.messages, 1)
+        
+        # 1. Modify the file (growth)
+        _write_agy_db(conv1, input_tokens=150, output_tokens=30, cache_read=0, model='claude-sonnet')
+        import time
+        os.utime(conv1, (time.time() + 5, time.time() + 5))
+        res2 = parser.parse()
+        self.assertEqual(res2.input_tokens, 150)
+        self.assertEqual(res2.sessions, 1)
+        self.assertEqual(res2.messages, 1)
+        
+        # 2. Add a new file
+        conv2 = os.path.join(self.conv_dir, 'conv2.db')
+        _write_agy_db(conv2, input_tokens=200, output_tokens=40, cache_read=0, model='gemini-flash')
+        res3 = parser.parse()
+        self.assertEqual(res3.input_tokens, 350)
+        self.assertEqual(res3.sessions, 2)
+        self.assertEqual(res3.messages, 2)
+        
+        # 3. Delete the first file (should NOT drop totals!)
+        os.remove(conv1)
+        res4 = parser.parse()
+        self.assertEqual(res4.input_tokens, 350)
+        self.assertEqual(res4.sessions, 2)
+        self.assertEqual(res4.messages, 2)
+
+
 class TestSourceRegistry(unittest.TestCase):
     """All sources are polled through the registry's parser factories."""
 
