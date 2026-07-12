@@ -382,7 +382,7 @@ def rebase_reset_history(conn: sqlite3.Connection, source: str) -> dict:
             prev_m = last_model_stored.get(name)
             if prev_m is not None:
                 for f in _MODEL_REBASE_FIELDS:
-                    if _is_reset(m_stored[f], prev_m[f]):
+                    if source_reset and _is_reset(m_stored[f], prev_m[f]):
                         off[f] = off.get(f, 0) + prev_m[f]
                         model_off[name] = off
             if any(off.get(f, 0) for f in _MODEL_REBASE_FIELDS):
@@ -566,10 +566,11 @@ def _do_insert_usage(conn, source, cycle_ts, sessions, messages, input_tokens, o
             'ORDER BY cycle_ts DESC LIMIT 1', (source, name, cycle_ts)).fetchone()
         if prev_m is not None:
             for f in _MODEL_REBASE_FIELDS:
-                last_raw = (prev_m[f] or 0) - off.get(f, 0)
-                if _is_reset(md[f] or 0, last_raw):
-                    off[f] = off.get(f, 0) + last_raw
-                    model_off[name] = off
+                if source_reset:
+                    last_raw = (prev_m[f] or 0) - off.get(f, 0)
+                    if _is_reset(md[f] or 0, last_raw):
+                        off[f] = off.get(f, 0) + last_raw
+                        model_off[name] = off
         conn.execute('''
             INSERT OR REPLACE INTO model_usage (
                 timestamp, source, cycle_ts, model_name, messages,
