@@ -31,6 +31,10 @@ class Poller:
         self.cfg = cfg
         self._stop = threading.Event()
         self._lock_fd = None
+        # Consecutive quota-poll failure counts per source.
+        # Used to downgrade the log level for transient boot-time errors
+        # (e.g. AGY language server not yet started) vs. persistent failures.
+        self._quota_fail_counts: dict[str, int] = {}
 
     def run_once(self, conn) -> None:
         now_sec = int(time.time())
@@ -205,11 +209,25 @@ class Poller:
                     record_quota(conn, source, cycle_ts, quota)
             else:
                 raw_error = quota.get('error', 'empty result') if quota else 'empty result'
-                logger.warning("quota poll failed for source=%s: %s", source, raw_error)
+                fail_count = self._quota_fail_counts.get(source, 0) + 1
+                self._quota_fail_counts[source] = fail_count
+                # First 2 failures are likely transient boot-time conditions
+                # (e.g. AGY language server not yet initialised). Log at INFO
+                # so they don't show up as actionable warnings; escalate after that.
+                _TRANSIENT_THRESHOLD = 2
+                if fail_count <= _TRANSIENT_THRESHOLD:
+                    logger.info(
+                        "quota poll for source=%s not yet available (attempt %d/%d): %s",
+                        source, fail_count, _TRANSIENT_THRESHOLD, raw_error,
+                    )
+                else:
+                    logger.warning("quota poll failed for source=%s: %s", source, raw_error)
                 record_status(conn, source, 'quota', cycle_ts, False,
                               raw_error if raw_error == 'empty result' else 'fetch failed',
                               (time.time() - start) * 1000)
                 return
+            # Reset failure counter on success
+            self._quota_fail_counts[source] = 0
             record_status(conn, source, 'quota', cycle_ts, True, None,
                           (time.time() - start) * 1000)
         except Exception as e:

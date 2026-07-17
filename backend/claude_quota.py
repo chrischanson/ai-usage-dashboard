@@ -5,6 +5,7 @@ the Anthropic usage API for 5-hour session and weekly limits.
 """
 import json
 import os
+import time
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone
@@ -12,6 +13,8 @@ from datetime import datetime, timezone
 CREDENTIALS_PATH = os.path.expanduser('~/.claude/.credentials.json')
 USAGE_URL = 'https://api.anthropic.com/api/oauth/usage'
 _NETWORK_TIMEOUT = 10
+_MAX_RETRIES = 3
+_RETRY_BASE_DELAY = 1.0  # seconds; doubles each attempt
 
 
 def fetch_claude_quota():
@@ -88,17 +91,35 @@ def fetch_claude_quota():
         },
     )
 
-    try:
-        with urllib.request.urlopen(req, timeout=_NETWORK_TIMEOUT) as resp:
-            data = json.loads(resp.read().decode('utf-8'))
-    except urllib.error.HTTPError as e:
+    last_error = None
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=_NETWORK_TIMEOUT) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+            break  # success — exit retry loop
+        except urllib.error.HTTPError as e:
+            last_error = f'HTTP {e.code}: {e.reason}'
+            if e.code == 429 and attempt < _MAX_RETRIES:
+                # Respect Retry-After if provided, otherwise exponential backoff
+                retry_after = e.headers.get('Retry-After')
+                try:
+                    delay = float(retry_after)
+                except (TypeError, ValueError):
+                    delay = _RETRY_BASE_DELAY * (2 ** attempt)
+                time.sleep(delay)
+                continue
+            return {
+                'error': last_error,
+                'subscription_type': subscription_type,
+            }
+        except Exception as e:
+            return {
+                'error': str(e),
+                'subscription_type': subscription_type,
+            }
+    else:
         return {
-            'error': f'HTTP {e.code}: {e.reason}',
-            'subscription_type': subscription_type,
-        }
-    except Exception as e:
-        return {
-            'error': str(e),
+            'error': last_error or 'max retries exceeded',
             'subscription_type': subscription_type,
         }
 
