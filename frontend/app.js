@@ -2,7 +2,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let historyChartInstance = null;
     let modelChartInstance = null;
     let currentSource = 'combined';
-    let timeRange = localStorage.getItem('dashboard_timeRange') || 'all';
+    let timeRange = 'all';
+    try {
+        timeRange = localStorage.getItem('dashboard_timeRange') || 'all';
+    } catch (e) {
+        console.warn('localStorage is not accessible:', e);
+    }
     
     // Restore time range active button state
     document.querySelectorAll('.range-btn').forEach(btn => {
@@ -283,7 +288,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const newRange = btn.dataset.range;
             if (timeRange !== newRange) {
                 timeRange = newRange;
-                localStorage.setItem('dashboard_timeRange', timeRange);
+                try {
+                    localStorage.setItem('dashboard_timeRange', timeRange);
+                } catch (e) {
+                    console.warn('Failed to save to localStorage:', e);
+                }
                 cachedHistory = null;
                 refresh();
             }
