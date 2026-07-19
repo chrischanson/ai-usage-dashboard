@@ -139,20 +139,71 @@ def create_app() -> FastAPI:
             conn.close()
 
     @app.get("/api/usage/{source}/history")
-    def api_source_history(source: str):
+    def api_source_history(source: str, range: str = Query('all'), with_models: bool = Query(None)):
         if source not in _VALID_SOURCES:
             return error_response("source_unknown", f"Unknown source: {source}", 404)
+        
+        start_ts = None
+        if range != 'all':
+            seconds_map = {
+                '1h': 3600,
+                '6h': 21600,
+                '1d': 86400,
+                '1w': 604800,
+                '1m': 2592000,
+                '3m': 7776000,
+            }
+            duration = seconds_map.get(range)
+            if duration:
+                conn = _db_connect(DB_PATH)
+                try:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT MAX(cycle_ts) FROM usage_history WHERE source=?", (source,))
+                    max_ts = cursor.fetchone()[0]
+                    if max_ts:
+                        start_ts = max_ts - duration
+                finally:
+                    conn.close()
+
+        if with_models is None:
+            with_models = (range != 'all')
+
         conn = _db_connect(DB_PATH)
         try:
-            return history(conn, source=source)
+            return history(conn, source=source, with_models=with_models, start_ts=start_ts)
         finally:
             conn.close()
 
     @app.get("/api/usage/history")
-    def api_history():
+    def api_history(range: str = Query('all'), with_models: bool = Query(None)):
+        start_ts = None
+        if range != 'all':
+            seconds_map = {
+                '1h': 3600,
+                '6h': 21600,
+                '1d': 86400,
+                '1w': 604800,
+                '1m': 2592000,
+                '3m': 7776000,
+            }
+            duration = seconds_map.get(range)
+            if duration:
+                conn = _db_connect(DB_PATH)
+                try:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT MAX(cycle_ts) FROM usage_history")
+                    max_ts = cursor.fetchone()[0]
+                    if max_ts:
+                        start_ts = max_ts - duration
+                finally:
+                    conn.close()
+
+        if with_models is None:
+            with_models = (range != 'all')
+
         conn = _db_connect(DB_PATH)
         try:
-            return history(conn, source=None)
+            return history(conn, source=None, with_models=with_models, start_ts=start_ts)
         finally:
             conn.close()
 
@@ -162,6 +213,18 @@ def create_app() -> FastAPI:
         from codex_quota import fetch_codex_quota
         from opencode_quota import fetch_opencode_cost
         from claude_quota import fetch_claude_quota
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            fut_agy = executor.submit(_get_cached_quota, 'agy', fetch_agy_quota)
+            fut_opencode = executor.submit(_get_cached_quota, 'opencode', fetch_opencode_cost)
+            fut_codex = executor.submit(_get_cached_quota, 'codex', fetch_codex_quota)
+            fut_claude = executor.submit(_get_cached_quota, 'claude', fetch_claude_quota)
+
+            raw_agy = fut_agy.result()
+            opencode_live = fut_opencode.result()
+            codex_live = fut_codex.result()
+            claude_live = fut_claude.result()
 
         conn = _db_connect(DB_PATH)
         try:
@@ -171,7 +234,6 @@ def create_app() -> FastAPI:
 
         if 'agy' not in result:
             result['agy'] = {}
-        raw_agy = _get_cached_quota('agy', fetch_agy_quota)
         if raw_agy and 'error' not in raw_agy:
             result['agy'] = _agy_quota_to_api(raw_agy)
         elif raw_agy and 'plan' in raw_agy:
@@ -179,7 +241,6 @@ def create_app() -> FastAPI:
 
         if 'opencode' not in result:
             result['opencode'] = {}
-        opencode_live = _get_cached_quota('opencode', fetch_opencode_cost)
         if opencode_live and 'error' not in opencode_live:
             result['opencode']['_cost'] = opencode_live
 

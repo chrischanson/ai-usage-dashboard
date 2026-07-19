@@ -2,7 +2,17 @@ document.addEventListener('DOMContentLoaded', () => {
     let historyChartInstance = null;
     let modelChartInstance = null;
     let currentSource = 'combined';
-    let timeRange = 'all';
+    let timeRange = localStorage.getItem('dashboard_timeRange') || 'all';
+    
+    // Restore time range active button state
+    document.querySelectorAll('.range-btn').forEach(btn => {
+        if (btn.dataset.range === timeRange) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+
     let mode = 'total';
     let cachedHistory = null;
     let cachedLatestOverview = null;
@@ -270,25 +280,12 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            timeRange = btn.dataset.range;
-            if (cachedHistory) {
-                const isCombined = currentSource === 'combined';
-                const historyValid = isCombined
-                    ? (typeof cachedHistory === 'object' && !Array.isArray(cachedHistory))
-                    : Array.isArray(cachedHistory);
-                if (!historyValid) return;
-                const overview = computeOverviewFromHistory(cachedHistory, timeRange);
-                if (overview) {
-                    renderOverview(overview);
-                    const label = document.getElementById('time-range-label');
-                    if (label) label.textContent = RANGE_LABELS[timeRange] || '';
-                } else if (cachedLatestOverview) {
-                    renderOverview(cachedLatestOverview);
-                    const label = document.getElementById('time-range-label');
-                    if (label) label.textContent = '';
-                }
-                renderHistoryChart(cachedHistory);
-                refreshModels();
+            const newRange = btn.dataset.range;
+            if (timeRange !== newRange) {
+                timeRange = newRange;
+                localStorage.setItem('dashboard_timeRange', timeRange);
+                cachedHistory = null;
+                refresh();
             }
         });
     });
@@ -429,12 +426,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchHistory() {
         try {
+            const rangeParam = '?range=' + timeRange;
             if (currentSource === 'combined') {
                 const results = await Promise.allSettled([
-                    fetch('/api/usage/agy/history'),
-                    fetch('/api/usage/opencode/history'),
-                    fetch('/api/usage/codex/history'),
-                    fetch('/api/usage/claude/history')
+                    fetch('/api/usage/agy/history' + rangeParam),
+                    fetch('/api/usage/opencode/history' + rangeParam),
+                    fetch('/api/usage/codex/history' + rangeParam),
+                    fetch('/api/usage/claude/history' + rangeParam)
                 ]);
                 let agyData = [], opencodeData = [], codexData = [], claudeData = [];
                 if (results[0].status === 'fulfilled') {
@@ -455,37 +453,37 @@ document.addEventListener('DOMContentLoaded', () => {
                 let codex = codexData;
                 let claude = claudeData;
                 
-                while (true) {
-                    const allTimes = Array.from(new Set([
-                        ...agy.map(d => d.timestamp),
-                        ...opencode.map(d => d.timestamp),
-                        ...codex.map(d => d.timestamp),
-                        ...claude.map(d => d.timestamp)
-                    ])).sort();
-                    
-                    if (allTimes.length === 0) break;
-                    
-                    const latestTs = allTimes[allTimes.length - 1];
-                    const hasAgy = agy.some(d => d.timestamp === latestTs);
-                    const hasOpencode = opencode.some(d => d.timestamp === latestTs);
-                    const hasCodex = codex.some(d => d.timestamp === latestTs);
-                    const hasClaude = claude.some(d => d.timestamp === latestTs);
-                    
-                    if (!(hasAgy && hasOpencode && hasCodex && hasClaude)) {
-                        agy = agy.filter(d => d.timestamp !== latestTs);
-                        opencode = opencode.filter(d => d.timestamp !== latestTs);
-                        codex = codex.filter(d => d.timestamp !== latestTs);
-                        claude = claude.filter(d => d.timestamp !== latestTs);
-                    } else {
-                        latestCompleteTimestamp = latestTs;
-                        break;
+                const agySet = new Set(agy.map(d => d.timestamp));
+                const opencodeSet = new Set(opencode.map(d => d.timestamp));
+                const codexSet = new Set(codex.map(d => d.timestamp));
+                const claudeSet = new Set(claude.map(d => d.timestamp));
+
+                let latestTs = null;
+                for (const ts of agySet) {
+                    if (opencodeSet.has(ts) && codexSet.has(ts) && claudeSet.has(ts)) {
+                        if (latestTs === null || ts > latestTs) {
+                            latestTs = ts;
+                        }
                     }
+                }
+
+                if (latestTs !== null) {
+                    latestCompleteTimestamp = latestTs;
+                    agy = agy.filter(d => d.timestamp <= latestTs);
+                    opencode = opencode.filter(d => d.timestamp <= latestTs);
+                    codex = codex.filter(d => d.timestamp <= latestTs);
+                    claude = claude.filter(d => d.timestamp <= latestTs);
+                } else {
+                    agy = [];
+                    opencode = [];
+                    codex = [];
+                    claude = [];
                 }
                 
                 cachedHistory = { agy, opencode, codex, claude };
                 renderHistoryChart(cachedHistory);
             } else {
-                const resp = await fetch(`/api/usage/${currentSource}/history`);
+                const resp = await fetch(`/api/usage/${currentSource}/history` + rangeParam);
                 if (!resp.ok) throw new Error('HTTP ' + resp.status);
                 let data = await resp.json();
                 // Note: latestCompleteTimestamp is a combined-view concept (the
@@ -660,14 +658,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function filterByTimeRange(data, range) {
         if (!Array.isArray(data) || range === 'all' || !data.length) return data;
-        const timestamps = data.map(d => parseTs(d.timestamp).getTime());
-        const dataEnd = Math.max(...timestamps);
+        const lastTsVal = parseTs(data[data.length - 1].timestamp);
+        if (!lastTsVal) return data;
+        const dataEnd = lastTsVal.getTime();
         const ms = {
             '1h': 3600000, '6h': 21600000,
             '1d': 86400000, '1w': 604800000, '1m': 2592000000, '3m': 7776000000
         }[range] || 86400000;
-        const cutoff = new Date(dataEnd - ms);
-        return data.filter(d => parseTs(d.timestamp) >= cutoff);
+        const cutoff = dataEnd - ms;
+
+        // Binary search for the first element >= cutoff (since input is pre-sorted)
+        let low = 0;
+        let high = data.length - 1;
+        let resultIdx = data.length;
+
+        while (low <= high) {
+            const mid = Math.floor((low + high) / 2);
+            const midTs = parseTs(data[mid].timestamp);
+            if (midTs && midTs.getTime() >= cutoff) {
+                resultIdx = mid;
+                high = mid - 1;
+            } else {
+                low = mid + 1;
+            }
+        }
+        return data.slice(resultIdx);
     }
 
     function computeOverviewFromHistory(history, range) {
@@ -778,14 +793,23 @@ document.addEventListener('DOMContentLoaded', () => {
         return isNaN(d) ? null : d;
     }
 
+    const labelCache = new Map();
     function formatLabel(ts) {
+        const isMobile = window.innerWidth <= 640;
+        const cacheKey = ts + '_' + isMobile;
+        let cachedVal = labelCache.get(cacheKey);
+        if (cachedVal !== undefined) return cachedVal;
+
         const dt = parseTs(ts);
         if (!dt) return ts;
-        const isMobile = window.innerWidth <= 640;
+        let formatted;
         if (isMobile) {
-            return dt.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+            formatted = dt.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+        } else {
+            formatted = dt.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
         }
-        return dt.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        labelCache.set(cacheKey, formatted);
+        return formatted;
     }
 
     function renderHistoryChart(history) {
@@ -823,6 +847,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
             labels = allTimes.map(formatLabel);
 
+            // Cache parsed date times to avoid repetitive parsing inside loops
+            const parsedTimeCache = new Map();
+            function getParsedTime(ts) {
+                let val = parsedTimeCache.get(ts);
+                if (val === undefined) {
+                    const dt = parseTs(ts);
+                    val = dt ? dt.getTime() : 0;
+                    parsedTimeCache.set(ts, val);
+                }
+                return val;
+            }
+
             // Forward-fill: for each unified timestamp, carry forward the last known
             // value from each source so gaps don't cause dips in stacked charts.
             const MS_TOLERANCE = 30 * 60 * 1000; // 30 minutes
@@ -831,11 +867,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 let lastEntry = null;
                 let dataIdx = 0;
                 for (const ts of allTimes) {
-                    const t = parseTs(ts).getTime();
+                    const t = getParsedTime(ts);
                     while (dataIdx < data.length) {
-                        const dt = parseTs(data[dataIdx].timestamp);
-                        if (!dt) { dataIdx++; continue; }
-                        if (dt.getTime() <= t) {
+                        const dTs = data[dataIdx].timestamp;
+                        const dTime = getParsedTime(dTs);
+                        if (dTime <= t) {
                             lastEntry = data[dataIdx];
                             dataIdx++;
                         } else {

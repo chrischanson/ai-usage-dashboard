@@ -610,7 +610,7 @@ def _do_insert_usage(conn, source, cycle_ts, sessions, messages, input_tokens, o
 
 # --- Read-time derivation ---
 
-def _derive_usage_rows(rows: list, last_only: bool = False) -> list:
+def _derive_usage_rows(rows: list, last_only: bool = False, start_ts: int = None) -> list:
     """Convert raw observation rows (one source, ascending cycle_ts) into
     display rows: each _USAGE_FIELDS key becomes the cumulative total since
     the first observation, and delta_<field> holds the per-cycle increment.
@@ -635,6 +635,8 @@ def _derive_usage_rows(rows: list, last_only: bool = False) -> list:
         prev_raw = raw
         if last_only and i != last_index:
             continue
+        if start_ts is not None and r['cycle_ts'] < start_ts:
+            continue
         d = dict(r)
         for f in _USAGE_FIELDS:
             d[f] = totals[f]
@@ -643,7 +645,7 @@ def _derive_usage_rows(rows: list, last_only: bool = False) -> list:
     return out
 
 
-def _derive_model_rows(model_rows: list, only_cycle: int = None) -> dict:
+def _derive_model_rows(model_rows: list, only_cycle: int = None, start_ts: int = None) -> dict:
     """Same derivation per (model_name), for one source's model_usage rows in
     ascending cycle_ts order. Returns {cycle_ts: [derived model dicts]};
     with only_cycle set, only that cycle's dicts are built (the walk still
@@ -664,6 +666,8 @@ def _derive_model_rows(model_rows: list, only_cycle: int = None) -> dict:
         prev_raw[name] = raw
         if only_cycle is not None and r['cycle_ts'] != only_cycle:
             continue
+        if start_ts is not None and r['cycle_ts'] < start_ts:
+            continue
         d = dict(r)
         for f in _MODEL_FIELDS:
             d[f] = tot[f]
@@ -673,16 +677,16 @@ def _derive_model_rows(model_rows: list, only_cycle: int = None) -> dict:
 
 
 def _derived_source_history(conn: sqlite3.Connection, source: str, with_models: bool = True,
-                            latest_only: bool = False) -> list:
+                            latest_only: bool = False, start_ts: int = None) -> list:
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM usage_history WHERE source=? ORDER BY cycle_ts ASC', (source,))
-    rows = _derive_usage_rows(cursor.fetchall(), last_only=latest_only)
+    rows = _derive_usage_rows(cursor.fetchall(), last_only=latest_only, start_ts=start_ts)
     if rows and with_models:
         cursor.execute(
             'SELECT * FROM model_usage WHERE source=? ORDER BY cycle_ts ASC, model_name ASC',
             (source,))
         only_cycle = rows[-1]['cycle_ts'] if latest_only else None
-        models_by_cycle = _derive_model_rows(cursor.fetchall(), only_cycle=only_cycle)
+        models_by_cycle = _derive_model_rows(cursor.fetchall(), only_cycle=only_cycle, start_ts=start_ts)
         for r in rows:
             models = models_by_cycle.get(r['cycle_ts'], [])
             r['models'] = sorted(models, key=lambda m: m['input_tokens'], reverse=True)
@@ -727,9 +731,9 @@ def _latest_source_row(conn: sqlite3.Connection, source: str):
     return row
 
 
-def history(conn: sqlite3.Connection, source: str = None) -> list:
+def history(conn: sqlite3.Connection, source: str = None, with_models: bool = True, start_ts: int = None) -> list:
     if source is not None:
-        return _derived_source_history(conn, source)
+        return _derived_source_history(conn, source, with_models=with_models, start_ts=start_ts)
 
     # Aggregated view: derive each source, forward-fill cumulative totals
     # across the union of cycles (a source that skipped a cycle hasn't lost
@@ -738,7 +742,7 @@ def history(conn: sqlite3.Connection, source: str = None) -> list:
     from source_registry import get_all_names
     per_source = {}
     for src in get_all_names():
-        rows = _derived_source_history(conn, src, with_models=False)
+        rows = _derived_source_history(conn, src, with_models=with_models, start_ts=start_ts)
         if rows:
             per_source[src] = {r['cycle_ts']: r for r in rows}
 
@@ -762,6 +766,27 @@ def history(conn: sqlite3.Connection, source: str = None) -> list:
         }
         entry.update(agg)
         entry.update({f'delta_{f}': agg_delta[f] for f in _USAGE_FIELDS})
+        if with_models:
+            models_map = {}
+            for src, rows in per_source.items():
+                row = rows.get(cts)
+                if row and 'models' in row:
+                    for m in row['models']:
+                        name = m['model_name']
+                        if name not in models_map:
+                            models_map[name] = {
+                                'model_name': name,
+                                'messages': 0,
+                                'input_tokens': 0,
+                                'output_tokens': 0,
+                                'cache_read': 0,
+                                'cache_write': 0,
+                                'cost': 0.0,
+                            }
+                        for f in _MODEL_FIELDS:
+                            models_map[name][f] += (m.get(f) or 0)
+                        models_map[name]['cost'] += (m.get('cost') or 0.0)
+            entry['models'] = sorted(models_map.values(), key=lambda m: m['input_tokens'], reverse=True)
         out.append(entry)
     return out
 
