@@ -39,6 +39,7 @@ def main():
         port=cfg.port,
         log_level=cfg.log_level.lower(),
         factory=True,
+        timeout_graceful_shutdown=2,
     )
 
 

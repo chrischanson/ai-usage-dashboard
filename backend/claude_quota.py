@@ -103,9 +103,9 @@ def fetch_claude_quota():
                 # Respect Retry-After if provided, otherwise exponential backoff
                 retry_after = e.headers.get('Retry-After')
                 try:
-                    delay = float(retry_after)
+                    delay = min(float(retry_after), 1.0)
                 except (TypeError, ValueError):
-                    delay = _RETRY_BASE_DELAY * (2 ** attempt)
+                    delay = min(_RETRY_BASE_DELAY * (2 ** attempt), 1.0)
                 time.sleep(delay)
                 continue
             return {
