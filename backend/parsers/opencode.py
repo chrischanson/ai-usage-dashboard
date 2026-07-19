@@ -5,7 +5,7 @@ from .base import Parser, ParserResult, ModelUsage, SourceUnavailable
 
 
 class OpenCodeParser(Parser):
-    def __init__(self, timeout: int = 20):
+    def __init__(self, timeout: int = 3):
         self.timeout = timeout
 
     def _parse_number(self, val_str: str) -> float:
