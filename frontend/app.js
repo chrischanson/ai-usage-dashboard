@@ -184,7 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 lastHistoryFetchTime = 0;
-                await Promise.all([refresh(), minWait]);
+                await Promise.all([refresh(true), minWait]);
                 setStatus('live', 'Live');
                 refreshBtn.classList.remove('loading');
                 refreshBtn.classList.add('success');
@@ -362,11 +362,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Fetch & render ---
-    async function refresh() {
+    async function refresh(force = false) {
         if (offline) return;
         hideError();
-        // fetchLatest is cheap and carries cycle_ts, so await it first to
-        // decide whether the (expensive) history series actually changed
+        // Step 1: fetch latest observations first so latestObservedCycleTs is known
         // before firing it off alongside the other concurrent fetches.
         const latestOk = await fetchLatest();
         const now = Date.now();
@@ -375,7 +374,7 @@ document.addEventListener('DOMContentLoaded', () => {
             || latestObservedCycleTs == null
             || latestObservedCycleTs !== lastHistoryCycleTs
             || (now - lastHistoryFetchTime) > HISTORY_STALE_MS;
-        const pending = [fetchQuota(), fetchIntegrity()];
+        const pending = [fetchQuota(force), fetchIntegrity()];
         if (needHistory) pending.push(fetchHistory());
         await Promise.all(pending);
         if (needHistory) {
@@ -1113,11 +1112,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Quota ---
-    async function fetchQuota() {
+    async function fetchQuota(force = false) {
         try {
             let url = '/api/quota/latest';
             if (currentSource !== 'combined') {
                 url = `/api/quota/${currentSource}/latest`;
+            }
+            if (force) {
+                url += (url.includes('?') ? '&' : '?') + 'force=true';
             }
             const titleMap = {
                 combined: 'Quota Limits',
@@ -1263,17 +1265,35 @@ document.addEventListener('DOMContentLoaded', () => {
         if (hasLimit) {
             const pct = clampPct(rateLimit.remaining_pct);
             const barColor = pct > 50 ? 'green' : pct > 20 ? 'amber' : 'red';
-            const seconds = rateLimit.refreshes_in || rateLimit.refreshes_in_seconds || 0;
+            const resetAt = rateLimit.reset_at;
+            let seconds = rateLimit.refreshes_in || rateLimit.refreshes_in_seconds || 0;
+            if (resetAt && resetAt > 0) {
+                const nowSec = Math.floor(Date.now() / 1000);
+                seconds = Math.max(0, Math.floor(resetAt - nowSec));
+            }
+
             let refreshStr = '';
-            if (seconds >= 86400) {
-                const days = Math.round(seconds / 86400);
-                refreshStr = `Resets in ${days} ${days === 1 ? 'day' : 'days'}`;
-            } else if (seconds >= 3600) {
-                const hrs = Math.round(seconds / 3600);
-                refreshStr = `Resets in ${hrs} ${hrs === 1 ? 'hr' : 'hrs'}`;
-            } else if (seconds > 0) {
-                const mins = Math.round(seconds / 60);
-                refreshStr = `Resets in ${mins} ${mins === 1 ? 'min' : 'mins'}`;
+            if (seconds > 0) {
+                const days = Math.floor(seconds / 86400);
+                const hrs = Math.floor((seconds % 86400) / 3600);
+                const mins = Math.floor((seconds % 3600) / 60);
+
+                let timeStr = '';
+                if (days > 0) {
+                    timeStr = `${days}d ${hrs}h`;
+                } else if (hrs > 0) {
+                    timeStr = `${hrs}h ${mins}m`;
+                } else {
+                    timeStr = `${mins}m`;
+                }
+
+                if (resetAt && resetAt > 0) {
+                    const dt = new Date(resetAt * 1000);
+                    const formatted = dt.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                    refreshStr = `Resets in ${timeStr} (${formatted})`;
+                } else {
+                    refreshStr = `Resets in ${timeStr}`;
+                }
             } else if (pct >= 99.9) {
                 refreshStr = 'Quota reset (100% available)';
             }

@@ -59,10 +59,10 @@ def _lock_for(source: str) -> threading.Lock:
         return lock
 
 
-def _get_cached_quota(source: str, fetcher):
+def _get_cached_quota(source: str, fetcher, force: bool = False):
     now = time.time()
     cached = _quota_cache.get(source)
-    if cached and (now - cached[0]) < _QUOTA_TTL_SECONDS:
+    if not force and cached and (now - cached[0]) < _QUOTA_TTL_SECONDS:
         return cached[1]
 
     # Cache stampede guard: on expiry, every concurrent request for this
@@ -72,7 +72,7 @@ def _get_cached_quota(source: str, fetcher):
     lock = _lock_for(source)
     with lock:
         cached = _quota_cache.get(source)
-        if cached and (time.time() - cached[0]) < _QUOTA_TTL_SECONDS:
+        if not force and cached and (time.time() - cached[0]) < _QUOTA_TTL_SECONDS:
             return cached[1]
         try:
             raw = fetcher()
@@ -208,7 +208,7 @@ def create_app() -> FastAPI:
             conn.close()
 
     @app.get("/api/quota/latest")
-    def api_quota_latest():
+    def api_quota_latest(force: bool = False):
         from quota_parser import fetch_agy_quota
         from codex_quota import fetch_codex_quota
         from opencode_quota import fetch_opencode_cost
@@ -216,10 +216,10 @@ def create_app() -> FastAPI:
         from concurrent.futures import ThreadPoolExecutor
 
         with ThreadPoolExecutor(max_workers=4) as executor:
-            fut_agy = executor.submit(_get_cached_quota, 'agy', fetch_agy_quota)
-            fut_opencode = executor.submit(_get_cached_quota, 'opencode', fetch_opencode_cost)
-            fut_codex = executor.submit(_get_cached_quota, 'codex', fetch_codex_quota)
-            fut_claude = executor.submit(_get_cached_quota, 'claude', fetch_claude_quota)
+            fut_agy = executor.submit(_get_cached_quota, 'agy', fetch_agy_quota, force)
+            fut_opencode = executor.submit(_get_cached_quota, 'opencode', fetch_opencode_cost, force)
+            fut_codex = executor.submit(_get_cached_quota, 'codex', fetch_codex_quota, force)
+            fut_claude = executor.submit(_get_cached_quota, 'claude', fetch_claude_quota, force)
 
             raw_agy = fut_agy.result()
             opencode_live = fut_opencode.result()
@@ -244,19 +244,23 @@ def create_app() -> FastAPI:
         if opencode_live and 'error' not in opencode_live:
             result['opencode']['_cost'] = opencode_live
 
-        codex_live = _get_cached_quota('codex', fetch_codex_quota)
+        codex_live = _get_cached_quota('codex', fetch_codex_quota, force)
         if codex_live and 'error' not in codex_live:
             if 'codex' not in result:
                 result['codex'] = {}
             plan = codex_live.get('plan_type') or codex_live.get('plan', 'free')
             result['codex']['_plan'] = plan
             if 'primary_used_pct' in codex_live:
+                reset_at = codex_live.get('reset_at', 0)
+                now = time.time()
+                resets_in = max(0, int(reset_at - now)) if reset_at > now else 0
                 result['codex']['openai'] = {
                     'rate_limit': {
                         'remaining_pct': 100.0 - codex_live['primary_used_pct'],
                         'used': codex_live['primary_used_pct'],
                         'total': 100.0,
-                        'refreshes_in_seconds': codex_live.get('resets_in_seconds', 0),
+                        'refreshes_in_seconds': resets_in,
+                        'reset_at': reset_at,
                     }
                 }
             elif 'total_used_usd' in codex_live:
@@ -310,7 +314,7 @@ def create_app() -> FastAPI:
         return result
 
     @app.get("/api/quota/{source}/latest")
-    def api_quota_source_latest(source: str):
+    def api_quota_source_latest(source: str, force: bool = False):
         if source not in _VALID_SOURCES:
             return error_response("source_unknown", f"Unknown source: {source}", 404)
 
@@ -326,7 +330,7 @@ def create_app() -> FastAPI:
             conn.close()
 
         if source == 'agy':
-            raw = _get_cached_quota('agy', fetch_agy_quota)
+            raw = _get_cached_quota('agy', fetch_agy_quota, force)
             if raw and 'error' not in raw:
                 return {'agy': _agy_quota_to_api(raw)}
             if raw and 'plan' in raw:
@@ -338,26 +342,27 @@ def create_app() -> FastAPI:
 
         elif source == 'opencode':
             result = db_result or {'opencode': {}}
-            opencode_live = _get_cached_quota('opencode', fetch_opencode_cost)
+            opencode_live = _get_cached_quota('opencode', fetch_opencode_cost, force)
             if opencode_live and 'error' not in opencode_live:
                 result['opencode']['_cost'] = opencode_live
             return result
 
         elif source == 'codex':
             db_data = db_result or {}
-            codex_live = _get_cached_quota('codex', fetch_codex_quota)
+            codex_live = _get_cached_quota('codex', fetch_codex_quota, force)
             if codex_live and 'error' not in codex_live:
                 plan = codex_live.get('plan_type') or codex_live.get('plan', 'free')
-                if db_data:
-                    db_data['codex']['_plan'] = plan
-                    return db_data
                 result = {'codex': {'_plan': plan, 'openai': {}}}
                 if 'primary_used_pct' in codex_live:
+                    reset_at = codex_live.get('reset_at', 0)
+                    now = time.time()
+                    resets_in = max(0, int(reset_at - now)) if reset_at > now else 0
                     result['codex']['openai']['rate_limit'] = {
                         'remaining_pct': 100.0 - codex_live['primary_used_pct'],
                         'used': codex_live['primary_used_pct'],
                         'total': 100.0,
-                        'refreshes_in_seconds': codex_live.get('resets_in_seconds', 0),
+                        'refreshes_in_seconds': resets_in,
+                        'reset_at': reset_at,
                     }
                 elif 'total_used_usd' in codex_live:
                     result['codex']['openai']['cost'] = {
