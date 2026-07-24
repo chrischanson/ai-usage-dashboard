@@ -42,12 +42,16 @@
                     <button class="range-btn active" data-range="all" aria-label="All time">All</button>
                 </div>
                 <button class="refresh-btn" id="refresh-btn" aria-label="Refresh data" title="Refresh data">
-                    <svg class="refresh-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <polyline points="23 4 23 10 17 10"></polyline>
-                        <polyline points="1 20 1 14 7 14"></polyline>
-                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                    </svg>
-                    <span>Refresh</span>
+                    <span class="refresh-icon-wrapper">
+                        <svg class="refresh-icon" viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M21.5 2v6h-6M2.5 22v-6h6"></path>
+                            <path d="M2 11.5a10 10 0 0 1 18.8-4.3L21.5 8M22 12.5a10 10 0 0 1-18.8 4.3L2.5 16"></path>
+                        </svg>
+                        <svg class="check-icon" viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                    </span>
+                    <span class="refresh-text" id="refresh-text">Refresh</span>
                 </button>
                 <div class="status-indicator" id="status-indicator" role="status" aria-live="polite" aria-atomic="true">
                     <span class="dot" aria-hidden="true"></span>

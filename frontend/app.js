@@ -170,19 +170,38 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const refreshBtn = document.getElementById('refresh-btn');
+    const refreshText = document.getElementById('refresh-text');
     if (refreshBtn) {
+        let refreshTimeout;
         refreshBtn.addEventListener('click', async () => {
             if (refreshBtn.disabled || offline) return;
             refreshBtn.disabled = true;
+            refreshBtn.classList.remove('success');
             refreshBtn.classList.add('loading');
+            if (refreshText) refreshText.textContent = 'Refreshing...';
+
+            const minWait = new Promise(resolve => setTimeout(resolve, 600));
+
             try {
                 lastHistoryFetchTime = 0;
-                await refresh();
+                await Promise.all([refresh(), minWait]);
                 setStatus('live', 'Live');
-            } finally {
                 refreshBtn.classList.remove('loading');
+                refreshBtn.classList.add('success');
+                if (refreshText) refreshText.textContent = 'Refreshed!';
+            } catch (err) {
+                refreshBtn.classList.remove('loading');
+                if (refreshText) refreshText.textContent = 'Refresh';
                 refreshBtn.disabled = false;
+                return;
             }
+
+            clearTimeout(refreshTimeout);
+            refreshTimeout = setTimeout(() => {
+                refreshBtn.classList.remove('success');
+                if (refreshText) refreshText.textContent = 'Refresh';
+                refreshBtn.disabled = false;
+            }, 1200);
         });
     }
 
