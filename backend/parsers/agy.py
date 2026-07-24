@@ -115,6 +115,14 @@ class AgyParser(Parser):
 
     @staticmethod
     def _extract_model_name(fields: dict) -> str | None:
+        # Preferred protobuf fields for model name (1.21: display name, 1.19/3.28: raw model id)
+        for field_key in ('1.21', '1.19', '3.28'):
+            for v in fields.get(field_key, []):
+                if isinstance(v, str) and any(k in v.lower() for k in _MODEL_KEYWORDS) and '\n' not in v:
+                    vl = v.lower()
+                    if not (vl.startswith(('used_', 'use_', 'enable-', 'disable-')) or 'used_claude' in vl or 'used_non_gemini' in vl):
+                        return v
+
         candidates = []
         for vals in fields.values():
             for v in vals:
@@ -122,7 +130,8 @@ class AgyParser(Parser):
                     continue
                 vl = v.lower()
                 if any(k in vl for k in _MODEL_KEYWORDS) and 3 < len(v) < 60 and '\n' not in v:
-                    candidates.append(v)
+                    if not (vl.startswith(('used_', 'use_', 'enable-', 'disable-')) or 'used_claude' in vl or 'used_non_gemini' in vl):
+                        candidates.append(v)
         if candidates:
             return sorted(candidates, key=len)[0]
         return None

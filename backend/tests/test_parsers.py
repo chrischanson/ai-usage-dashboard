@@ -202,6 +202,15 @@ class TestAgyParserInternals(unittest.TestCase):
         name = self.parser._extract_model_name(fields)
         self.assertEqual(name, 'gemini-2.0-flash')
 
+    def test_extract_model_name_ignores_telemetry_tags(self):
+        fields = {
+            '1.20.1': ['used_claude', 'used_claude_conservative', 'used_non_gemini_model'],
+            '1.21': ['Gemini 3.5 Flash (Low)'],
+            '1.19': ['gemini-3-flash-c'],
+        }
+        name = self.parser._extract_model_name(fields)
+        self.assertEqual(name, 'Gemini 3.5 Flash (Low)')
+
 
 class TestCodexParserInternals(unittest.TestCase):
     def setUp(self):
