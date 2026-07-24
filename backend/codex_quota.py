@@ -59,26 +59,35 @@ def _parse_logs_for_limits():
         # ReadWritePaths on ~/.codex (see install/usage-dashboard.service).
         conn = sqlite3.connect(f'file:{CODEX_LOGS}?mode=ro', uri=True)
         cursor = conn.execute(
-            "SELECT feedback_log_body FROM logs WHERE feedback_log_body LIKE '%codex.rate_limits%' ORDER BY id DESC LIMIT 1"
+            "SELECT feedback_log_body FROM logs WHERE feedback_log_body LIKE '%rate_limits%' OR feedback_log_body LIKE '%rateLimits%' ORDER BY id DESC LIMIT 50"
         )
-        row = cursor.fetchone()
-        if not row:
+        rows = cursor.fetchall()
+        if not rows:
             conn.close()
             return None
 
-        body = row[0]
-        idx = body.find('"type":"codex.rate_limits"')
-        if idx < 0:
-            conn.close()
-            return None
-        # Find the opening { before type, then use json.JSONDecoder to find the matching }
-        start = body.rfind('{', 0, idx)
-        if start < 0:
-            conn.close()
-            return None
-        try:
-            data, _ = json.JSONDecoder().raw_decode(body, start)
-        except json.JSONDecodeError:
+        data = None
+        for row in rows:
+            body = row[0]
+            if not body:
+                continue
+            idx = body.find('"type":"codex.rate_limits"')
+            if idx < 0:
+                idx = body.find('"rate_limits"')
+            if idx < 0:
+                continue
+            start = body.rfind('{', 0, idx)
+            if start < 0:
+                continue
+            try:
+                parsed, _ = json.JSONDecoder().raw_decode(body, start)
+                if parsed and isinstance(parsed, dict) and ('rate_limits' in parsed or 'rateLimits' in parsed):
+                    data = parsed
+                    break
+            except Exception:
+                continue
+
+        if not data:
             conn.close()
             return None
         limits = data.get('rate_limits', {})
