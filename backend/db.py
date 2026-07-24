@@ -293,6 +293,67 @@ def _migrate_to_v3(conn: sqlite3.Connection) -> None:
 
     cursor.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '3')")
     conn.commit()
+    _clean_legacy_telemetry_models(conn)
+
+
+def _clean_legacy_telemetry_models(conn: sqlite3.Connection) -> None:
+    """One-time repair: merge stale telemetry model names (e.g. 'used_claude') in model_usage
+    into 'Gemini 3.5 Flash (Low)' and purge telemetry keys from agy_conv_states."""
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT cycle_ts, messages, input_tokens, output_tokens, cache_read, cache_write
+            FROM model_usage 
+            WHERE source='agy' AND (model_name LIKE 'used_%' OR model_name LIKE 'use_%' OR model_name LIKE 'enable-%' OR model_name LIKE 'disable-%')
+        """)
+        stale_rows = cursor.fetchall()
+        for cts, msgs, inp, outp, cread, cwrite in stale_rows:
+            cursor.execute(
+                "SELECT messages, input_tokens, output_tokens, cache_read, cache_write FROM model_usage WHERE source='agy' AND cycle_ts=? AND model_name='Gemini 3.5 Flash (Low)'",
+                (cts,)
+            )
+            target = cursor.fetchone()
+            if target:
+                cursor.execute("""
+                    UPDATE model_usage 
+                    SET messages=?, input_tokens=?, output_tokens=?, cache_read=?, cache_write=?
+                    WHERE source='agy' AND cycle_ts=? AND model_name='Gemini 3.5 Flash (Low)'
+                """, (target[0] + msgs, target[1] + inp, target[2] + outp, target[3] + cread, target[4] + cwrite, cts))
+            else:
+                cursor.execute("""
+                    INSERT INTO model_usage (source, cycle_ts, model_name, messages, input_tokens, output_tokens, cache_read, cache_write, cost)
+                    VALUES ('agy', ?, 'Gemini 3.5 Flash (Low)', ?, ?, ?, ?, ?, 0.0)
+                """, (cts, msgs, inp, outp, cread, cwrite))
+
+        cursor.execute("DELETE FROM model_usage WHERE source='agy' AND (model_name LIKE 'used_%' OR model_name LIKE 'use_%' OR model_name LIKE 'enable-%' OR model_name LIKE 'disable-%')")
+
+        cursor.execute("SELECT value FROM meta WHERE key='agy_conv_states'")
+        row = cursor.fetchone()
+        if row:
+            import json
+            state = json.loads(row['value'] if isinstance(row, sqlite3.Row) else row[0])
+            files = state.get('files', {})
+            stale = False
+            for fpath, fval in files.items():
+                m = fval.get('model', '')
+                if m.startswith(('used_', 'use_', 'enable-', 'disable-')) or 'used_claude' in m:
+                    fval['model'] = 'Gemini 3.5 Flash (Low)'
+                    stale = True
+            cum_models = state.get('cumulative', {}).get('models', {})
+            stale_keys = [k for k in cum_models if k.startswith(('used_', 'use_', 'enable-', 'disable-')) or 'used_claude' in k]
+            for k in stale_keys:
+                stale = True
+                val = cum_models.pop(k)
+                target = cum_models.setdefault('Gemini 3.5 Flash (Low)', {'messages':0, 'input_tokens':0, 'output_tokens':0, 'cache_read':0})
+                target['messages'] += val.get('messages', 0)
+                target['input_tokens'] += val.get('input_tokens', 0)
+                target['output_tokens'] += val.get('output_tokens', 0)
+                target['cache_read'] += val.get('cache_read', 0)
+            if stale:
+                cursor.execute("UPDATE meta SET value = ? WHERE key='agy_conv_states'", (json.dumps(state),))
+        conn.commit()
+    except Exception:
+        pass
 
 
 def rebase_reset_history(conn: sqlite3.Connection, source: str) -> dict:

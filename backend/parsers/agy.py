@@ -324,14 +324,19 @@ class AgyParser(Parser):
             cum = state.get('cumulative', {})
 
             # Self-healing migration: if stored state contains telemetry keys (e.g. 'used_claude'),
-            # purge stale model entries and rebuild cum['models'] from current_files.
+            # purge stale model entries, update prev_files models, and rebuild cum['models'] from current_files.
             cum_models = cum.get('models', {})
             stale_keys = [k for k in cum_models if k.startswith(('used_', 'use_', 'enable-', 'disable-')) or 'used_claude' in k]
-            if stale_keys:
+            stale_files = [f for f, v in prev_files.items() if v.get('model', '').startswith(('used_', 'use_', 'enable-', 'disable-')) or 'used_claude' in v.get('model', '')]
+            if stale_keys or stale_files:
+                for fval in prev_files.values():
+                    m = fval.get('model', '')
+                    if m.startswith(('used_', 'use_', 'enable-', 'disable-')) or 'used_claude' in m:
+                        fval['model'] = 'Gemini 3.5 Flash (Low)'
                 cum['models'] = {}
                 for usage in current_files.values():
                     model = usage['model']
-                    if model.startswith(('used_', 'use_', 'enable-', 'disable-')):
+                    if model.startswith(('used_', 'use_', 'enable-', 'disable-')) or 'used_claude' in model:
                         model = 'Gemini 3.5 Flash (Low)'
                     m_cum = cum['models'].setdefault(model, {
                         'messages': 0, 'input_tokens': 0, 'output_tokens': 0, 'cache_read': 0
