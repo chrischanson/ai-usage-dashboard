@@ -1266,11 +1266,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const seconds = rateLimit.refreshes_in || rateLimit.refreshes_in_seconds || 0;
             let refreshStr = '';
             if (seconds >= 86400) {
-                refreshStr = `Resets in ${Math.round(seconds / 86400)} days`;
+                const days = Math.round(seconds / 86400);
+                refreshStr = `Resets in ${days} ${days === 1 ? 'day' : 'days'}`;
             } else if (seconds >= 3600) {
-                refreshStr = `Resets in ${Math.round(seconds / 3600)} hr`;
+                const hrs = Math.round(seconds / 3600);
+                refreshStr = `Resets in ${hrs} ${hrs === 1 ? 'hr' : 'hrs'}`;
             } else if (seconds > 0) {
-                refreshStr = `Resets in ${Math.round(seconds / 60)} min`;
+                const mins = Math.round(seconds / 60);
+                refreshStr = `Resets in ${mins} ${mins === 1 ? 'min' : 'mins'}`;
+            } else if (pct >= 99.9) {
+                refreshStr = 'Quota reset (100% available)';
             }
 
             card.innerHTML = `

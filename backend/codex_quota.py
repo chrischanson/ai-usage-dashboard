@@ -83,14 +83,29 @@ def _parse_logs_for_limits():
             return None
         limits = data.get('rate_limits', {})
         primary = limits.get('primary', {})
+        reset_at = int(primary.get('reset_at', 0))
+        now = time.time()
+
+        if reset_at > 0 and reset_at < now:
+            # The rate limit window has expired and reset
+            used_pct = 0.0
+            resets_in = 0
+            limit_reached = False
+            allowed = True
+        else:
+            used_pct = float(primary.get('used_percent', 0))
+            resets_in = max(0, int(reset_at - now))
+            limit_reached = limits.get('limit_reached', False)
+            allowed = limits.get('allowed', True)
+
         return {
             'plan_type': data.get('plan_type', 'unknown'),
-            'primary_used_pct': float(primary.get('used_percent', 0)),
+            'primary_used_pct': used_pct,
             'window_minutes': int(primary.get('window_minutes', 0)),
-            'resets_in_seconds': max(0, int(primary.get('reset_at', 0) - time.time())),
-            'reset_at': int(primary.get('reset_at', 0)),
-            'limit_reached': limits.get('limit_reached', False),
-            'allowed': limits.get('allowed', True),
+            'resets_in_seconds': resets_in,
+            'reset_at': reset_at,
+            'limit_reached': limit_reached,
+            'allowed': allowed,
         }
     except Exception:
         return None
