@@ -166,8 +166,23 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     if (dismissBtn) {
-        dismissBtn.addEventListener('click', () => {
-            hideError();
+        dismissBtn.addEventListener('click', hideError);
+    }
+
+    const refreshBtn = document.getElementById('refresh-btn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', async () => {
+            if (refreshBtn.disabled || offline) return;
+            refreshBtn.disabled = true;
+            refreshBtn.classList.add('loading');
+            try {
+                lastHistoryFetchTime = 0;
+                await refresh();
+                setStatus('live', 'Live');
+            } finally {
+                refreshBtn.classList.remove('loading');
+                refreshBtn.disabled = false;
+            }
         });
     }
 

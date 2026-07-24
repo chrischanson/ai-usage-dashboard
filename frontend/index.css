@@ -163,7 +163,8 @@ header h1 {
 .range-btn,
 .mode-btn,
 .retry-btn,
-.dismiss-btn {
+.dismiss-btn,
+.refresh-btn {
     min-height: 44px;
     display: flex;
     align-items: center;
@@ -540,6 +541,47 @@ header h1 {
 
 .mode-btn[data-mode="rate"].active {
     background: var(--accent-purple);
+}
+
+/* Refresh button */
+.refresh-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 500;
+    padding: 0.4rem 0.85rem;
+    border-radius: 9999px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    transition: background 0.2s, border-color 0.2s, color 0.2s, opacity 0.2s;
+    user-select: none;
+}
+
+.refresh-btn:hover:not(:disabled) {
+    background: rgba(79, 138, 255, 0.15);
+    border-color: rgba(79, 138, 255, 0.4);
+    color: #ffffff;
+}
+
+.refresh-btn:active:not(:disabled) {
+    transform: scale(0.97);
+}
+
+.refresh-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.refresh-btn.loading .refresh-icon {
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    100% { transform: rotate(360deg); }
 }
 
 /* Quota */
