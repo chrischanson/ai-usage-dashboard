@@ -1298,9 +1298,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 refreshStr = 'Quota reset (100% available)';
             }
 
+            let windowLabel = 'Primary Limit';
+            if (rateLimit.window_minutes) {
+                const wm = rateLimit.window_minutes;
+                if (wm >= 43200) windowLabel = 'Primary Limit (Monthly)';
+                else if (wm >= 10080) windowLabel = 'Primary Limit (Weekly)';
+                else if (wm >= 1440) windowLabel = 'Primary Limit (Daily)';
+                else if (wm >= 60) windowLabel = `Primary Limit (${Math.round(wm / 60)}h window)`;
+                else windowLabel = `Primary Limit (${wm}m window)`;
+            }
+
             card.innerHTML = `
                 <h3>Codex <span class="badge badge-codex">${escapeHtml(planLabel)}</span></h3>
-                ${renderMeterRow('Monthly Limit (30d)', `${pct.toFixed(1)}% remaining`, pct, barColor, refreshStr)}
+                ${renderMeterRow(windowLabel, `${pct.toFixed(1)}% remaining`, pct, barColor, refreshStr)}
             `;
         } else {
             card.innerHTML = `

@@ -261,6 +261,7 @@ def create_app() -> FastAPI:
                         'total': 100.0,
                         'refreshes_in_seconds': resets_in,
                         'reset_at': reset_at,
+                        'window_minutes': codex_live.get('window_minutes', 0),
                     }
                 }
             elif 'total_used_usd' in codex_live:
@@ -363,6 +364,7 @@ def create_app() -> FastAPI:
                         'total': 100.0,
                         'refreshes_in_seconds': resets_in,
                         'reset_at': reset_at,
+                        'window_minutes': codex_live.get('window_minutes', 0),
                     }
                 elif 'total_used_usd' in codex_live:
                     result['codex']['openai']['cost'] = {
