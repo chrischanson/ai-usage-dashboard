@@ -323,6 +323,24 @@ class AgyParser(Parser):
             prev_files = state.get('files', {})
             cum = state.get('cumulative', {})
 
+            # Self-healing migration: if stored state contains telemetry keys (e.g. 'used_claude'),
+            # purge stale model entries and rebuild cum['models'] from current_files.
+            cum_models = cum.get('models', {})
+            stale_keys = [k for k in cum_models if k.startswith(('used_', 'use_', 'enable-', 'disable-')) or 'used_claude' in k]
+            if stale_keys:
+                cum['models'] = {}
+                for usage in current_files.values():
+                    model = usage['model']
+                    if model.startswith(('used_', 'use_', 'enable-', 'disable-')):
+                        model = 'Gemini 3.5 Flash (Low)'
+                    m_cum = cum['models'].setdefault(model, {
+                        'messages': 0, 'input_tokens': 0, 'output_tokens': 0, 'cache_read': 0
+                    })
+                    m_cum['messages'] += 1
+                    m_cum['input_tokens'] += usage['input_tokens']
+                    m_cum['output_tokens'] += usage['output_tokens']
+                    m_cum['cache_read'] += usage['cache_read']
+
             delta_sessions = 0
             delta_messages = 0
             delta_input = 0
