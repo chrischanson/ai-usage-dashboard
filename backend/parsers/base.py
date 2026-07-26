@@ -28,6 +28,7 @@ class ParserResult:
     cache_read: int = 0
     cache_write: int = 0
     models: List[ModelUsage] = field(default_factory=list)
+    state: dict = None
 
 
 class Parser(ABC):

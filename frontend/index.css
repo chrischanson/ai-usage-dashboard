@@ -1,8 +1,8 @@
 :root {
     --bg-color: #0a0f1e;
     --bg-surface: #0d1528;
-    --text-primary: #f0f4ff;
-    --text-secondary: #6b7fa3;
+    --text-primary: #e8edff;
+    --text-secondary: #8a9fc8;
     --glass-bg: rgba(20, 30, 60, 0.65);
     --glass-border: rgba(100, 140, 255, 0.12);
     --accent-blue: #4f8aff;
@@ -52,22 +52,8 @@
     border: 0;
 }
 
-/* AA contrast: ensure text-secondary meets 4.5:1 on bg-color */
-:root {
-    --bg-color: #0a0f1e;
-    --bg-surface: #0d1528;
-    --text-primary: #e8edff;
-    --text-secondary: #8a9fc8;
-    --glass-bg: rgba(20, 30, 60, 0.65);
-    --glass-border: rgba(100, 140, 255, 0.12);
-    --accent-blue: #4f8aff;
-    --accent-purple: #9b6dff;
-    --accent-green: #10c48a;
-    --accent-amber: #f59e0b;
-}
-
 body {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background-color: var(--bg-color);
     color: var(--text-primary);
     min-height: 100vh;
@@ -262,6 +248,7 @@ header h1 {
 
 .overview-cards .card p {
     font-size: 1.15rem;
+    font-variant-numeric: tabular-nums;
 }
 
 .overview-cards .card .card-sub {
@@ -269,6 +256,7 @@ header h1 {
     font-weight: 700;
     color: var(--text-primary);
     margin-top: 0.15rem;
+    font-variant-numeric: tabular-nums;
 }
 
 .card-row {
@@ -394,7 +382,7 @@ header h1 {
 
 #models-table tbody td:first-child {
     text-align: left;
-    font-family: 'Inter', monospace;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     font-weight: 500;
 }
 
@@ -700,6 +688,22 @@ header h1 {
     font-weight: 600;
     margin-bottom: 0.75rem;
     color: var(--accent-blue);
+}
+
+.quota-subtitle {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent-purple);
+    margin-top: -0.2rem;
+    margin-bottom: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.quota-section-divider {
+    margin-top: 0.85rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--glass-border);
 }
 
 .quota-limit {

@@ -8,8 +8,8 @@ import logging
 import threading
 import time
 from config import Config
-from db import connect, init_schema, record_observation, record_quota, record_status, prune
-from source_registry import get_all_sources
+from db import connect, init_schema, record_observation, record_quota, record_status, prune, get_source_state, set_source_state
+from source_registry import get_all_sources, get_source
 from util import parse_iso_seconds
 
 logger = logging.getLogger(__name__)
@@ -30,44 +30,12 @@ class Poller:
     def __init__(self, cfg: Config):
         self.cfg = cfg
         self._stop = threading.Event()
+        self._thread = None
         self._lock_fd = None
         # Consecutive quota-poll failure counts per source.
         # Used to downgrade the log level for transient boot-time errors
         # (e.g. AGY language server not yet started) vs. persistent failures.
         self._quota_fail_counts: dict[str, int] = {}
-
-    def run_once(self, conn) -> None:
-        now_sec = int(time.time())
-        interval = self.cfg.poll_interval if self.cfg.poll_interval else 600
-        cycle_ts = (now_sec // interval) * interval
-
-        for source, entry in get_all_sources().items():
-            self._poll_usage(conn, cycle_ts, source, entry)
-        self._poll_quota_source(conn, cycle_ts, 'agy', self._collect_agy_quota)
-        self._poll_quota_source(conn, cycle_ts, 'opencode', self._collect_opencode_cost)
-        self._poll_quota_source(conn, cycle_ts, 'codex', self._collect_codex_quota)
-        self._poll_quota_source(conn, cycle_ts, 'claude', self._collect_claude_quota)
-
-        from integrity import check_integrity
-        report = check_integrity(conn, interval)
-        for warning in report['warnings']:
-            print(f"[poller] integrity: {warning}")
-
-        prune(conn, self.cfg.retention_days)
-
-    def start(self) -> None:
-        if not self._acquire_lock():
-            logger.warning(
-                "another poller already holds the lock for db_path=%s; "
-                "not starting the polling thread here (this process will "
-                "still serve the API off the existing DB)", self.cfg.db_path)
-            return
-
-        conn = connect(self.cfg.db_path)
-        init_schema(conn)
-        conn.close()
-        t = threading.Thread(target=self._loop, daemon=True)
-        t.start()
 
     def _acquire_lock(self) -> bool:
         """Exclusive, non-blocking guard: at most one poller may write a
@@ -80,32 +48,67 @@ class Poller:
             return True
         lock_path = db_path + '.poller.lock'
         try:
-            fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o644)
-        except OSError as e:
-            logger.warning(
-                "could not create poller lockfile %s (%s); starting "
-                "without the single-poller guard", lock_path, e)
-            return True
-        try:
+            os.makedirs(os.path.dirname(os.path.abspath(lock_path)), exist_ok=True)
+            fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError:
-            os.close(fd)
-            return False
-        self._lock_fd = fd
-        return True
+            self._lock_fd = fd
+            return True
+        except (BlockingIOError, OSError) as e:
+            if isinstance(e, BlockingIOError):
+                logger.warning(
+                    "another poller already holds the lock for db_path=%s; not "
+                    "starting the polling thread here (this process will still serve "
+                    "the API off the existing DB)", self.cfg.db_path
+                )
+                self._lock_fd = None
+                return False
+            else:
+                logger.warning(
+                    "could not create poller lockfile %s (%s); starting without the "
+                    "single-poller guard", lock_path, e
+                )
+                self._lock_fd = None
+                return True
 
-    def stop(self) -> None:
+    def start(self) -> None:
+        if self._thread is not None:
+            return
+        if not self._acquire_lock():
+            return
+
+        conn = connect(self.cfg.db_path)
+        init_schema(conn)
+        conn.close()
+        self._stop.clear()
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+        self._thread.start()
+
+    def stop(self):
         self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=2.0)
+            self._thread = None
         if self._lock_fd is not None:
             try:
                 fcntl.flock(self._lock_fd, fcntl.LOCK_UN)
-            except OSError:
-                pass
-            try:
                 os.close(self._lock_fd)
             except OSError:
                 pass
             self._lock_fd = None
+
+    def run_once(self, conn):
+        now = time.time()
+        cycle_ts = (int(now) // self.cfg.poll_interval) * self.cfg.poll_interval
+        init_schema(conn)
+
+        sources = get_all_sources()
+        for name, entry in sources.items():
+            if entry.parser:
+                self._poll_usage(conn, cycle_ts, name, entry)
+            if entry.quota_collector:
+                self._poll_quota_source(conn, cycle_ts, name, entry.quota_collector)
+
+        prune(conn, self.cfg.retention_days)
 
     def _loop(self):
         while not self._stop.is_set():
@@ -121,7 +124,14 @@ class Poller:
     def _poll_usage(self, conn, cycle_ts, source, entry):
         start = time.time()
         try:
-            result = entry.parser().parse()
+            state = get_source_state(conn, source)
+            parser = entry.parser()
+            if hasattr(parser, 'state'):
+                parser.state = state
+            result = parser.parse()
+            res_state = getattr(result, 'state', None)
+            if isinstance(res_state, dict):
+                set_source_state(conn, source, res_state)
             if result and (result.sessions or result.messages):
                 record_observation(conn, source, cycle_ts, result)
                 record_status(conn, source, 'usage', cycle_ts, True, None,
@@ -139,81 +149,13 @@ class Poller:
         try:
             quota = collector()
             if quota and 'error' not in quota:
-                if source == 'opencode':
-                    record_quota(conn, 'opencode', cycle_ts, {
-                        'opencode': {
-                            'total_cost': {
-                                'used': quota['total_cost'],
-                                'total': 0,
-                                'remaining_pct': 100.0,
-                                'refreshes_in': 0,
-                            }
-                        }
-                    })
-                elif source == 'codex':
-                    if 'primary_used_pct' in quota:
-                        record_quota(conn, 'codex', cycle_ts, {
-                            'openai': {
-                                'rate_limit': {
-                                    'remaining_pct': 100.0 - quota['primary_used_pct'],
-                                    'used': quota['primary_used_pct'],
-                                    'total': 100.0,
-                                    'refreshes_in_seconds': quota.get('resets_in_seconds', 0),
-                                }
-                            }
-                        })
-                    elif 'total_used_usd' in quota:
-                        record_quota(conn, 'codex', cycle_ts, {
-                            'openai': {
-                                'cost': {
-                                    'used': quota['total_used_usd'],
-                                    'total': quota.get('hard_limit_usd', 0),
-                                    'remaining': quota.get('remaining_usd', 0),
-                                }
-                            }
-                        })
-                elif source == 'claude':
-                    if 'five_hour' in quota:
-                        rows = []
-                        fh = quota['five_hour']
-                        rows.append({
-                            'model_group': 'session',
-                            'limit_type': 'five_hour',
-                            'used': fh.get('utilization', 0),
-                            'total': 100.0,
-                            'remaining_pct': 100.0 - fh.get('utilization', 0),
-                            'refreshes_in_seconds': parse_iso_seconds(fh.get('resets_at', '')),
-                        })
-                        wd = quota.get('seven_day', {})
-                        rows.append({
-                            'model_group': 'weekly',
-                            'limit_type': 'all_models',
-                            'used': wd.get('utilization', 0),
-                            'total': 100.0,
-                            'remaining_pct': 100.0 - wd.get('utilization', 0),
-                            'refreshes_in_seconds': parse_iso_seconds(wd.get('resets_at', '')),
-                        })
-                        for lim in quota.get('limits', []):
-                            if lim.get('kind') == 'weekly_scoped' and lim.get('scope', {}).get('model', {}).get('display_name'):
-                                model_name = lim['scope']['model']['display_name']
-                                rows.append({
-                                    'model_group': 'weekly',
-                                    'limit_type': model_name,
-                                    'used': lim.get('percent', 0),
-                                    'total': 100.0,
-                                    'remaining_pct': 100.0 - lim.get('percent', 0),
-                                    'refreshes_in_seconds': parse_iso_seconds(lim.get('resets_at', '')),
-                                })
-                        record_quota(conn, 'claude', cycle_ts, rows)
-                else:
-                    record_quota(conn, source, cycle_ts, quota)
+                entry = get_source(source)
+                normalized = entry.quota_normalizer(quota) if (entry and entry.quota_normalizer) else quota
+                record_quota(conn, source, cycle_ts, normalized)
             else:
                 raw_error = quota.get('error', 'empty result') if quota else 'empty result'
                 fail_count = self._quota_fail_counts.get(source, 0) + 1
                 self._quota_fail_counts[source] = fail_count
-                # First 2 failures are likely transient boot-time conditions
-                # (e.g. AGY language server not yet initialised). Log at INFO
-                # so they don't show up as actionable warnings; escalate after that.
                 _TRANSIENT_THRESHOLD = 2
                 if fail_count <= _TRANSIENT_THRESHOLD:
                     logger.info(
@@ -226,7 +168,6 @@ class Poller:
                               raw_error if raw_error == 'empty result' else 'fetch failed',
                               (time.time() - start) * 1000)
                 return
-            # Reset failure counter on success
             self._quota_fail_counts[source] = 0
             record_status(conn, source, 'quota', cycle_ts, True, None,
                           (time.time() - start) * 1000)

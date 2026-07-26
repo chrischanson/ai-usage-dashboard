@@ -569,6 +569,45 @@ document.addEventListener('DOMContentLoaded', () => {
         setCard('cache-reads', formatNum(data.cache_read));
     }
 
+    function formatModelName(name) {
+        if (!name) return 'Unknown';
+        const str = String(name).trim();
+        const sl = str.toLowerCase();
+
+        if (str.startsWith('Gemini ') || str.startsWith('Claude ') || str.startsWith('GPT-') || str.startsWith('o1') || str.startsWith('o3')) {
+            return str;
+        }
+
+        if (sl.includes('claude') || sl.includes('non_gemini') || sl.includes('non-gemini')) {
+            if (sl.includes('3.7') || sl.includes('3_7')) return 'Claude 3.7 Sonnet';
+            if (sl.includes('opus')) return 'Claude 3 Opus';
+            if (sl.includes('haiku')) return 'Claude 3 Haiku';
+            return 'Claude 3.5 Sonnet';
+        }
+
+        if (sl.includes('gemini')) {
+            if (sl.includes('3.6') || sl.includes('3_6')) return 'Gemini 3.6 Flash';
+            if (sl.includes('3.5') || sl.includes('3_5')) return 'Gemini 3.5 Flash';
+            if (sl.includes('2.5') || sl.includes('2_5')) return 'Gemini 2.5 Flash';
+            if (sl.includes('1.5') || sl.includes('1_5') || sl.includes('pro')) return 'Gemini 1.5 Pro';
+            if (sl.includes('flash')) return 'Gemini 3.6 Flash';
+            return 'Gemini 3.6 Flash';
+        }
+
+        if (sl.includes('gpt') || sl.includes('o1') || sl.includes('o3')) {
+            if (sl.includes('4o') || sl.includes('4-o')) return 'GPT-4o';
+            if (sl.includes('o1')) return 'o1';
+            if (sl.includes('o3')) return 'o3-mini';
+            return 'GPT-4o';
+        }
+
+        if (sl.startsWith('used_') || sl.startsWith('use_') || sl.startsWith('enable-') || sl.startsWith('disable-')) {
+            return 'Gemini 3.6 Flash';
+        }
+
+        return str.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    }
+
     function renderModels(models) {
         const tbody = document.getElementById('models-tbody');
         if (!tbody) return;
@@ -591,10 +630,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const pct = grandTotal > 0 ? (total / grandTotal * 100) : 0;
             const cost = m.cost;
             const color = palette[i % palette.length];
-            const name = m.model_name.split('/').pop();
+            const rawName = m.model_name.split('/').pop();
+            const name = formatModelName(rawName);
             const badgeHtml = m.source ? `<span class="badge badge-${m.source}">${escapeHtml(m.source)}</span>` : '';
             return {
-                model_name: m.model_name,
+                model_name: name,
                 displayName: name,
                 badge: badgeHtml,
                 color: color,
@@ -658,7 +698,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const ctx = document.getElementById('modelChart').getContext('2d');
         const palette = COLORS[currentSource].donut;
         const labels = models.map(m => {
-            const name = m.model_name.split('/').pop();
+            const rawName = m.model_name.split('/').pop();
+            const name = formatModelName(rawName);
             return m.source ? `${name} (${m.source})` : name;
         });
         const data = models.map(m => Math.max(0, (m.input_tokens || 0) + (m.output_tokens || 0)));
@@ -1207,7 +1248,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     renderCodexQuota(container, rateLimit, plan);
                 }
             } else if (src === 'claude') {
-                renderClaudeQuota(container, quotaData);
+                const targetContainer = (source === 'combined' || source === 'all') ? getCompactColumn() : container;
+                renderClaudeQuota(targetContainer, quotaData);
+            } else if (src === 'agy') {
+                renderAgyQuota(container, quotaData);
             } else {
                 const agyPlan = quotaData._plan || 'Free';
                 for (const [group, limits] of Object.entries(quotaData)) {
@@ -1237,6 +1281,97 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }
+    }
+
+    function renderAgyQuota(container, data) {
+        const agyPlan = data._plan || 'Gemini Code Assist';
+
+        const card = document.createElement('div');
+        card.className = 'quota-group';
+
+        const groupKeys = Object.keys(data).filter(k => k !== '_plan');
+        groupKeys.sort((a, b) => {
+            if (a.includes('gemini')) return -1;
+            if (b.includes('gemini')) return 1;
+            return 0;
+        });
+
+        let sectionsHtml = '';
+        let isFirstSection = true;
+
+        for (const groupKey of groupKeys) {
+            const limits = data[groupKey];
+            if (!limits || typeof limits !== 'object') continue;
+
+            let subTitle = '';
+            if (groupKey === 'gemini_models') {
+                subTitle = 'Gemini';
+            } else if (groupKey === 'claude_gpt_models') {
+                subTitle = 'Claude / GPT';
+            } else {
+                subTitle = groupKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\bGpt\b/g, 'GPT');
+            }
+
+            let limitsHtml = '';
+
+            // Session (5h) limit — top
+            const fiveHour = limits.five_hour_limit || limits['5h'] || limits.five_hour || {};
+            if (fiveHour.used !== undefined || fiveHour.remaining_pct !== undefined) {
+                const pct = clampPct(fiveHour.remaining_pct);
+                const barColor = pct > 50 ? 'green' : pct > 20 ? 'amber' : 'red';
+                const seconds = fiveHour.refreshes_in_seconds || fiveHour.refreshes_in || 0;
+                let refreshStr = '';
+                if (seconds > 0) {
+                    if (seconds < 3600) {
+                        refreshStr = `Refreshes in ${Math.round(seconds / 60)} min`;
+                    } else {
+                        refreshStr = `Refreshes in ${Math.round(seconds / 3600)} hr`;
+                    }
+                }
+                limitsHtml += renderMeterRow('Session (5h)', `${pct.toFixed(1)}%`, pct, barColor, refreshStr);
+            }
+
+            // Weekly limit — bottom
+            const weekly = limits.weekly_limit || limits.weekly || {};
+            if (weekly.used !== undefined || weekly.remaining_pct !== undefined) {
+                const pct = clampPct(weekly.remaining_pct);
+                const barColor = pct > 50 ? 'green' : pct > 20 ? 'amber' : 'red';
+                const seconds = weekly.refreshes_in_seconds || weekly.refreshes_in || 0;
+                let refreshStr = '';
+                if (seconds > 0) {
+                    if (seconds >= 86400) {
+                        refreshStr = `Refreshes in ${Math.round(seconds / 86400)} days`;
+                    } else if (seconds >= 3600) {
+                        refreshStr = `Refreshes in ${Math.round(seconds / 3600)} hr`;
+                    } else {
+                        refreshStr = `Refreshes in ${Math.round(seconds / 60)} min`;
+                    }
+                }
+                limitsHtml += renderMeterRow('Weekly', `${pct.toFixed(1)}%`, pct, barColor, refreshStr);
+            }
+
+            for (const [limitType, info] of Object.entries(limits)) {
+                if (['five_hour_limit', '5h', 'five_hour', 'weekly_limit', 'weekly'].includes(limitType)) continue;
+                if (!info || typeof info !== 'object' || info.remaining_pct === undefined) continue;
+                const pct = clampPct(info.remaining_pct);
+                const barColor = pct > 50 ? 'green' : pct > 20 ? 'amber' : 'red';
+                const label = limitType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                limitsHtml += renderMeterRow(label, `${pct.toFixed(1)}%`, pct, barColor, '');
+            }
+
+            const dividerClass = isFirstSection ? '' : ' quota-section-divider';
+            sectionsHtml += `
+                <div class="quota-section${dividerClass}">
+                    <div class="quota-subtitle">${escapeHtml(subTitle)}</div>
+                    ${limitsHtml}
+                </div>
+            `;
+            isFirstSection = false;
+        }
+
+        const planBadge = ` <span class="badge badge-agy">${escapeHtml(agyPlan)}</span>`;
+        card.innerHTML = `<h3>Antigravity${planBadge}</h3>${sectionsHtml}`;
+        container.appendChild(card);
     }
 
     function renderOpenCodeCost(container, cost) {
@@ -1333,6 +1468,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let limitsHtml = '';
 
+        // Session (5h) limit — shown first (matches AGY order)
+        const sessionGroup = data.session || {};
+        const sessionLimit = sessionGroup.five_hour || {};
+        if (sessionLimit.used !== undefined) {
+            const remaining = clampPct(sessionLimit.remaining_pct);
+            const barColor = remaining > 50 ? 'green' : remaining > 20 ? 'amber' : 'red';
+            const seconds = sessionLimit.refreshes_in_seconds || 0;
+            let refreshStr = '';
+            if (seconds > 0) {
+                if (seconds < 3600) {
+                    refreshStr = `Resets in ${Math.round(seconds / 60)} min`;
+                } else {
+                    refreshStr = `Resets in ${Math.round(seconds / 3600)} hr`;
+                }
+            }
+            limitsHtml += renderMeterRow('Session (5h)', `${remaining.toFixed(1)}% left`, remaining, barColor, refreshStr);
+        }
+
         // Weekly limit
         const weeklyGroup = data.weekly || {};
         const weeklyAll = weeklyGroup.all_models || {};
@@ -1362,24 +1515,6 @@ document.addEventListener('DOMContentLoaded', () => {
             limitsHtml += renderMeterRow(`Weekly: ${modelName}`, `${remaining.toFixed(1)}% left`, remaining, barColor, '');
         }
 
-        // Session (5h) limit — shown last, after weekly and per-model weekly
-        const sessionGroup = data.session || {};
-        const sessionLimit = sessionGroup.five_hour || {};
-        if (sessionLimit.used !== undefined) {
-            const remaining = clampPct(sessionLimit.remaining_pct);
-            const barColor = remaining > 50 ? 'green' : remaining > 20 ? 'amber' : 'red';
-            const seconds = sessionLimit.refreshes_in_seconds || 0;
-            let refreshStr = '';
-            if (seconds > 0) {
-                if (seconds < 3600) {
-                    refreshStr = `Resets in ${Math.round(seconds / 60)} min`;
-                } else {
-                    refreshStr = `Resets in ${Math.round(seconds / 3600)} hr`;
-                }
-            }
-            limitsHtml += renderMeterRow('Session (5h)', `${remaining.toFixed(1)}% left`, remaining, barColor, refreshStr);
-        }
-
         card.innerHTML = `
             <h3>Claude <span class="badge badge-claude">${escapeHtml(plan)}</span></h3>
             ${limitsHtml || '<p style="color: #8a9fc8; font-size: 0.85rem; margin: 0.5rem 0;">Claude quota data will appear once authenticated.</p>'}
@@ -1399,10 +1534,17 @@ document.addEventListener('DOMContentLoaded', () => {
     refresh();
     setInterval(() => {
         if (offline) return;
+        if (document.visibilityState === 'hidden') return;
         const elapsed = (Date.now() - lastFetchTime) / 1000;
         if (elapsed > 120) {
             setStatus('stale', 'Stale');
         }
         refresh();
     }, 60_000);
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && !offline) {
+            refresh();
+        }
+    });
 });

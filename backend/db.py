@@ -37,6 +37,7 @@ DB_PATH = os.getenv('USAGE_DB_PATH') or os.path.join(os.path.dirname(__file__), 
 
 _USAGE_FIELDS = ('sessions', 'messages', 'input_tokens', 'output_tokens', 'cache_read', 'cache_write')
 _MODEL_FIELDS = ('messages', 'input_tokens', 'output_tokens', 'cache_read', 'cache_write')
+_MODEL_DERIVE_FIELDS = _MODEL_FIELDS + ('cost',)
 
 
 def connect(path: str) -> sqlite3.Connection:
@@ -126,9 +127,15 @@ def init_schema(conn: sqlite3.Connection) -> None:
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_model_usage_cycle_ts ON model_usage(cycle_ts)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_quota_snapshots_cycle_ts ON quota_snapshots(cycle_ts)')
 
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_usage_history_source_ts ON usage_history(source, cycle_ts)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_model_usage_source_ts ON model_usage(source, cycle_ts)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_quota_snapshots_source_ts ON quota_snapshots(source, cycle_ts)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_quota_ts ON quota_snapshots(cycle_ts)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_model_usage_source_model_ts ON model_usage(source, model_name, cycle_ts)')
+
     cursor.execute(
         "INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)",
-        ('schema_version', '3')
+        ('schema_version', '4')
     )
 
     conn.commit()
@@ -183,6 +190,17 @@ def _migrate_schema(conn: sqlite3.Connection) -> None:
             or _table_exists(cursor, 'source_baselines')
             or _table_exists(cursor, 'model_baselines')):
         _migrate_to_v3(conn)
+        version = 3
+
+    if version < 4:
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_usage_history_source_ts ON usage_history(source, cycle_ts)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_model_usage_source_ts ON model_usage(source, cycle_ts)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_quota_snapshots_source_ts ON quota_snapshots(source, cycle_ts)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_quota_ts ON quota_snapshots(cycle_ts)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_model_usage_source_model_ts ON model_usage(source, model_name, cycle_ts)')
+        cursor.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '4')")
+        conn.commit()
+        version = 4
 
 
 def _table_exists(cursor, name: str) -> bool:
@@ -297,60 +315,76 @@ def _migrate_to_v3(conn: sqlite3.Connection) -> None:
 
 
 def _clean_legacy_telemetry_models(conn: sqlite3.Connection) -> None:
-    """One-time repair: merge stale telemetry model names (e.g. 'used_claude') in model_usage
-    into 'Gemini 3.5 Flash (Low)' and purge telemetry keys from agy_conv_states."""
+    """One-time repair: purge stale telemetry keys (e.g. 'used_claude') from agy_conv_states
+    and model_usage, re-scanning conversation DBs for their true model names and consolidating
+    legacy model names into clean display names across historical records."""
+    import os, json
+    from parsers.agy import AgyParser
     cursor = conn.cursor()
     try:
-        cursor.execute("""
-            SELECT cycle_ts, messages, input_tokens, output_tokens, cache_read, cache_write
-            FROM model_usage 
-            WHERE source='agy' AND (model_name LIKE 'used_%' OR model_name LIKE 'use_%' OR model_name LIKE 'enable-%' OR model_name LIKE 'disable-%')
-        """)
-        stale_rows = cursor.fetchall()
-        for cts, msgs, inp, outp, cread, cwrite in stale_rows:
-            cursor.execute(
-                "SELECT messages, input_tokens, output_tokens, cache_read, cache_write FROM model_usage WHERE source='agy' AND cycle_ts=? AND model_name='Gemini 3.5 Flash (Low)'",
-                (cts,)
-            )
-            target = cursor.fetchone()
-            if target:
-                cursor.execute("""
-                    UPDATE model_usage 
-                    SET messages=?, input_tokens=?, output_tokens=?, cache_read=?, cache_write=?
-                    WHERE source='agy' AND cycle_ts=? AND model_name='Gemini 3.5 Flash (Low)'
-                """, (target[0] + msgs, target[1] + inp, target[2] + outp, target[3] + cread, target[4] + cwrite, cts))
-            else:
-                cursor.execute("""
-                    INSERT INTO model_usage (source, cycle_ts, model_name, messages, input_tokens, output_tokens, cache_read, cache_write, cost)
-                    VALUES ('agy', ?, 'Gemini 3.5 Flash (Low)', ?, ?, ?, ?, ?, 0.0)
-                """, (cts, msgs, inp, outp, cread, cwrite))
+        cursor.execute("DELETE FROM model_usage WHERE source='agy' AND (model_name LIKE 'used_%' OR model_name LIKE 'use_%' OR model_name LIKE 'enable-%' OR model_name LIKE 'disable-%' OR model_name = 'unknown')")
 
-        cursor.execute("DELETE FROM model_usage WHERE source='agy' AND (model_name LIKE 'used_%' OR model_name LIKE 'use_%' OR model_name LIKE 'enable-%' OR model_name LIKE 'disable-%')")
+        # Consolidate legacy AGY model names in historical model_usage rows
+        cursor.execute("""
+            CREATE TEMP TABLE IF NOT EXISTS tmp_model_usage AS
+            SELECT 
+                id, cycle_ts, timestamp, source,
+                CASE 
+                    WHEN source='agy' AND model_name IN ('gemini-3-flash-a', 'gemini-3-flash-b', 'gemini-3.6-flash', 'gemini-3.6-flash-tiered', 'Gemini 3.6 Flash (High)') THEN 'Gemini 3.6 Flash (High)'
+                    WHEN source='agy' AND model_name IN ('gemini-default', 'gemini-3.5-flash', 'Gemini 3.5 Flash (Low)') THEN 'Gemini 3.5 Flash (Low)'
+                    WHEN source='agy' AND model_name IN ('used_claude', 'used_non_gemini_model') THEN 'Gemini 3.6 Flash (High)'
+                    ELSE model_name
+                END AS target_model_name,
+                messages, input_tokens, output_tokens, cache_read, cache_write, cost
+            FROM model_usage
+        """)
+        cursor.execute("DELETE FROM model_usage")
+        cursor.execute("""
+            INSERT INTO model_usage (cycle_ts, timestamp, source, model_name, messages, input_tokens, output_tokens, cache_read, cache_write, cost)
+            SELECT 
+                cycle_ts, MAX(timestamp), source, target_model_name,
+                SUM(messages), SUM(input_tokens), SUM(output_tokens), SUM(cache_read), SUM(cache_write), SUM(cost)
+            FROM tmp_model_usage
+            GROUP BY source, cycle_ts, target_model_name
+        """)
+        cursor.execute("DROP TABLE IF EXISTS tmp_model_usage")
 
         cursor.execute("SELECT value FROM meta WHERE key='agy_conv_states'")
         row = cursor.fetchone()
         if row:
-            import json
             state = json.loads(row['value'] if isinstance(row, sqlite3.Row) else row[0])
             files = state.get('files', {})
-            stale = False
-            for fpath, fval in files.items():
+            for fpath, fval in list(files.items()):
                 m = fval.get('model', '')
-                if m.startswith(('used_', 'use_', 'enable-', 'disable-')) or 'used_claude' in m:
-                    fval['model'] = 'Gemini 3.5 Flash (Low)'
-                    stale = True
-            cum_models = state.get('cumulative', {}).get('models', {})
-            stale_keys = [k for k in cum_models if k.startswith(('used_', 'use_', 'enable-', 'disable-')) or 'used_claude' in k]
-            for k in stale_keys:
-                stale = True
-                val = cum_models.pop(k)
-                target = cum_models.setdefault('Gemini 3.5 Flash (Low)', {'messages':0, 'input_tokens':0, 'output_tokens':0, 'cache_read':0})
-                target['messages'] += val.get('messages', 0)
-                target['input_tokens'] += val.get('input_tokens', 0)
-                target['output_tokens'] += val.get('output_tokens', 0)
-                target['cache_read'] += val.get('cache_read', 0)
-            if stale:
-                cursor.execute("UPDATE meta SET value = ? WHERE key='agy_conv_states'", (json.dumps(state),))
+                if m.startswith(('used_', 'use_', 'enable-', 'disable-')) or 'used_claude' in m or 'used_non_gemini' in m or m == 'unknown':
+                    real_model = 'Gemini 3.5 Flash (Low)'
+                    if os.path.exists(fpath):
+                        try:
+                            c = sqlite3.connect(f'file:{fpath}?mode=ro', uri=True)
+                            rws = c.execute('SELECT data FROM gen_metadata ORDER BY idx').fetchall()
+                            c.close()
+                            for (d,) in rws:
+                                if not d: continue
+                                flds = AgyParser._scan_fields(d)
+                                extracted = AgyParser._extract_model_name(flds)
+                                if extracted and not extracted.startswith(('used_', 'use_', 'enable-', 'disable-')):
+                                    real_model = extracted
+                                    break
+                        except Exception:
+                            pass
+                    fval['model'] = real_model
+
+            new_cum_models = {}
+            for fpath, fval in files.items():
+                m = fval.get('model', 'Gemini 3.5 Flash (Low)')
+                m_entry = new_cum_models.setdefault(m, {'messages': 0, 'input_tokens': 0, 'output_tokens': 0, 'cache_read': 0})
+                m_entry['input_tokens'] += fval.get('input_tokens', 0)
+                m_entry['output_tokens'] += fval.get('output_tokens', 0)
+                m_entry['cache_read'] += fval.get('cache_read', 0)
+                m_entry['messages'] += fval.get('messages', 1)
+
+            state['cumulative']['models'] = new_cum_models
+            cursor.execute("UPDATE meta SET value = ? WHERE key='agy_conv_states'", (json.dumps(state),))
         conn.commit()
     except Exception:
         pass
@@ -716,12 +750,15 @@ def _derive_model_rows(model_rows: list, only_cycle: int = None, start_ts: int =
     by_cycle: dict = {}
     for r in model_rows:
         name = r['model_name']
-        raw = {f: (r[f] or 0) for f in _MODEL_FIELDS}
-        tot = totals.setdefault(name, {f: 0 for f in _MODEL_FIELDS})
+        raw = {f: (r[f] or 0) for f in _MODEL_DERIVE_FIELDS}
+        tot = totals.setdefault(name, {f: (0.0 if f == 'cost' else 0) for f in _MODEL_DERIVE_FIELDS})
         prev = prev_raw.get(name)
         deltas = {}
-        for f in _MODEL_FIELDS:
-            delta = 0 if prev is None else max(0, raw[f] - prev[f])
+        for f in _MODEL_DERIVE_FIELDS:
+            if f == 'cost':
+                delta = 0.0 if prev is None else max(0.0, float(raw[f]) - float(prev[f]))
+            else:
+                delta = 0 if prev is None else max(0, int(raw[f]) - int(prev[f]))
             tot[f] += delta
             deltas[f] = delta
         prev_raw[name] = raw
@@ -730,7 +767,7 @@ def _derive_model_rows(model_rows: list, only_cycle: int = None, start_ts: int =
         if start_ts is not None and r['cycle_ts'] < start_ts:
             continue
         d = dict(r)
-        for f in _MODEL_FIELDS:
+        for f in _MODEL_DERIVE_FIELDS:
             d[f] = tot[f]
             d[f'delta_{f}'] = deltas[f]
         by_cycle.setdefault(r['cycle_ts'], []).append(d)
@@ -1020,7 +1057,10 @@ def metrics(conn: sqlite3.Connection) -> dict:
     total_polls = cursor.fetchone()['cnt']
 
     try:
-        db_size_bytes = os.path.getsize(DB_PATH)
+        cursor.execute("PRAGMA database_list")
+        db_list_row = cursor.fetchone()
+        db_file = db_list_row[2] if db_list_row and len(db_list_row) > 2 else None
+        db_size_bytes = os.path.getsize(db_file) if db_file and os.path.exists(db_file) else 0
     except OSError:
         db_size_bytes = 0
 
@@ -1055,4 +1095,24 @@ def prune(conn: sqlite3.Connection, retention_days: int) -> None:
     conn.execute("DELETE FROM quota_snapshots WHERE cycle_ts < ?", (cutoff_ts,))
     conn.execute("DELETE FROM collection_status WHERE cycle_ts < ?", (cutoff_ts,))
 
+    conn.commit()
+    conn.execute("PRAGMA optimize")
+
+
+def get_source_state(conn: sqlite3.Connection, source: str) -> dict | None:
+    cursor = conn.cursor()
+    key = 'agy_conv_states' if source == 'agy' else f'source_state_{source}'
+    cursor.execute("SELECT value FROM meta WHERE key=?", (key,))
+    row = cursor.fetchone()
+    if row and row['value']:
+        try:
+            return json.loads(row['value'])
+        except Exception:
+            return None
+    return None
+
+
+def set_source_state(conn: sqlite3.Connection, source: str, state: dict) -> None:
+    key = 'agy_conv_states' if source == 'agy' else f'source_state_{source}'
+    conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", (key, json.dumps(state)))
     conn.commit()

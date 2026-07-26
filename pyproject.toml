@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-usage-dashboard"
+version = "0.1.0"
+description = "Full-stack AI Usage Dashboard monitoring AGY, OpenCode, Codex, and Claude"
+authors = [{ name = "Dev User" }]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.20.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["backend"]

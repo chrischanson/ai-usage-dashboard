@@ -31,7 +31,7 @@ If you run multiple AI coding assistants, tracking quota and spend across separa
 - 🗂️ **Per-source tabs**: All (combined), AGY, Claude, OpenCode, Codex
 - ⏱️ **Time range filters**: 1h / 6h / 1d / 1w / 1m / 3m / all
 - 💳 **Quota bars** with live plan badge for AGY and Claude; cost display for OpenCode; monthly limit for Codex
-- 📱 **Mobile responsive** — single 640 px breakpoint
+- 📱 **Mobile responsive** — responsive breakpoints at 900 px and 640 px
 - ♿ **Accessible** — ARIA roles, keyboard navigation, `:focus-visible`, `prefers-reduced-motion`
 - 🔒 **Secure by default** — local-only bind (`127.0.0.1`), CSP headers, no secrets logged
 

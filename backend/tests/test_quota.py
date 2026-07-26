@@ -64,7 +64,7 @@ class TestQuotaCollectAgyShape(unittest.TestCase):
 class TestQuotaCollectOpencodeShape(unittest.TestCase):
     def test_opencode_shape_has_cost_keys(self):
         from unittest.mock import patch
-        with patch('quota._collect_opencode') as mock_fn:
+        with patch('opencode_quota.fetch_opencode_cost') as mock_fn:
             mock_fn.return_value = {
                 'total_cost': 42.50,
                 'cost_by_model': {'gemini-2.0-flash': 42.50},
@@ -103,7 +103,7 @@ class TestQuotaCollectCodexShape(unittest.TestCase):
 class TestCollectDispatchesToCorrectInternal(unittest.TestCase):
     def test_collect_agy_calls_collect_agy(self):
         from unittest.mock import patch
-        with patch('quota._collect_agy') as mock_fn:
+        with patch('quota_parser.fetch_agy_quota') as mock_fn:
             mock_fn.return_value = None
             cfg = load_config()
             collect('agy', cfg)
@@ -111,7 +111,7 @@ class TestCollectDispatchesToCorrectInternal(unittest.TestCase):
 
     def test_collect_opencode_calls_collect_opencode(self):
         from unittest.mock import patch
-        with patch('quota._collect_opencode') as mock_fn:
+        with patch('opencode_quota.fetch_opencode_cost') as mock_fn:
             mock_fn.return_value = None
             cfg = load_config()
             collect('opencode', cfg)
@@ -119,7 +119,7 @@ class TestCollectDispatchesToCorrectInternal(unittest.TestCase):
 
     def test_collect_codex_calls_collect_codex(self):
         from unittest.mock import patch
-        with patch('quota._collect_codex') as mock_fn:
+        with patch('codex_quota.fetch_codex_quota') as mock_fn:
             mock_fn.return_value = None
             cfg = load_config()
             collect('codex', cfg)

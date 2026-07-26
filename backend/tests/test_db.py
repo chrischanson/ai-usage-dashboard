@@ -186,6 +186,53 @@ class DerivationTest(unittest.TestCase):
         self.assertIsNotNone(row)
         self.assertEqual(row['ok'], 1)
 
+    def test_model_cost_derivation_and_clamp(self):
+        m1 = [ModelUsage('claude-3-5-sonnet', messages=10, input_tokens=1000, cost=10.50)]
+        m2 = [ModelUsage('claude-3-5-sonnet', messages=20, input_tokens=2000, cost=15.75)]
+        m3 = [ModelUsage('claude-3-5-sonnet', messages=5, input_tokens=500, cost=2.00)] # counter drop / reset
+        m4 = [ModelUsage('claude-3-5-sonnet', messages=10, input_tokens=1000, cost=4.50)]
+
+        record_observation(self.conn, 'claude', 1000, _result(1000, models=m1))
+        record_observation(self.conn, 'claude', 1600, _result(2000, models=m2))
+        record_observation(self.conn, 'claude', 2200, _result(2500, models=m3))
+        record_observation(self.conn, 'claude', 2800, _result(3000, models=m4))
+
+        rows = history(self.conn, 'claude')
+        models_by_cycle = {r['cycle_ts']: r['models'][0] for r in rows if r.get('models')}
+
+        # First observation -> delta 0
+        self.assertAlmostEqual(models_by_cycle[1000]['cost'], 0.0)
+        self.assertAlmostEqual(models_by_cycle[1000]['delta_cost'], 0.0)
+
+        # Rising cost -> delta 15.75 - 10.50 = 5.25, total 5.25
+        self.assertAlmostEqual(models_by_cycle[1600]['cost'], 5.25)
+        self.assertAlmostEqual(models_by_cycle[1600]['delta_cost'], 5.25)
+
+        # Drop (2.00 < 15.75) -> clamped to 0.0, total stays 5.25
+        self.assertAlmostEqual(models_by_cycle[2200]['cost'], 5.25)
+        self.assertAlmostEqual(models_by_cycle[2200]['delta_cost'], 0.0)
+
+        # Resume (4.50 > 2.00) -> delta 4.50 - 2.00 = 2.50, total 7.75
+        self.assertAlmostEqual(models_by_cycle[2800]['cost'], 7.75)
+        self.assertAlmostEqual(models_by_cycle[2800]['delta_cost'], 2.50)
+
+    def test_schema_v4_indexes_exist(self):
+        row = self.conn.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
+        self.assertEqual(row['value'], '4')
+        cursor = self.conn.execute("SELECT name FROM sqlite_master WHERE type='index'")
+        indexes = {r['name'] for r in cursor.fetchall()}
+        expected_indexes = {
+            'idx_usage_history_cycle_ts',
+            'idx_model_usage_cycle_ts',
+            'idx_quota_snapshots_cycle_ts',
+            'idx_usage_history_source_ts',
+            'idx_model_usage_source_ts',
+            'idx_quota_snapshots_source_ts',
+            'idx_quota_ts',
+            'idx_model_usage_source_model_ts',
+        }
+        self.assertTrue(expected_indexes.issubset(indexes))
+
 
 class RebaseResetHistoryTest(unittest.TestCase):
     """rebase_reset_history replays *historical* rows that were written

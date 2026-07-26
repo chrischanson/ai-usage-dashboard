@@ -39,8 +39,9 @@ retry/backoff state on top of it. If a feature here is not required by the
 | Source | Usage Data | Quota Data |
 |---|---|---|
 | **AGY** | Conversation protobuf blobs from `~/.gemini/antigravity-*/conversations/*.db` | Cloud Code API via local RPC (`RetrieveUserQuotaSummary`) + `loadCodeAssist` for plan (`paidTier.name`) |
+| **Claude (Claude Code)** | Local `~/.claude/projects/**/*.jsonl` transcripts | Anthropic OAuth usage API (`~/.claude/.credentials.json`) |
 | **OpenCode** | `opencode stats --models` subprocess output | Same subprocess; total cost extracted |
-| **Codex (OpenAI)** | `~/.codex/state_5.sqlite` threads table | JWT plan (`chatgpt_plan_type`) + billing API (optional, if key present) + `logs_2.sqlite` rate-limit events (`codex.rate_limits`) |
+| **Codex (OpenAI)** | `~/.codex/state_5.sqlite` threads table | JWT plan (`chatgpt_plan_type`) + billing API + `logs_2.sqlite` rate-limit events |
 
 Every source is **optional and isolated**: if a source's files/commands are
 absent or fail, the rest of the system keeps working and reports that source
@@ -50,12 +51,13 @@ as unavailable rather than crashing.
 
 | Endpoint | Method | Returns | Notes |
 |---|---|---|---|
+| `/api/sources` | GET | List of available data sources | Returns `[{name, display_name}]` from source registry |
 | `/api/usage/latest` | GET | Combined latest usage for all sources | Server-aggregated at latest `cycle_ts`; `?deltas=true` adds model deltas |
 | `/api/usage/history` | GET | Combined history across all sources | Server-aggregated per `cycle_ts`; optional `?range=` |
-| `/api/usage/{source}/latest` | GET | Per-source usage (`agy`/`opencode`/`codex`) | 404 on unknown source |
-| `/api/usage/{source}/history` | GET | Per-source history series | optional `?limit=` cap |
-| `/api/quota/latest` | GET | Combined quota with plan labels | live-enriched, falls back to last snapshot |
-| `/api/quota/{source}/latest` | GET | Per-source quota | 404 on unknown source |
+| `/api/usage/{source}/latest` | GET | Per-source usage (`agy`/`claude`/`opencode`/`codex`) | 404 on unknown source |
+| `/api/usage/{source}/history` | GET | Per-source history series | optional `?range=` cap |
+| `/api/quota/latest` | GET | Combined quota with plan labels | Served from DB snapshots by default; `?force=true` triggers live refresh |
+| `/api/quota/{source}/latest` | GET | Per-source quota | 404 on unknown source; DB snapshot by default |
 | `/health` | GET | Liveness — `{ "status": "ok" }`, always 200 if running | — |
 | `/ready` | GET | Readiness — 200 once DB is reachable and ≥1 poll succeeded; else 503 | — |
 | `/metrics` | GET | Operational metrics (JSON) | per-source last success/error, poll count, DB size |
@@ -66,7 +68,7 @@ envelope otherwise (see *API Specification*).
 #### Frontend Layout
 
 - **Header**: Title "Model Usage Dashboard" + time range buttons + Live pill in one row. No subtitle.
-- **Tabs**: All, AGY, OpenCode, Codex (OpenAI). Tab label is "All", not "Combined (All)".
+- **Tabs**: All, AGY, Claude, OpenCode, Codex. Tab label is "All", not "Combined (All)".
 - **Overview + Quota**: Side-by-side in `.stats-row` flex container.
 - **Overview Cards**: 2×2 grid. Row 1: Sessions/Messages (same row, same size, `/` separator) | Cache Reads. Row 2: Input Tokens | Output Tokens.
 - **History Chart**: Stacked area (Total mode) or individual lines (Rate mode).
@@ -77,7 +79,8 @@ envelope otherwise (see *API Specification*).
 
 #### Quota Display
 
-- **AGY**: Model groups with limit bars. Plan badge dynamic from API (`paidTier.name`).
+- **AGY**: Model groups with limit bars (`Session 5h` top, `Weekly` bottom). Plan badge dynamic from API (`paidTier.name`).
+- **Claude**: Model groups with limit bars (`Session 5h` top, `Weekly` bottom). Plan badge dynamic.
 - **OpenCode**: Total cost display.
 - **Codex**: Monthly limit % bar + plan badge only. No cost display. Plan from JWT (`chatgpt_plan_type`).
 

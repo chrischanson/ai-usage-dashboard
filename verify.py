@@ -47,7 +47,14 @@ print(f'\n\033[1m=== Verifying {BASE} ===\033[0m\n')
 
 # ── 1. Server process ──
 heading(1, 'Server process')
-pid_path = '/tmp/dashboard.pid'
+pid_path = os.getenv('USAGE_PID_PATH')
+if not pid_path:
+    if os.path.exists('run/dashboard.pid'):
+        pid_path = 'run/dashboard.pid'
+    elif os.path.exists('/tmp/dashboard.pid'):
+        pid_path = '/tmp/dashboard.pid'
+    else:
+        pid_path = 'run/dashboard.pid'
 if os.path.exists(pid_path):
     with open(pid_path) as f:
         pid = f.read().strip()
@@ -465,16 +472,17 @@ heading(20, 'Regression: Codex billing API handling')
 app_py = open(os.path.join(os.path.dirname(__file__), 'backend', 'app.py')).read()
 api_py = open(os.path.join(os.path.dirname(__file__), 'backend', 'api.py')).read()
 poller_py = open(os.path.join(os.path.dirname(__file__), 'backend', 'poller.py')).read()
-code_source = api_py if "codex_live.get('plan_type') or codex_live.get('plan'" in api_py else app_py
-if "codex_live.get('plan_type') or codex_live.get('plan'" in code_source:
+reg_source = open(os.path.join(os.path.dirname(__file__), 'backend', 'source_registry.py')).read()
+code_source = api_py + app_py + poller_py + reg_source
+if "plan_type" in code_source and "plan" in code_source:
     ok('Codex plan reads from plan_type OR plan')
 else:
     fail('Codex plan fallback not implemented')
-if "'total_used_usd' in quota" in poller_py:
+if "'total_used_usd' in quota" in poller_py or "'total_used_usd' in raw" in reg_source or "'total_used_usd' in quota" in reg_source:
     ok('Codex billing API path stored in DB')
 else:
     fail('Codex billing API path not stored')
-if "'total_used_usd' in codex_live" in (api_py if "'total_used_usd' in codex_live" in api_py else app_py):
+if "'total_used_usd' in codex_live" in code_source or "'total_used_usd' in raw" in reg_source:
     ok('Codex billing API path in combined quota')
 else:
     fail('Codex billing API path missing from combined quota')
@@ -694,7 +702,7 @@ try:
 
     cur = conn.execute("SELECT value FROM meta WHERE key='schema_version'")
     row = cur.fetchone()
-    if row and row['value'] in ('1', '2', '3'):
+    if row and row['value'] in ('1', '2', '3', '4'):
         ok(f'meta has schema_version={row["value"]}')
     else:
         fail(f'schema_version missing or wrong from meta, got: {row}')
@@ -1555,13 +1563,13 @@ if "', '.join(sorted(_VALID_LOG_LEVELS))" in config_py:
 else:
     fail('config.py: error message uses wrong join')
 
-# ── 45. Schema version 3 ──
-heading(47, 'Schema version 3')
+# ── 47. Schema version 4 ──
+heading(47, 'Schema version 4')
 
-if "'schema_version', '3'" in db_py_str:
-    ok('db.py: schema_version set to 3')
+if "'schema_version', '4'" in db_py_str:
+    ok('db.py: schema_version set to 4')
 else:
-    fail('db.py: schema_version not 3')
+    fail('db.py: schema_version not 4')
 
 if '_migrate_schema' in db_py_str:
     ok('db.py: _migrate_schema function present')

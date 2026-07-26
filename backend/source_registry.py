@@ -88,13 +88,29 @@ def _normalize_opencode(raw):
 def _normalize_agy(raw):
     if not raw or 'error' in raw:
         return None
-    from api import _agy_quota_to_api
-    return _agy_quota_to_api(raw)
+    result = {}
+    plan = raw.get('plan', 'Gemini Code Assist')
+    result['_plan'] = plan
+    for group_key, limits in raw.items():
+        if group_key == 'plan' or not isinstance(limits, dict):
+            continue
+        result[group_key] = {}
+        for limit_key, info in limits.items():
+            if not isinstance(info, dict):
+                continue
+            result[group_key][limit_key] = {
+                'used': info.get('used', 0.0),
+                'total': info.get('total', 100.0),
+                'remaining_pct': info.get('remaining_pct', 0.0),
+                'refreshes_in_seconds': info.get('refreshes_in', info.get('refreshes_in_seconds', 0)),
+            }
+    return result
 
 
 def _normalize_codex(raw):
     if not raw or 'error' in raw:
         return None
+    import time
     result = {}
     plan = raw.get('plan_type') or raw.get('plan', 'free')
     result['_plan'] = plan
@@ -126,22 +142,43 @@ def _normalize_codex(raw):
 def _normalize_claude(raw):
     if not raw or 'error' in raw:
         return None
+    from util import parse_iso_seconds
     result = {}
     plan = raw.get('subscription_type', 'pro')
     result['_plan'] = f"Claude {plan.title()}"
-    for group_key, limits in raw.items():
-        if group_key in ('subscription_type',) or not isinstance(limits, dict):
-            continue
-        result[group_key] = {}
-        for limit_key, info in limits.items():
-            if not isinstance(info, dict):
-                continue
-            result[group_key][limit_key] = {
-                'used': info.get('used', 0.0),
-                'total': info.get('total', 100.0),
-                'remaining_pct': info.get('remaining_pct', 0.0),
-                'refreshes_in_seconds': info.get('refreshes_in_seconds', 0),
+    if 'five_hour' in raw:
+        fh = raw['five_hour']
+        result['session'] = {
+            'five_hour': {
+                'used': fh.get('utilization', 0.0),
+                'total': 100.0,
+                'remaining_pct': 100.0 - fh.get('utilization', 0.0),
+                'refreshes_in_seconds': parse_iso_seconds(fh.get('resets_at', '')),
             }
+        }
+    if 'seven_day' in raw:
+        wd = raw['seven_day']
+        result['weekly'] = {
+            'all_models': {
+                'used': wd.get('utilization', 0.0),
+                'total': 100.0,
+                'remaining_pct': 100.0 - wd.get('utilization', 0.0),
+                'refreshes_in_seconds': parse_iso_seconds(wd.get('resets_at', '')),
+            }
+        }
+    for lim in raw.get('limits', []):
+        if lim.get('kind') == 'weekly_scoped':
+            scope_model = lim.get('scope', {}).get('model', {})
+            model_name = scope_model.get('display_name')
+            if model_name:
+                if 'weekly' not in result:
+                    result['weekly'] = {}
+                result['weekly'][model_name] = {
+                    'used': lim.get('percent', 0.0),
+                    'total': 100.0,
+                    'remaining_pct': 100.0 - lim.get('percent', 0.0),
+                    'refreshes_in_seconds': parse_iso_seconds(lim.get('resets_at', '')),
+                }
     return result
 
 
