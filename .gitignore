@@ -37,3 +37,6 @@ IMPROVE.md
 todo/
 implemented_plans/
 
+
+# Local agent config
+.claude/
