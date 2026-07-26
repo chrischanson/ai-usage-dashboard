@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Model Usage Dashboard</title>
     <meta name="description" content="Live model usage and quota dashboard for Antigravity, OpenCode, Codex, and Claude">
-    <link rel="stylesheet" href="index.css?v=2">
+    <link rel="stylesheet" href="index.css?v=3">
     <script src="chart.js"></script>
     <script src="hammer.js"></script>
     <script src="chartjs-plugin-zoom.js"></script>
@@ -13,7 +13,7 @@
 <body>
     <div class="container">
         <header>
-            <h1>Model Usage Dashboard</h1>
+            <h1>USAGE · DASHBOARD</h1>
             <div class="header-right">
                 <div class="tabs" id="source-tabs" role="tablist" aria-label="Data source">
                     <button class="tab active" data-source="combined" id="tab-combined" role="tab" aria-selected="true" aria-controls="panel-main">
@@ -53,12 +53,23 @@
                     </span>
                     <span class="refresh-text" id="refresh-text">Refresh</span>
                 </button>
-                <div class="status-indicator" id="status-indicator" role="status" aria-live="polite" aria-atomic="true">
-                    <span class="dot" aria-hidden="true"></span>
-                    <span id="status-text">Live</span>
-                </div>
             </div>
         </header>
+
+        <!-- Cycle strip: the poller writes one aligned row per source every
+             `poll_interval_s`. Each tick is one expected cycle — filled when it
+             landed, hollow when it did not. Never invents a tick. -->
+        <div class="cycle-strip" id="cycle-strip">
+            <span class="cycle-strip-label">Cycles</span>
+            <div class="cycle-ticks" id="cycle-ticks" aria-hidden="true"></div>
+            <div class="status-indicator" id="status-indicator" role="status" aria-live="polite" aria-atomic="true">
+                <span class="dot" aria-hidden="true"></span>
+                <span id="status-text">Live</span>
+            </div>
+            <span class="cycle-updated" id="last-updated">Last updated: --</span>
+            <span class="cycle-countdown" id="cycle-countdown" aria-hidden="true"></span>
+            <span class="visually-hidden" id="cycle-summary" role="status" aria-live="polite"></span>
+        </div>
 
         <!-- Error Banner -->
         <div id="error-banner" class="error-banner" role="alert" hidden>
@@ -79,7 +90,7 @@
                 <div class="stats-overview">
                     <h2 class="section-title">Overview <span id="time-range-label" class="section-subtitle"></span></h2>
                     <div class="overview-cards">
-                        <div class="card glass" id="card-sessions">
+                        <div class="card" id="card-sessions">
                             <h3>Sessions / Messages</h3>
                             <div class="card-row">
                                 <span id="total-sessions" class="skeleton skeleton-text"><span class="visually-hidden">Loading</span></span>
@@ -87,11 +98,11 @@
                                 <span id="total-messages" class="skeleton skeleton-text"><span class="visually-hidden">Loading</span></span>
                             </div>
                         </div>
-                        <div class="card glass" id="card-cache">
+                        <div class="card" id="card-cache">
                             <h3>Cache Reads</h3>
                             <p id="cache-reads" class="skeleton skeleton-text"><span class="visually-hidden">Loading</span></p>
                         </div>
-                        <div class="card glass" id="card-tokens">
+                        <div class="card" id="card-tokens">
                             <h3>Input / Output Tokens</h3>
                             <div class="card-row">
                                 <span id="input-tokens" class="skeleton skeleton-text"><span class="visually-hidden">Loading</span></span>
@@ -99,7 +110,7 @@
                                 <span id="output-tokens" class="skeleton skeleton-text"><span class="visually-hidden">Loading</span></span>
                             </div>
                         </div>
-                        <div class="card glass" id="card-cost">
+                        <div class="card" id="card-cost">
                             <h3>Total Cost</h3>
                             <p id="total-cost" class="skeleton skeleton-text"><span class="visually-hidden">Loading</span></p>
                         </div>
@@ -115,7 +126,7 @@
 
             <!-- Charts -->
             <section class="charts-section">
-                <div class="chart-container glass">
+                <div class="chart-container">
                     <div class="chart-header">
                         <h2>Historical Token Usage</h2>
                         <div class="mode-toggle" role="group" aria-label="Chart mode">
@@ -124,18 +135,18 @@
                         </div>
                     </div>
                     <p class="chart-tip">Scroll to zoom, drag to pan, or double-click to reset.</p>
-                    <canvas id="historyChart"></canvas>
+                    <canvas id="historyChart" role="img" aria-label="Historical token usage over time. The Models table below lists the same figures."></canvas>
                 </div>
-                <div class="chart-container glass">
+                <div class="chart-container">
                     <h2>Model Distribution</h2>
-                    <canvas id="modelChart"></canvas>
+                    <canvas id="modelChart" role="img" aria-label="Share of tokens by model. The Models table below lists the same figures."></canvas>
                 </div>
             </section>
 
             <!-- Model Breakdown -->
             <section class="models-list" aria-label="Model breakdown">
                 <h2>Models</h2>
-                <div class="table-wrapper glass">
+                <div class="table-wrapper">
                     <table id="models-table">
                         <thead>
                             <tr>
@@ -156,10 +167,10 @@
         </main>
 
         <footer class="footer">
-            <span id="last-updated">Last updated: --</span>
+            <span id="footer-note"></span>
         </footer>
     </div>
 
-    <script src="app.js?v=2"></script>
+    <script type="module" src="js/main.js?v=3"></script>
 </body>
 </html>

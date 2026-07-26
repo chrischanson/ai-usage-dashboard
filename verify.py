@@ -38,6 +38,25 @@ def get(path):
         return str(e), 0
 
 
+_FRONTEND_JS_DIR = os.path.join(os.path.dirname(__file__), 'frontend', 'js')
+
+
+def frontend_js():
+    """Concatenated source of every ES module under frontend/js/.
+
+    The frontend used to be a single frontend/app.js; it is now a set of native
+    ES modules. The source-text checks below still apply to the app as a whole,
+    so they run against the concatenation rather than one file.
+    """
+    parts = []
+    for root, _dirs, files in os.walk(_FRONTEND_JS_DIR):
+        for name in sorted(files):
+            if name.endswith('.js'):
+                with open(os.path.join(root, name)) as fh:
+                    parts.append(fh.read())
+    return '\n'.join(parts)
+
+
 # ── Section headers ──
 def heading(n, title):
     print(f'\n── [{n}] {title} ──')
@@ -106,26 +125,26 @@ else:
 
 # ── 3. Frontend JS ──
 heading(3, 'Frontend JS')
-js, status = get('/static/app.js')
+js, status = frontend_js(), 200
 if status == 200:
     checks = [
         ("container.className = 'quota-cards source-' + source",
          'Dynamic source CSS class set on quota-cards'),
-        ('renderCodexQuota(container, rateLimit, plan)',
+        ('renderCodexQuota(targetContainer, rateLimit, plan)',
          'Codex plan passed to renderCodexQuota'),
         ('badge badge-codex">${escapeHtml(planLabel)}',
          'Codex badge uses dynamic plan label'),
         ('badge badge-agy">${escapeHtml(agyPlan)}',
          'AGY badge uses dynamic plan label'),
-        ('renderQuota(data, currentSource)',
+        ('renderQuota(data, state.currentSource)',
          'renderQuota called with currentSource'),
         ('fetchQuota(', 'fetchQuota function defined'),
         ('renderOpenCodeCost(', 'OpenCode cost rendering function'),
         ('renderCodexQuota(', 'Codex quota rendering function'),
-        ('let timeRange', 'timeRange state variable'),
-        ('let mode', 'mode state variable'),
-        ('let cachedHistory', 'cachedHistory variable'),
-        ('cachedHistory =', 'Caches history data after fetch'),
+        ("timeRange: 'all'", 'timeRange state variable'),
+        ("mode: 'total'", 'mode state variable'),
+        ('cachedHistory: null', 'cachedHistory variable'),
+        ('state.cachedHistory =', 'Caches history data after fetch'),
         ('filterByTimeRange(data, range)',
          'filterByTimeRange function'),
         ('delta_input_tokens',
@@ -134,10 +153,10 @@ if status == 200:
          'Time range button event listeners'),
         ('document.querySelectorAll(\'.mode-btn\')',
          'Mode toggle event listeners'),
-        ('renderHistoryChart(cachedHistory)',
+        ('renderHistoryChart(state.cachedHistory)',
          'Chart re-renders from cache on range/mode change'),
         ('beginAtZero: true', 'Y-axis begins at zero'),
-        ('deltasParam = mode === \'rate\' ? \'?deltas=true\' : \'\'', 'Model deltas param based on mode'),
+        ('deltasParam = state.mode === \'rate\' ? \'?deltas=true\' : \'\'', 'Model deltas param based on mode'),
         ('_modelDeltas', 'Model deltas stored separately from cumulative'),
         ('chartTitle = \'Model Distribution\'', 'Model chart title static'),
     ]
@@ -147,7 +166,7 @@ if status == 200:
         else:
             fail(f'Missing: {msg}')
 else:
-    fail(f'app.js returned HTTP {status}')
+    fail(f'frontend JS modules unreadable')
 
 # ── 4. CSS ──
 heading(4, 'CSS')
@@ -158,14 +177,14 @@ if status == 200:
         ('.source-agy', '.source-agy class'),
         ('0.5fr 1fr 1fr 1fr 1fr', 'Combined 5-column grid with OpenCode half-width'),
         ('grid-template-columns: repeat(2, 1fr)', 'AGY 2-column grid'),
-        ('@media (max-width: 900px)', 'Responsive breakpoint at 900px'),
-        ('@media (max-width: 600px)', 'Responsive breakpoint at 600px'),
+        ('@media (max-width: 1024px)', 'Responsive breakpoint at 1024px'),
+        ('@container', 'Container queries drive component reflow'),
         ('.badge-agy', 'AGY badge style'),
         ('.badge-opencode', 'OpenCode badge style'),
         ('.badge-codex', 'Codex badge style'),
-        ('.quota-bar-fill.green', 'Green quota bar'),
-        ('.quota-bar-fill.amber', 'Amber quota bar'),
-        ('.quota-bar-fill.red', 'Red quota bar'),
+        ('.meter-tick.filled.ok', 'Quota meter: ok ticks'),
+        ('.meter-tick.filled.warn', 'Quota meter: warn ticks'),
+        ('.meter-tick.filled.danger', 'Quota meter: danger ticks'),
         ('.stats-row', 'Stats row layout'),
         ('.stats-overview', 'Stats overview section'),
         ('.range-btn', 'Time range button style'),
@@ -371,11 +390,11 @@ if status == 200 and '</html>' in html:
     ok('index.html serves correctly')
 else:
     fail('index.html check')
-body, status = get('/static/app.js')
+body, status = get('/static/js/main.js')
 if status == 200:
-    ok('app.js serves correctly')
+    ok('js/main.js serves correctly')
 else:
-    fail('app.js check')
+    fail('js/main.js check')
 body, status = get('/static/index.css')
 if status == 200:
     ok('index.css serves correctly')
@@ -396,7 +415,7 @@ else:
 
 # ── 15. Regression: XSS prevention ──
 heading(15, 'Regression: XSS prevention')
-js, _ = get('/static/app.js')
+js = frontend_js()
 if 'function escapeHtml' in js:
     ok('escapeHtml function defined')
 else:
@@ -702,7 +721,7 @@ try:
 
     cur = conn.execute("SELECT value FROM meta WHERE key='schema_version'")
     row = cur.fetchone()
-    if row and row['value'] in ('1', '2', '3', '4'):
+    if row and row['value'] in ('1', '2', '3', '4', '5'):
         ok(f'meta has schema_version={row["value"]}')
     else:
         fail(f'schema_version missing or wrong from meta, got: {row}')
@@ -1207,7 +1226,7 @@ heading(35, 'M7+M8: Frontend Shell + UX + A11y')
 
 html = open(os.path.join(os.path.dirname(__file__), 'frontend', 'index.html')).read()
 css = open(os.path.join(os.path.dirname(__file__), 'frontend', 'index.css')).read()
-js = open(os.path.join(os.path.dirname(__file__), 'frontend', 'app.js')).read()
+js = frontend_js()
 
 # --- ARIA ---
 if 'role="tablist"' in html:
@@ -1522,7 +1541,7 @@ if 'tab-claude' in html:
 else:
     fail('HTML: tab-claude id missing')
 
-js = open(os.path.join(os.path.dirname(__file__), 'frontend', 'app.js')).read()
+js = frontend_js()
 if "'claude'" in js:
     ok('JS: Claude source handled')
 else:
@@ -1563,13 +1582,18 @@ if "', '.join(sorted(_VALID_LOG_LEVELS))" in config_py:
 else:
     fail('config.py: error message uses wrong join')
 
-# ── 47. Schema version 4 ──
-heading(47, 'Schema version 4')
+# ── 47. Schema version 5 ──
+heading(47, 'Schema version 5')
 
-if "'schema_version', '4'" in db_py_str:
-    ok('db.py: schema_version set to 4')
+if "'schema_version', '5'" in db_py_str:
+    ok('db.py: schema_version set to 5')
 else:
-    fail('db.py: schema_version not 4')
+    fail('db.py: schema_version not 5')
+
+if 'quota_plans' in db_py_str:
+    ok('db.py: quota_plans table for persisted plan badges')
+else:
+    fail('db.py: quota_plans table missing')
 
 if '_migrate_schema' in db_py_str:
     ok('db.py: _migrate_schema function present')

@@ -12,6 +12,8 @@ from db import connect as _db_connect, DB_PATH, init_schema
 from util import parse_iso_seconds
 from source_registry import get_all_names
 
+_VALID_SOURCES = set(get_all_names())
+
 
 def error_response(code: str, message: str, status: int = 400):
     return JSONResponse(
@@ -145,13 +147,34 @@ def create_app() -> FastAPI:
         from source_registry import get_all_sources
         return [{"name": entry.name, "display_name": entry.display_name} for entry in get_all_sources().values()]
 
+    def _cadence_meta(result: dict) -> dict:
+        """Read-only cadence facts for the header's cycle strip.
+
+        Additive and derived: the newest cycle_ts already present in `result`
+        plus the configured poll interval. Nothing here changes what is polled
+        or stored. Keyed under `_meta` so it can never collide with a source
+        name (sources are the only other top-level keys).
+        """
+        from config import load_config
+        interval = load_config().poll_interval
+        cycles = [row.get('cycle_ts') for row in result.values()
+                  if isinstance(row, dict) and row.get('cycle_ts')]
+        latest = max(cycles) if cycles else None
+        return {
+            "poll_interval_s": interval,
+            "latest_cycle_ts": latest,
+            "next_cycle_ts": (latest + interval) if latest else None,
+        }
+
     @app.get("/api/usage/latest")
     def api_usage_latest(deltas: bool = Query(False)):
         conn = _db_connect(DB_PATH)
         try:
-            return latest_usage(conn, deltas=deltas)
+            result = latest_usage(conn, include_model_deltas=deltas)
         finally:
             conn.close()
+        result['_meta'] = _cadence_meta(result)
+        return result
 
     @app.get("/api/usage/{source}/latest")
     def api_usage_source_latest(source: str):
@@ -160,9 +183,11 @@ def create_app() -> FastAPI:
 
         conn = _db_connect(DB_PATH)
         try:
-            return latest_usage(conn, source=source)
+            result = latest_usage(conn, source=source)
         finally:
             conn.close()
+        result['_meta'] = _cadence_meta(result)
+        return result
 
     @app.get("/api/usage/{source}/history")
     def api_usage_source_history(source: str, range: str = Query('all'), with_models: bool = Query(None)):

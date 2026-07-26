@@ -5,12 +5,14 @@ import sys
 import sqlite3
 import json
 import tempfile
+import shutil
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from db import (init_schema, record_observation, record_status, history, latest_usage,
-                metrics, prune, rebase_reset_history, _USAGE_FIELDS, _MODEL_REBASE_FIELDS)
+from db import (init_schema, connect, record_observation, record_quota, record_status,
+                history, latest_usage, latest_quota, metrics, prune, rebase_reset_history,
+                _USAGE_FIELDS, _MODEL_REBASE_FIELDS)
 from parsers.base import ParserResult, ModelUsage
 from integrity import check_integrity
 
@@ -216,9 +218,9 @@ class DerivationTest(unittest.TestCase):
         self.assertAlmostEqual(models_by_cycle[2800]['cost'], 7.75)
         self.assertAlmostEqual(models_by_cycle[2800]['delta_cost'], 2.50)
 
-    def test_schema_v4_indexes_exist(self):
+    def test_schema_v5_indexes_exist(self):
         row = self.conn.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
-        self.assertEqual(row['value'], '4')
+        self.assertEqual(row['value'], '5')
         cursor = self.conn.execute("SELECT name FROM sqlite_master WHERE type='index'")
         indexes = {r['name'] for r in cursor.fetchall()}
         expected_indexes = {
@@ -230,8 +232,15 @@ class DerivationTest(unittest.TestCase):
             'idx_quota_snapshots_source_ts',
             'idx_quota_ts',
             'idx_model_usage_source_model_ts',
+            'idx_quota_plans_source_ts',
         }
         self.assertTrue(expected_indexes.issubset(indexes))
+
+    def test_schema_v5_has_quota_plans_table(self):
+        row = self.conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='quota_plans'"
+        ).fetchone()
+        self.assertIsNotNone(row, 'quota_plans table missing')
 
 
 class RebaseResetHistoryTest(unittest.TestCase):
@@ -405,3 +414,70 @@ class MetricsTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class QuotaPlanPersistenceTest(unittest.TestCase):
+    """The plan a source reports must survive a restart.
+
+    Before schema v5 the normalizers produced `_plan` but nothing stored it:
+    `_do_insert_quota` skipped it because it is a scalar, not a limit group.
+    `/api/quota/latest` reads from the DB, so every plan badge silently fell
+    back to a hardcoded default ("Claude Pro", "Gemini Code Assist", "free")
+    unless a forced live refresh had just run.
+    """
+
+    def setUp(self):
+        import tempfile
+        self.tmp = tempfile.mkdtemp()
+        self.path = os.path.join(self.tmp, 'plans.db')
+        self.conn = connect(self.path)
+        init_schema(self.conn)
+
+    def tearDown(self):
+        self.conn.close()
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _quota(self, plan):
+        return {
+            '_plan': plan,
+            'gemini_models': {
+                'weekly_limit': {'used': 10.0, 'total': 100.0,
+                                 'remaining_pct': 90.0, 'refreshes_in_seconds': 60},
+            },
+        }
+
+    def test_plan_round_trips(self):
+        record_quota(self.conn, 'agy', 1000, self._quota('Gemini Advanced Plan'))
+        self.assertEqual(latest_quota(self.conn)['agy']['_plan'], 'Gemini Advanced Plan')
+
+    def test_plan_survives_a_new_connection(self):
+        record_quota(self.conn, 'agy', 1000, self._quota('Gemini Advanced Plan'))
+        self.conn.close()
+        self.conn = connect(self.path)
+        self.assertEqual(latest_quota(self.conn)['agy']['_plan'], 'Gemini Advanced Plan')
+
+    def test_latest_cycle_wins(self):
+        record_quota(self.conn, 'agy', 1000, self._quota('Old Plan'))
+        record_quota(self.conn, 'agy', 1600, self._quota('New Plan'))
+        self.assertEqual(latest_quota(self.conn)['agy']['_plan'], 'New Plan')
+
+    def test_plan_carries_forward_when_a_cycle_omits_it(self):
+        record_quota(self.conn, 'agy', 1000, self._quota('Gemini Advanced Plan'))
+        later = self._quota('ignored')
+        del later['_plan']
+        record_quota(self.conn, 'agy', 1600, later)
+        # limits came from cycle 1600, plan from the newest cycle that had one
+        self.assertEqual(latest_quota(self.conn)['agy']['_plan'], 'Gemini Advanced Plan')
+
+    def test_absent_plan_is_omitted_not_invented(self):
+        q = self._quota('x')
+        del q['_plan']
+        record_quota(self.conn, 'agy', 1000, q)
+        self.assertNotIn('_plan', latest_quota(self.conn)['agy'])
+
+    def test_plan_is_per_source(self):
+        record_quota(self.conn, 'agy', 1000, self._quota('Gemini Advanced Plan'))
+        record_quota(self.conn, 'claude', 1000, self._quota('Claude Pro'))
+        result = latest_quota(self.conn)
+        self.assertEqual(result['agy']['_plan'], 'Gemini Advanced Plan')
+        self.assertEqual(result['claude']['_plan'], 'Claude Pro')

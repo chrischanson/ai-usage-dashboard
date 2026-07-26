@@ -109,6 +109,20 @@ def init_schema(conn: sqlite3.Connection) -> None:
         )
     ''')
 
+    # The plan/tier a source reports alongside its quota (e.g. "Claude Pro").
+    # It is a per-cycle observation like any other, but it is a scalar, so it
+    # cannot live in quota_snapshots' model_group/limit_type grid.
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS quota_plans (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source TEXT NOT NULL,
+            cycle_ts INTEGER DEFAULT 0,
+            timestamp TEXT,
+            plan TEXT,
+            UNIQUE(source, cycle_ts)
+        )
+    ''')
+
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS collection_status (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -132,10 +146,11 @@ def init_schema(conn: sqlite3.Connection) -> None:
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_quota_snapshots_source_ts ON quota_snapshots(source, cycle_ts)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_quota_ts ON quota_snapshots(cycle_ts)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_model_usage_source_model_ts ON model_usage(source, model_name, cycle_ts)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_quota_plans_source_ts ON quota_plans(source, cycle_ts)')
 
     cursor.execute(
         "INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)",
-        ('schema_version', '4')
+        ('schema_version', '5')
     )
 
     conn.commit()
@@ -201,6 +216,24 @@ def _migrate_schema(conn: sqlite3.Connection) -> None:
         cursor.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '4')")
         conn.commit()
         version = 4
+
+    # v5 adds quota_plans. Purely additive, so it is safe to run against any
+    # v4 database: the plan simply starts being recorded from the next poll.
+    if version < 5 or not _table_exists(cursor, 'quota_plans'):
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS quota_plans (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source TEXT NOT NULL,
+                cycle_ts INTEGER DEFAULT 0,
+                timestamp TEXT,
+                plan TEXT,
+                UNIQUE(source, cycle_ts)
+            )
+        ''')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_quota_plans_source_ts ON quota_plans(source, cycle_ts)')
+        cursor.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '5')")
+        conn.commit()
+        version = 5
 
 
 def _table_exists(cursor, name: str) -> bool:
@@ -534,8 +567,10 @@ def record_observation(conn: sqlite3.Connection, source: str, cycle_ts: int, res
                      result.models)
 
 
-def record_quota(conn: sqlite3.Connection, source: str, cycle_ts: int, data) -> None:
-    _do_insert_quota(conn, source, cycle_ts, data)
+def record_quota(conn: sqlite3.Connection, source: str, cycle_ts: int, data, plan=None) -> None:
+    """`data` may be the normalized dict (plan carried as `_plan`) or a flat
+    list of limit rows, in which case pass `plan` explicitly."""
+    _do_insert_quota(conn, source, cycle_ts, data, plan=plan)
 
 
 def record_status(conn: sqlite3.Connection, source: str, kind: str, cycle_ts: int,
@@ -930,8 +965,20 @@ def latest_usage(conn: sqlite3.Connection, source: str = None, cycle_ts: int = N
 
 # --- Quota ---
 
-def _do_insert_quota(conn, source, cycle_ts, data):
+def _do_insert_quota(conn, source, cycle_ts, data, plan=None):
     ts_str = datetime.fromtimestamp(cycle_ts, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+
+    # `_plan` is a scalar sitting next to the nested limit groups, so the loop
+    # below skips it (it is not a dict). Record it separately, or the plan a
+    # source reports would only ever survive until the next restart.
+    if plan is None and isinstance(data, dict):
+        plan = data.get('_plan')
+    if plan:
+        conn.execute(
+            "INSERT OR REPLACE INTO quota_plans (source, cycle_ts, timestamp, plan)"
+            " VALUES (?, ?, ?, ?)",
+            (source, cycle_ts, ts_str, str(plan))
+        )
 
     if isinstance(data, dict):
         for key, val in data.items():
@@ -1009,6 +1056,18 @@ def latest_quota(conn: sqlite3.Connection, source: str = None) -> dict:
             if group not in result[src]:
                 result[src][group] = {}
             result[src][group][r['limit_type']] = dict(r)
+
+        # The most recent plan at or before this cycle. Falling back to the
+        # newest known plan keeps the badge correct when a cycle recorded
+        # limits but the plan lookup failed that round.
+        cursor.execute(
+            "SELECT plan FROM quota_plans WHERE source=? AND cycle_ts<=?"
+            " ORDER BY cycle_ts DESC LIMIT 1",
+            (src, cts)
+        )
+        prow = cursor.fetchone()
+        if prow and prow['plan']:
+            result[src]['_plan'] = prow['plan']
 
     return result
 

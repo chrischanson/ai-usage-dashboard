@@ -184,7 +184,7 @@ def main():
         {"model_group": "gemini_models", "limit_type": "five_hour_limit", "used": 15.0, "total": 100.0, "remaining_pct": 85.0, "refreshes_in_seconds": 3600},
         {"model_group": "claude_gpt_models", "limit_type": "weekly_limit", "used": 75.0, "total": 100.0, "remaining_pct": 25.0, "refreshes_in_seconds": 45000},
         {"model_group": "claude_gpt_models", "limit_type": "five_hour_limit", "used": 60.0, "total": 100.0, "remaining_pct": 40.0, "refreshes_in_seconds": 7200}
-    ])
+    ], plan="Gemini Advanced Plan")
     
     # Claude
     record_quota(conn, "claude", end_cycle, [
@@ -192,17 +192,17 @@ def main():
         {"model_group": "weekly", "limit_type": "all_models", "used": 48.0, "total": 100.0, "remaining_pct": 52.0, "refreshes_in_seconds": 172800},
         {"model_group": "weekly", "limit_type": "Claude 3.5 Sonnet", "used": 58.0, "total": 100.0, "remaining_pct": 42.0, "refreshes_in_seconds": 172800},
         {"model_group": "weekly", "limit_type": "Claude 3 Opus", "used": 18.0, "total": 100.0, "remaining_pct": 82.0, "refreshes_in_seconds": 172800}
-    ])
+    ], plan="Claude Pro")
     
     # OpenCode
     record_quota(conn, "opencode", end_cycle, [
         {"model_group": "opencode", "limit_type": "total_cost", "used": 45.80, "total": 100.0, "remaining_pct": 54.2, "refreshes_in_seconds": 0}
-    ])
+    ], plan="free")
     
     # Codex
     record_quota(conn, "codex", end_cycle, [
         {"model_group": "openai", "limit_type": "rate_limit", "used": 42.5, "total": 100.0, "remaining_pct": 57.5, "refreshes_in_seconds": 1800}
-    ])
+    ], plan="chatgptplusplan")
 
     # Record active/ok status for all sources
     for src in ("agy", "claude", "opencode", "codex"):

@@ -140,3 +140,73 @@ class TestStaticFiles(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestUsageEndpointsRespond(unittest.TestCase):
+    """Invoke the usage/quota routes, don't just check they are registered.
+
+    The route-registration tests above passed while /api/usage/latest and every
+    /api/usage/{source}/* route returned HTTP 500 (a renamed kwarg and a dropped
+    _VALID_SOURCES definition). Registration is not a substitute for a response.
+    """
+
+    def setUp(self):
+        from fastapi.testclient import TestClient
+        self.client = TestClient(create_app())
+
+    def test_all_usage_routes_return_200(self):
+        for path in ('/api/usage/latest',
+                     '/api/usage/latest?deltas=true',
+                     '/api/usage/history',
+                     '/api/quota/latest'):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 200)
+
+    def test_per_source_routes_return_200(self):
+        for src in ('agy', 'opencode', 'codex', 'claude'):
+            for tmpl in ('/api/usage/{}/latest',
+                         '/api/usage/{}/history',
+                         '/api/quota/{}/latest'):
+                path = tmpl.format(src)
+                with self.subTest(path=path):
+                    self.assertEqual(self.client.get(path).status_code, 200)
+
+    def test_unknown_source_returns_404(self):
+        for tmpl in ('/api/usage/{}/latest',
+                     '/api/usage/{}/history',
+                     '/api/quota/{}/latest'):
+            path = tmpl.format('definitely-not-a-source')
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 404)
+
+
+class TestCadenceMeta(unittest.TestCase):
+    """The `_meta` block feeding the header's cycle strip."""
+
+    def setUp(self):
+        from fastapi.testclient import TestClient
+        self.client = TestClient(create_app())
+
+    def _assert_meta_shape(self, meta):
+        self.assertIsInstance(meta, dict)
+        for key in ('poll_interval_s', 'latest_cycle_ts', 'next_cycle_ts'):
+            self.assertIn(key, meta)
+        self.assertIsInstance(meta['poll_interval_s'], int)
+        self.assertGreater(meta['poll_interval_s'], 0)
+        # next_cycle_ts is exactly one interval past the newest observation,
+        # or None when there is no data at all — never invented.
+        if meta['latest_cycle_ts'] is None:
+            self.assertIsNone(meta['next_cycle_ts'])
+        else:
+            self.assertEqual(meta['next_cycle_ts'],
+                             meta['latest_cycle_ts'] + meta['poll_interval_s'])
+
+    def test_combined_latest_exposes_meta(self):
+        self._assert_meta_shape(self.client.get('/api/usage/latest').json()['_meta'])
+
+    def test_source_latest_exposes_meta(self):
+        self._assert_meta_shape(self.client.get('/api/usage/agy/latest').json()['_meta'])
+
+    def test_meta_does_not_shadow_a_source(self):
+        from source_registry import get_all_names
+        self.assertNotIn('_meta', set(get_all_names()))

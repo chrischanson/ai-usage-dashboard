@@ -31,8 +31,8 @@ If you run multiple AI coding assistants, tracking quota and spend across separa
 - 🗂️ **Per-source tabs**: All (combined), AGY, Claude, OpenCode, Codex
 - ⏱️ **Time range filters**: 1h / 6h / 1d / 1w / 1m / 3m / all
 - 💳 **Quota bars** with live plan badge for AGY and Claude; cost display for OpenCode; monthly limit for Codex
-- 📱 **Mobile responsive** — responsive breakpoints at 900 px and 640 px
-- ♿ **Accessible** — ARIA roles, keyboard navigation, `:focus-visible`, `prefers-reduced-motion`
+- 📱 **Mobile responsive** — container queries plus responsive breakpoints at 1024 px and 640 px
+- ♿ **Accessible** — cycle strip live region, `aria-sort` on sortable columns, `role="meter"` quota meters, ARIA roles, keyboard navigation, `:focus-visible`, `prefers-reduced-motion`
 - 🔒 **Secure by default** — local-only bind (`127.0.0.1`), CSP headers, no secrets logged
 
 ---
@@ -134,10 +134,10 @@ Full design decisions: [DESIGN.md](DESIGN.md)
 ## Testing
 
 ```bash
-# 233-check integration suite
+# 318-check integration suite
 PYTHONPATH=backend python3 verify.py
 
-# Unit tests
+# 127 unit tests
 PYTHONPATH=backend python3 -m unittest discover -s backend/tests
 ```
 
@@ -147,10 +147,23 @@ PYTHONPATH=backend python3 -m unittest discover -s backend/tests
 
 ```
 backend/          FastAPI server, parsers, poller, DB layer, integrity monitor
-frontend/         Static HTML/CSS/JS dashboard (Chart.js, no framework)
+frontend/
+  index.html      Page shell
+  index.css       Design tokens, @layer cascade, responsive layout (container queries)
+  fonts/          6 self-hosted IBM Plex woff2 files (OFL)
+  js/
+    main.js       Wiring, event handlers, refresh loop
+    state.js      Single mutable state object + constants
+    api.js        All fetches
+    format.js     Pure formatters
+    colors.js     Reads design tokens from CSS custom properties
+    charts.js     Both Chart.js configs
+    derive.js     Read-time totals/deltas from history
+    ui/           Component modules (banners, skeleton, kpis, table, quota, strip)
+  chart.js, hammer.js, chartjs-plugin-zoom.js  (vendored)
 install/          systemd service + SysVinit scripts
 DESIGN.md         Architecture, data model, API spec, build order
-verify.py         Integration test suite (233 checks)
+verify.py         Integration test suite (318 checks)
 run.sh            Convenience launcher (creates venv, installs deps)
 ```
 
@@ -159,9 +172,14 @@ run.sh            Convenience launcher (creates venv, installs deps)
 ## Regenerating Screenshot
 
 If you need to regenerate the dashboard screenshot, a dedicated agent skill configuration is available in this repository under:
-`.agents/skills/generate-dashboard-screenshot/`
+`.claude/skills/generate-dashboard-screenshot/`
 
 This skill provides the workflow and tools to seed mock historical data, temporarily bypass real APIs, and take a clean screenshot of the dashboard.
+
+## Browser Support
+
+The UI uses CSS container queries, so it needs Chrome, Safari, or Firefox from 2023 onward.  
+Older browsers will display unstyled content without error.
 
 ---
 

@@ -52,7 +52,7 @@ as unavailable rather than crashing.
 | Endpoint | Method | Returns | Notes |
 |---|---|---|---|
 | `/api/sources` | GET | List of available data sources | Returns `[{name, display_name}]` from source registry |
-| `/api/usage/latest` | GET | Combined latest usage for all sources | Server-aggregated at latest `cycle_ts`; `?deltas=true` adds model deltas |
+| `/api/usage/latest` | GET | Combined latest usage for all sources | Server-aggregated at latest `cycle_ts`; `?deltas=true` adds model deltas; additive `_meta` block carries `{poll_interval_s, latest_cycle_ts, next_cycle_ts}` for the cycle strip |
 | `/api/usage/history` | GET | Combined history across all sources | Server-aggregated per `cycle_ts`; optional `?range=` |
 | `/api/usage/{source}/latest` | GET | Per-source usage (`agy`/`claude`/`opencode`/`codex`) | 404 on unknown source |
 | `/api/usage/{source}/history` | GET | Per-source history series | optional `?range=` cap |
@@ -118,6 +118,7 @@ envelope otherwise (see *API Specification*).
 │                       ▼                                     │
 │        db.py → usage.db (WAL, idempotent schema)            │
 │     usage_history · model_usage · quota_snapshots ·         │
+│     quota_plans ·                                           │
 │     collection_status · meta  (all keyed by cycle_ts)       │
 │                       ▲                                     │
 │   api.py (FastAPI: aggregates across sources by cycle_ts)   │
@@ -205,6 +206,12 @@ idempotent — a re-run of the same cycle replaces, not duplicates.
   `source`, `cycle_ts`, `model_group`, `limit_type`, `used`, `total`,
   `remaining_pct`, `refreshes_in_seconds`. Unique `(source, cycle_ts,
   model_group, limit_type)`.
+- **quota_plans** (schema v5): the plan/tier a source reports, one row per
+  cycle. `source`, `cycle_ts`, `timestamp`, `plan`. Unique `(source, cycle_ts)`.
+  It is a scalar, so it cannot live in `quota_snapshots`' model_group/limit_type
+  grid; before v5 nothing stored it and every plan badge silently fell back to a
+  hardcoded default. `latest_quota()` returns it as `_plan`, taking the most
+  recent plan at or before the cycle being read.
 - **collection_status**: per-source health per cycle. `source`, `cycle_ts`,
   `ok`, `error` (nullable), `duration_ms`. Unique `(source, cycle_ts)`. Drives
   `/ready`, `/metrics`, and the frontend's per-source availability indicator.
@@ -292,21 +299,41 @@ Invalid values fail fast on load with a clear message.
 
 ## Frontend Architecture
 
-Three files, matching the existing layout: `index.html`, `styles.css`,
-`app.js` (Chart.js vendored locally). `verify.py` checks for the presence of
-functions and CSS rules, so these may stay in one `app.js`/`styles.css` or be
-split later without affecting verification. `app.js` is organized into clearly
-named, independently testable sections:
+**Modular ES6 architecture** loaded as native modules (no build step):
+`<script type="module" src="js/main.js">`. Splitting the old monolithic `app.js`
+into focused modules improves maintainability and testability. `verify.py`
+checks for the presence of expected functions and CSS rules across the
+distributed files.
 
-| Section | Functions (names verify.py checks) | Responsibility |
+**Core modules:**
+
+| Module | Responsibility | Exports |
 |---|---|---|
-| Utils | `escapeHtml()`, `formatNumber()`, `formatTime()` | Escaping + compact number/time formatting |
-| API client | `fetchJSON(path)` | Fetch, parse envelope, surface errors, detect offline |
-| State | `setSource()`, `setRange()`, `setMode()` | Hold `currentSource`/`timeRange`/`mode`; invalidate caches on tab switch |
-| Render | `renderHeader()`, `renderTabs()`, `renderOverview()`, `renderQuota()`, `renderHistory()`, `renderModelDist()` | Paint each region from cached data |
-| States | `renderLoading()`, `renderError()`, `renderEmpty()`, `updateStaleBadge()` | Loading/error/empty/stale UX |
-| Loop | `refresh()`, `startRefreshLoop()` | 60s refresh; stale detection; offline reconnect |
-| Bootstrap | `init()` | Wire state → render → loop |
+| `state.js` | Single mutable state object + configuration constants | `state`, constants |
+| `api.js` | All network fetches, envelope parsing, offline detection | `fetchJSON(path)`, `fetchUsageLatest()`, `fetchUsageHistory()`, etc. |
+| `format.js` | Pure string formatters (no side effects) | `formatNumber()`, `formatTime()`, `formatPercent()`, etc. |
+| `colors.js` | Read design tokens from CSS custom properties; build color maps | `getColorValue(token)`, `getSourceColors()` |
+| `charts.js` | Chart.js configuration objects for history and distribution | `historyChartConfig()`, `distributionChartConfig()` |
+| `derive.js` | Read-time aggregations from history: totals, deltas, time-bucketed sums | `deriveOverview()`, `deriveModelDeltas()` |
+| `ui/*.js` | Component renderers (banners, skeleton, KPIs, table, quota meters, cycle strip) | `renderBanners()`, `renderSkeleton()`, `renderKpis()`, `renderTable()`, `renderQuota()`, `renderCycleStrip()` |
+| `main.js` | Bootstrap: wire state → render → refresh loop; event delegation | `init()`, `refresh()` |
+
+**Design system** (CSS):
+
+`index.css` is organized in layers (`@layer`) for predictable cascade:
+- **Reset**: normalize.css-like baseline across browsers.
+- **Tokens**: CSS custom properties for color, spacing, typography, z-index, transitions.
+  Color palette is dark-only warm graphite with phosphor-amber signal. IBM Plex Sans for UI,
+  IBM Plex Mono (tabular figures) for all numerals. All colors are colourblind-validated (worst ΔE >9 under simulated protanopia; AA contrast ≥3:1).
+- **Base**: element defaults (headings, buttons, inputs).
+- **Components**: layout & composition blocks (`.header`, `.tabs`, `.stats-row`, `.card`, `.chart-container`).
+- **Utilities**: one-off rules (`.hidden`, `.truncate`, responsive helpers).
+
+**Responsive strategy**:
+- Container queries + two viewport breakpoints (1024px, 640px) replace five breakpoints.
+- Mobile layouts: stacked header, scrollable tabs, single-column stats, cards replace table rows.
+- Touch targets ≥44×44px; reduced padding on mobile.
+- No layout shift: skeleton placeholders match final size.
 
 ### Frontend State Machine
 
