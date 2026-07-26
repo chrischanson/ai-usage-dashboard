@@ -175,7 +175,7 @@ if status == 200:
     for pattern, msg in [
         ('.source-combined', '.source-combined class'),
         ('.source-agy', '.source-agy class'),
-        ('grid-template-areas', 'Board grid places the panels by area'),
+        ('.charts-section', 'Charts row: history beside the donut'),
         ('grid-template-columns: repeat(2, 1fr)', 'AGY 2-column grid'),
         ('@media (max-width: 1024px)', 'Responsive breakpoint at 1024px'),
         ('@container', 'Container queries drive component reflow'),
@@ -551,8 +551,8 @@ heading(24, 'Regression: Chart sizing')
 # canvas grows without limit, which is the regression this guard exists for.
 if 'maintainAspectRatio: false' in js:
     ok('Charts fill their panel (maintainAspectRatio disabled)')
-    if 'grid-template-rows' in css and '.board' in css:
-        ok('Chart panels are height-constrained by the board grid')
+    if '.chart-history,' in css and 'height: clamp(' in css:
+        ok('Chart panels have a definite height, so the canvas is bounded')
     else:
         fail('maintainAspectRatio:false without a height-constrained panel')
 else:
