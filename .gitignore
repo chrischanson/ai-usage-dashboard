@@ -5,8 +5,9 @@ __pycache__/
 .env
 venv/
 
-# Runtime databases
+# Runtime databases + poller lockfile
 *.db
+*.lock
 *.db.bak
 *.db-wal
 *.db-shm
