@@ -38,5 +38,7 @@ todo/
 implemented_plans/
 
 
-# Local agent config
-.claude/
+# Local agent config — keep .claude/skills and the shared plugin settings,
+# ignore only per-machine local state
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
