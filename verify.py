@@ -175,7 +175,7 @@ if status == 200:
     for pattern, msg in [
         ('.source-combined', '.source-combined class'),
         ('.source-agy', '.source-agy class'),
-        ('0.5fr 1fr 1fr 1fr 1fr', 'Combined 5-column grid with OpenCode half-width'),
+        ('grid-template-areas', 'Board grid places the panels by area'),
         ('grid-template-columns: repeat(2, 1fr)', 'AGY 2-column grid'),
         ('@media (max-width: 1024px)', 'Responsive breakpoint at 1024px'),
         ('@container', 'Container queries drive component reflow'),
@@ -545,10 +545,18 @@ else:
 
 # ── 24. Regression: Chart sizing ──
 heading(24, 'Regression: Chart sizing')
-if 'maintainAspectRatio' not in js:
-    ok('Charts use natural aspect ratio')
+# Charts fill a height-constrained panel rather than imposing their own aspect
+# ratio, so the dashboard fits one desktop viewport. That is only safe while the
+# panel actually bounds the height -- an unconstrained maintainAspectRatio:false
+# canvas grows without limit, which is the regression this guard exists for.
+if 'maintainAspectRatio: false' in js:
+    ok('Charts fill their panel (maintainAspectRatio disabled)')
+    if 'grid-template-rows' in css and '.board' in css:
+        ok('Chart panels are height-constrained by the board grid')
+    else:
+        fail('maintainAspectRatio:false without a height-constrained panel')
 else:
-    fail('Chart maintainAspectRatio should be removed')
+    fail('Charts should fill their panel via maintainAspectRatio: false')
 
 # ── 25. Regression: Combined chart timestamp tolerance ──
 heading(25, 'Regression: Combined chart timestamp matching')

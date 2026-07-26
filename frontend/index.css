@@ -121,12 +121,12 @@
     }
 
     .container {
-        max-width: 1280px;
+        max-width: 1400px;
         margin: 0 auto;
-        padding: 2rem 2.5rem;
+        padding: 1rem 1.75rem;
         display: grid;
         grid-template-columns: 1fr;
-        gap: 1.75rem;
+        gap: 0;
     }
 
     /* Header */
@@ -134,7 +134,7 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 1.75rem;
+        margin-bottom: 1rem;
         flex-wrap: wrap;
         gap: 0.75rem;
     }
@@ -319,8 +319,8 @@
     .stats-row {
         display: grid;
         grid-template-columns: 1fr;
-        gap: 1.25rem;
-        margin-bottom: 1.75rem;
+        gap: 1rem;
+        margin-bottom: 1rem;
         container-type: inline-size;
     }
 
@@ -331,7 +331,7 @@
 
     .stats-overview .section-title,
     .stats-quota .section-title {
-        margin-bottom: 0.75rem;
+        margin-bottom: 0.45rem;
     }
 
     /* NB: not `display: contents` — that would dissolve the grid below and let
@@ -359,7 +359,7 @@
     }
 
     .overview-cards .card {
-        padding: 1rem;
+        padding: 0.7rem 0.9rem;
         display: flex;
         flex-direction: column;
         justify-content: flex-start;
@@ -430,10 +430,10 @@
     /* Charts section with container queries */
     .charts-section {
         display: grid;
-        grid-template-columns: 2fr 1fr;
-        gap: 1.25rem;
+        grid-template-columns: 1fr;
+        gap: 1rem;
         margin-bottom: 0;
-        align-items: start;
+        min-height: 0;
     }
 
     .chart-container {
@@ -848,10 +848,10 @@
     /* Quota */
     .quota-cards {
         display: grid;
-        grid-auto-flow: column;
-        grid-auto-columns: minmax(180px, 1fr);
-        gap: 1rem;
-        overflow-x: auto;
+        grid-auto-flow: row;
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+        align-content: start;
     }
 
     .quota-column {
@@ -863,14 +863,14 @@
     .quota-group {
         background: var(--surface-2);
         border: 1px solid var(--edge);
-        border-radius: 10px;
-        padding: 1.25rem;
+        border-radius: 8px;
+        padding: 0.6rem 0.7rem;
     }
 
     .quota-group h3 {
-        font-size: 0.85rem;
+        font-size: 0.78rem;
         font-weight: 600;
-        margin-bottom: 0.75rem;
+        margin-bottom: 0.45rem;
         color: var(--ink);
         font-family: 'IBM Plex Sans', sans-serif;
     }
@@ -893,7 +893,7 @@
     }
 
     .quota-limit {
-        margin-bottom: 0.75rem;
+        margin-bottom: 0.4rem;
     }
 
     .quota-limit:last-child {
@@ -903,8 +903,10 @@
     .quota-limit-header {
         display: flex;
         justify-content: space-between;
-        font-size: 0.75rem;
-        margin-bottom: 0.35rem;
+        align-items: baseline;
+        gap: 0.5rem;
+        font-size: 0.7rem;
+        margin-bottom: 0.2rem;
     }
 
     .quota-limit-label {
@@ -954,10 +956,11 @@
     }
 
     .quota-refresh {
-        font-size: 0.65rem;
-        color: var(--ink-dim);
-        margin-top: 0.25rem;
-        opacity: 0.7;
+        font-size: 0.62rem;
+        color: var(--ink-faint);
+        font-family: 'IBM Plex Mono', monospace;
+        margin-left: 0.4rem;
+        font-weight: 400;
     }
 
     /* Error Banner — flat surface-2 with danger left edge */
@@ -1131,51 +1134,33 @@
         to   { opacity: 1; transform: none; }
     }
 
-    /* ── Cycle strip ───────────────────────────────────────────────────────
-       The signature element: the polling heartbeat, made visible. One tick per
-       expected cycle. Filled = the write landed. Hollow = it did not, and the
-       strip says so rather than smoothing the gap away. */
-    .cycle-strip {
+    /* ── Cycle meter (header) ──────────────────────────────────────────────
+       The polling heartbeat, compact: one tick per expected cycle, filled when
+       the write landed, hollow when it did not. It sits with the refresh
+       control because that is the other "how fresh is this" affordance. */
+    .cycle-meter {
         display: flex;
         align-items: center;
-        gap: 0.9rem;
-        padding: 0.6rem 0.95rem;
-        margin-bottom: 1.5rem;
-        background: var(--surface);
+        gap: 0.5rem;
+        padding: 0 0.6rem;
+        height: 34px;
         border: 1px solid var(--edge);
         border-radius: 8px;
+        background: var(--surface);
         font-family: 'IBM Plex Mono', monospace;
-        font-size: var(--text-caption);
+        font-size: 0.7rem;
         color: var(--ink-dim);
-    }
-
-    .cycle-strip-label {
-        text-transform: uppercase;
-        letter-spacing: 0.14em;
-        color: var(--ink-faint);
-        white-space: nowrap;
     }
 
     .cycle-ticks {
         display: flex;
         align-items: center;
-        gap: 4px;
-        flex: 1;
-        min-width: 0;
-        overflow: hidden;
-        /* a hairline the ticks sit on, so the row reads as a gauge */
-        padding-bottom: 3px;
-        border-bottom: 1px solid var(--line);
-        align-self: stretch;
-        margin-block: 0.1rem;
+        gap: 2px;
     }
 
-    /* A tick is a filled bar. Hollow means "we have no observation for this
-       cycle" — it is deliberately an outline, never a dimmer fill, so a gap
-       can't be mistaken for a small value. */
     .cycle-tick {
-        width: 6px;
-        height: 18px;
+        width: 3px;
+        height: 12px;
         border-radius: 1px;
         background: var(--signal);
         flex: 0 0 auto;
@@ -1192,8 +1177,6 @@
         border: 1px solid var(--signal);
     }
 
-    /* The newest tick pulses — this is the live sweep, and the only ambient
-       motion on the page. */
     .cycle-tick:last-child {
         animation: cycle-sweep 2.4s ease-in-out infinite;
     }
@@ -1203,23 +1186,200 @@
         50%      { opacity: 0.35; }
     }
 
-    .cycle-updated,
     .cycle-countdown {
         white-space: nowrap;
         font-variant-numeric: tabular-nums;
-    }
-
-    .cycle-countdown {
         color: var(--signal);
+        min-width: 3.4em;
+        text-align: right;
     }
 
-    .cycle-countdown.due {
+    .cycle-countdown.due { color: var(--ink-faint); }
+
+    /* ── Board ─────────────────────────────────────────────────────────────
+       history | quota   on row 1
+       models  | donut   on row 2
+       Grid rows make each pair exactly the same height, and vh-based tracks
+       keep the whole dashboard inside a desktop viewport without scrolling.
+       Panels that can outgrow their track scroll inside themselves. */
+    .board {
+        display: grid;
+        grid-template-columns: 1.55fr 0.72fr 0.95fr;
+        grid-template-areas:
+            "history history quota"
+            "models  donut   quota";
+        grid-template-rows: minmax(196px, 30vh) minmax(164px, 25vh);
+        gap: 0.85rem;
+        min-height: 0;
+    }
+
+    .board-history { grid-area: history; }
+    .board-quota   { grid-area: quota; }
+    .board-models  { grid-area: models; }
+    .board-donut   { grid-area: donut; }
+
+    .board > * { min-height: 0; min-width: 0; }
+
+    .board-history,
+    .board-history .chart-container,
+    .board-donut {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+
+    /* The canvas takes whatever the panel has left after its header. */
+    .board-history .chart-container canvas,
+    .board-donut canvas {
+        flex: 1;
+        min-height: 0;
+    }
+
+    .board-quota,
+    .board-models {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+    }
+
+    .board-quota .quota-cards,
+    .board-models .table-wrapper {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: var(--line) transparent;
+    }
+
+    /* A hairline thumb: these panels scroll, but the scrollbar shouldn't read
+       as a UI element competing with the data. */
+    .board-quota .quota-cards::-webkit-scrollbar,
+    .board-models .table-wrapper::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .board-quota .quota-cards::-webkit-scrollbar-track,
+    .board-models .table-wrapper::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .board-quota .quota-cards::-webkit-scrollbar-thumb,
+    .board-models .table-wrapper::-webkit-scrollbar-thumb {
+        background: var(--line);
+        border-radius: 3px;
+    }
+
+    .board-quota .quota-cards::-webkit-scrollbar-thumb:hover,
+    .board-models .table-wrapper::-webkit-scrollbar-thumb:hover {
+        background: var(--edge);
+    }
+
+    /* The chart tip sits with the title rather than under the canvas, where it
+       collided with the axis labels once the canvas started filling the panel. */
+    /* Inline with the title: a hint, not a line of layout. */
+    .chart-header .chart-tip {
+        margin: 0 auto 0 0.9rem;
+        font-size: 0.65rem;
         color: var(--ink-faint);
+        align-self: center;
+    }
+
+    .board-donut h2,
+    .board-models h2 {
+        margin-bottom: 0.6rem;
+    }
+
+
+    /* ── Density pass ──────────────────────────────────────────────────────
+       Everything below trades whitespace for fitting the whole dashboard into
+       one desktop viewport, which is the point of the board layout. */
+    /* Fixed layout so all six columns survive the narrower panel — Cost is
+       the column people came for, and auto layout was dropping it. */
+    .board-models table {
+        font-size: 0.72rem;
+        table-layout: fixed;
+        width: 100%;
+    }
+
+    .board-models th:nth-child(1), .board-models td:nth-child(1) { width: 38%; }
+    .board-models th:nth-child(2), .board-models td:nth-child(2) { width: 12%; }
+    .board-models th:nth-child(3), .board-models td:nth-child(3) { width: 12%; }
+    .board-models th:nth-child(4), .board-models td:nth-child(4) { width: 13%; }
+    .board-models th:nth-child(5), .board-models td:nth-child(5) { width: 10%; }
+    .board-models th:nth-child(6), .board-models td:nth-child(6) { width: 15%; }
+
+    .board-models th,
+    .board-models td {
+        padding: 0.26rem 0.45rem;
+        white-space: nowrap;
+    }
+
+    /* Only the name truncates. The source badge is identity, not decoration,
+       so it never gets clipped. */
+    .board-models .model-name { max-width: 100%; }
+
+    .board-models .model-name-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+    }
+
+    .board-models .model-name .badge { flex: 0 0 auto; }
+
+    .board-quota .quota-group { padding: 0.5rem 0.6rem; }
+    .board-quota .quota-group h3 { margin-bottom: 0.3rem; font-size: 0.74rem; }
+    .board-quota .quota-limit { margin-bottom: 0.3rem; }
+    .board-quota .quota-limit-header { font-size: 0.67rem; margin-bottom: 0.15rem; }
+    .board-quota .quota-meter { gap: 1px; }
+    .board-quota .meter-tick { height: 7px; }
+    .board-quota .quota-group { margin: 0; }
+    .board-quota .quota-cards { gap: 0.4rem; }
+    .board-quota .quota-subtitle { margin: 0.35rem 0 0.2rem; font-size: 0.62rem; }
+    .board-quota .section-title { margin-bottom: 0.5rem; }
+
+    .board-donut .chart-tip { display: none; }
+
+
+    /* Below 1024px the board stops being a board: one column, natural heights,
+       and the panels that scrolled internally stop doing so — on a short/narrow
+       screen the page scroll is the right scroll. */
+    @media (max-width: 1024px) {
+        .board {
+            grid-template-columns: 1fr;
+            grid-template-areas:
+                "history"
+                "quota"
+                "models"
+                "donut";
+            grid-template-rows: auto;
+        }
+
+        /* Size the CONTAINER, never the canvas: Chart.js writes inline
+           width/height on the canvas, so a stylesheet height on it loses. With
+           maintainAspectRatio:false and an auto-height parent it has nothing
+           bounding it and grows without limit (measured 4252px tall at 390px).
+           A definite parent height is what actually constrains it. */
+        .board-history { height: clamp(320px, 48vh, 460px); }
+        .board-donut   { height: clamp(300px, 44vh, 420px); }
+
+        /* "Scroll to zoom, drag to pan" is mouse advice, and it was wrapping the
+           chart title onto two lines. Pinch-zoom still works via hammer.js. */
+        .chart-header .chart-tip { display: none; }
+
+        .board-quota .quota-cards,
+        .board-models .table-wrapper {
+            overflow-y: visible;
+        }
+
+        .board-quota .quota-cards {
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        }
     }
 
     .footer {
         text-align: center;
-        margin-top: 2rem;
+        margin-top: 0.6rem;
         font-size: 0.75rem;
         color: var(--ink-dim);
     }
@@ -1475,7 +1635,4 @@
         }
     }
 
-    /* Required selector strings for CI checks */
-    .source-combined { }
-    0.5fr 1fr 1fr 1fr 1fr { }
 }

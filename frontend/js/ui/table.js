@@ -74,7 +74,7 @@ export function renderSortedModels() {
         const costDisplay = formatCost(m.cost);
         const costClass = (m.cost == null || m.cost === 0) ? 'model-cost muted' : 'model-cost';
         return `<tr>
-            <td><div class="model-name"><span class="model-color-dot" style="background:${m.color}"></span>${escapeHtml(m.model_name)}${m.badge}</div></td>
+            <td><div class="model-name"><span class="model-color-dot" style="background:${m.color}"></span><span class="model-name-text" title="${escapeHtml(m.model_name)}">${escapeHtml(m.model_name)}</span>${m.badge}</div></td>
             <td>${formatNum(m.input_tokens)}</td>
             <td>${formatNum(m.output_tokens)}</td>
             <td>${formatNum(m.total)}</td>

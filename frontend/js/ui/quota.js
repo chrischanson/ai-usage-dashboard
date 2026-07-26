@@ -2,7 +2,14 @@ import { formatCost, clampPct, escapeHtml } from '../format.js';
 
 export function renderMeterRow(label, valueText, pct, barColor, refreshStr) {
     const titleAttr = refreshStr ? ` title="${escapeHtml(refreshStr)}"` : '';
-    const refreshLine = refreshStr ? `<div class="quota-refresh">${escapeHtml(refreshStr)}</div>` : '';
+    // The reset time rides on the value line instead of taking a third line of
+    // its own — with ten meters on screen that alone cost ~140px of height.
+    const shortRefresh = refreshStr
+        ? String(refreshStr).replace(/^(Refreshes|Resets)\s+in\s+/i, '')
+        : '';
+    const refreshLine = shortRefresh
+        ? `<span class="quota-refresh">${escapeHtml(shortRefresh)}</span>`
+        : '';
 
     // Map old color names to new status classes
     const colorMap = { 'green': 'ok', 'amber': 'warn', 'red': 'danger' };
@@ -28,12 +35,11 @@ export function renderMeterRow(label, valueText, pct, barColor, refreshStr) {
         <div class="quota-limit">
             <div class="quota-limit-header">
                 <span class="quota-limit-label">${escapeHtml(label)}</span>
-                <span class="quota-limit-value">${valueText}</span>
+                <span class="quota-limit-value">${valueText}${refreshLine}</span>
             </div>
             <div class="quota-meter" role="meter" aria-valuenow="${Math.round(pct)}" aria-valuemin="0" aria-valuemax="100" aria-label="${escapeHtml(label)}"${titleAttr}>
                 ${ticksHtml}
             </div>
-            ${refreshLine}
         </div>
     `;
 }

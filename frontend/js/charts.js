@@ -92,18 +92,24 @@ export function renderModelChart(models) {
             const centerX = left + width / 2;
             const centerY = top + height / 2;
 
+            // Scale with the ring: a fixed 16px total overflowed the hole once
+            // the donut had to share a short panel with its legend.
+            const inner = Math.min(width, height) / 2 * 0.58;
+            const totalSize = Math.max(10, Math.min(18, inner * 0.36));
+            const capSize = Math.max(7, totalSize * 0.55);
+            if (inner < 22) return;   // no room to write in: draw nothing
+
             ctx.save();
-            ctx.font = '500 16px "IBM Plex Mono"';
-            ctx.fillStyle = tokens.ink;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
 
-            const text = formatNum(totalTokens);
-            ctx.fillText(text, centerX, centerY - 8);
+            ctx.font = `500 ${totalSize}px "IBM Plex Mono"`;
+            ctx.fillStyle = tokens.ink;
+            ctx.fillText(formatNum(totalTokens), centerX, centerY - capSize * 0.6);
 
-            ctx.font = '400 11px "IBM Plex Mono"';
+            ctx.font = `400 ${capSize}px "IBM Plex Mono"`;
             ctx.fillStyle = tokens.inkFaint;
-            ctx.fillText('tokens', centerX, centerY + 12);
+            ctx.fillText('tokens', centerX, centerY + totalSize * 0.62);
 
             ctx.restore();
         },
@@ -123,15 +129,17 @@ export function renderModelChart(models) {
         plugins: [centerTextPlugin],
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             plugins: {
                 legend: {
                     position: 'bottom',
                     align: 'start',
                     labels: {
-                        padding: 12,
-                        font: { size: 11 },
+                        padding: 7,
+                        font: { size: 10 },
                         color: tokens.inkDim,
-                        boxWidth: 10,
+                        boxWidth: 8,
+                        boxHeight: 8,
                     },
                 },
                 title: {
@@ -369,6 +377,7 @@ export function renderHistoryChart(history) {
         data: { labels, datasets },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             interaction: { intersect: false, mode: 'index' },
             scales: {
                 y: {

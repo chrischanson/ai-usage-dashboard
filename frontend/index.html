@@ -53,23 +53,20 @@
                     </span>
                     <span class="refresh-text" id="refresh-text">Refresh</span>
                 </button>
+                <!-- Poll cadence, compact: one tick per expected cycle (filled =
+                     the write landed, hollow = it did not) plus a countdown to
+                     the next expected write. -->
+                <div class="cycle-meter" id="cycle-strip" title="Polling cadence">
+                    <div class="status-indicator" id="status-indicator" role="status" aria-live="polite" aria-atomic="true">
+                        <span class="dot" aria-hidden="true"></span>
+                        <span id="status-text" class="visually-hidden">Live</span>
+                    </div>
+                    <div class="cycle-ticks" id="cycle-ticks" aria-hidden="true"></div>
+                    <span class="cycle-countdown" id="cycle-countdown" aria-hidden="true"></span>
+                    <span class="visually-hidden" id="cycle-summary" role="status" aria-live="polite"></span>
+                </div>
             </div>
         </header>
-
-        <!-- Cycle strip: the poller writes one aligned row per source every
-             `poll_interval_s`. Each tick is one expected cycle — filled when it
-             landed, hollow when it did not. Never invents a tick. -->
-        <div class="cycle-strip" id="cycle-strip">
-            <span class="cycle-strip-label">Cycles</span>
-            <div class="cycle-ticks" id="cycle-ticks" aria-hidden="true"></div>
-            <div class="status-indicator" id="status-indicator" role="status" aria-live="polite" aria-atomic="true">
-                <span class="dot" aria-hidden="true"></span>
-                <span id="status-text">Live</span>
-            </div>
-            <span class="cycle-updated" id="last-updated">Last updated: --</span>
-            <span class="cycle-countdown" id="cycle-countdown" aria-hidden="true"></span>
-            <span class="visually-hidden" id="cycle-summary" role="status" aria-live="polite"></span>
-        </div>
 
         <!-- Error Banner -->
         <div id="error-banner" class="error-banner" role="alert" hidden>
@@ -85,7 +82,6 @@
         </div>
 
         <main id="panel-main" role="tabpanel">
-            <!-- Overview + Quota Row -->
             <div class="stats-row">
                 <div class="stats-overview">
                     <h2 class="section-title">Overview <span id="time-range-label" class="section-subtitle"></span></h2>
@@ -116,57 +112,62 @@
                         </div>
                     </div>
                 </div>
-                <div class="stats-quota">
+            </div>
+
+            <!-- Desktop board: history | quota on the first row, models | donut
+                 on the second. Grid rows keep paired panels the same height. -->
+            <div class="board">
+                <section class="charts-section board-history">
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h2>Historical Token Usage</h2>
+                            <p class="chart-tip">Scroll to zoom, drag to pan, or double-click to reset.</p>
+                            <div class="mode-toggle" role="group" aria-label="Chart mode">
+                                <button class="mode-btn active" data-mode="total" aria-label="Total mode, stacked area chart">Total</button>
+                                <button class="mode-btn" data-mode="rate" aria-label="Rate mode, individual line graphs">Rate</button>
+                            </div>
+                        </div>
+                        <canvas id="historyChart" role="img" aria-label="Historical token usage over time. The Models table below lists the same figures."></canvas>
+                    </div>
+                </section>
+
+                <div class="stats-quota board-quota">
                     <h2 class="section-title" id="quota-title">Quota Limits</h2>
                     <div id="quota-cards" class="quota-cards">
                         <div class="skeleton skeleton-card" aria-label="Loading quota"></div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Charts -->
-            <section class="charts-section">
-                <div class="chart-container">
-                    <div class="chart-header">
-                        <h2>Historical Token Usage</h2>
-                        <div class="mode-toggle" role="group" aria-label="Chart mode">
-                            <button class="mode-btn active" data-mode="total" aria-label="Total mode, stacked area chart">Total</button>
-                            <button class="mode-btn" data-mode="rate" aria-label="Rate mode, individual line graphs">Rate</button>
-                        </div>
+                <section class="models-list board-models" aria-label="Model breakdown">
+                    <h2>Models</h2>
+                    <div class="table-wrapper">
+                        <table id="models-table">
+                            <thead>
+                                <tr>
+                                    <th data-sort="model_name" class="sortable sort-asc" scope="col">Model <span class="sort-arrow" aria-hidden="true"></span></th>
+                                    <th data-sort="input_tokens" class="sortable" scope="col">Input <span class="sort-arrow" aria-hidden="true"></span></th>
+                                    <th data-sort="output_tokens" class="sortable" scope="col">Output <span class="sort-arrow" aria-hidden="true"></span></th>
+                                    <th data-sort="total" class="sortable" scope="col">Total <span class="sort-arrow" aria-hidden="true"></span></th>
+                                    <th data-sort="pct" class="sortable" scope="col">% <span class="sort-arrow" aria-hidden="true"></span></th>
+                                    <th data-sort="cost" class="sortable" scope="col">Cost <span class="sort-arrow" aria-hidden="true"></span></th>
+                                </tr>
+                            </thead>
+                            <tbody id="models-tbody">
+                                <tr><td colspan="6"><div class="skeleton skeleton-text" aria-label="Loading models"></div></td></tr>
+                            </tbody>
+                        </table>
                     </div>
-                    <p class="chart-tip">Scroll to zoom, drag to pan, or double-click to reset.</p>
-                    <canvas id="historyChart" role="img" aria-label="Historical token usage over time. The Models table below lists the same figures."></canvas>
-                </div>
-                <div class="chart-container">
+                </section>
+
+                <div class="chart-container board-donut">
                     <h2>Model Distribution</h2>
                     <canvas id="modelChart" role="img" aria-label="Share of tokens by model. The Models table below lists the same figures."></canvas>
                 </div>
-            </section>
-
-            <!-- Model Breakdown -->
-            <section class="models-list" aria-label="Model breakdown">
-                <h2>Models</h2>
-                <div class="table-wrapper">
-                    <table id="models-table">
-                        <thead>
-                            <tr>
-                                <th data-sort="model_name" class="sortable sort-asc" scope="col">Model <span class="sort-arrow" aria-hidden="true"></span></th>
-                                <th data-sort="input_tokens" class="sortable" scope="col">Input <span class="sort-arrow" aria-hidden="true"></span></th>
-                                <th data-sort="output_tokens" class="sortable" scope="col">Output <span class="sort-arrow" aria-hidden="true"></span></th>
-                                <th data-sort="total" class="sortable" scope="col">Total <span class="sort-arrow" aria-hidden="true"></span></th>
-                                <th data-sort="pct" class="sortable" scope="col">% <span class="sort-arrow" aria-hidden="true"></span></th>
-                                <th data-sort="cost" class="sortable" scope="col">Cost <span class="sort-arrow" aria-hidden="true"></span></th>
-                            </tr>
-                        </thead>
-                        <tbody id="models-tbody">
-                            <tr><td colspan="6"><div class="skeleton skeleton-text" aria-label="Loading models"></div></td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </section>
+            </div>
         </main>
 
         <footer class="footer">
+            <span id="last-updated">Last updated: --</span>
             <span id="footer-note"></span>
         </footer>
     </div>
