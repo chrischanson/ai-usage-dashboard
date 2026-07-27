@@ -108,12 +108,20 @@ class Poller:
             if entry.quota_collector:
                 self._poll_quota_source(conn, cycle_ts, name, entry.quota_collector)
 
-        # NOTE: reconcile_model_sums() is deliberately NOT called here.
-        # Introducing an 'Unattributed' row for new cycles only would create a
-        # one-time phantom delta the size of the whole historical gap (~50M),
-        # because the row is absent at cycle N-1 and present at N. It is only
-        # safe to enable alongside a full backfill of history, so it stays an
-        # explicit operation rather than something the poller does silently.
+        # Keep the 'Unattributed' series continuous for any source that already
+        # carries one. Totals are derived as deltas, so a row that appears on
+        # some cycles and not others produces a phantom spike where it appears
+        # and a clamped drop where it vanishes. Sources without the series are
+        # untouched — this never introduces it, only maintains it, which is why
+        # enabling it required the one-time history backfill first.
+        try:
+            from integrity import (backfill_unattributed,
+                                   sources_with_attribution_series)
+            existing = sources_with_attribution_series(conn)
+            if existing:
+                backfill_unattributed(conn, sources=existing, cycle_ts=cycle_ts)
+        except Exception as e:
+            print(f"[poller] attribution upkeep error: {e}")
 
         prune(conn, self.cfg.retention_days)
 

@@ -39,10 +39,20 @@ export function computeModelsFromHistory(history, range) {
         if (!data || data.length < 2) return null;
         const filtered = filterByTimeRange(data, range);
         if (filtered.length < 2) return null;
-        const first = filtered[0];
         const last = filtered[filtered.length - 1];
+
+        // Baseline each model at its EARLIEST reading inside the window, not at
+        // the window's first cycle. A model that starts being reported partway
+        // through is absent from cycle 0, and treating that absence as a zero
+        // baseline charges its entire lifetime total to this window — one model
+        // showed 19.89M of "usage in the last day" against a real daily total
+        // of 3.08M. Only growth observed inside the window counts.
         const firstModels = {};
-        (first.models || []).forEach(function(m) { firstModels[m.model_name] = m; });
+        for (const row of filtered) {
+            (row.models || []).forEach(function(m) {
+                if (!(m.model_name in firstModels)) firstModels[m.model_name] = m;
+            });
+        }
         const deltas = [];
         (last.models || []).forEach(function(m) {
             const prev = firstModels[m.model_name] || {};

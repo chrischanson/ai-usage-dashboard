@@ -109,6 +109,106 @@ def reconcile_model_sums(conn: sqlite3.Connection, source: str = None,
     }
 
 
+def sources_needing_attribution(conn: sqlite3.Connection) -> set:
+    """Sources whose model rows fall short of the source row by more than
+    check_integrity's tolerance on at least one cycle.
+
+    Membership is per-source and all-or-nothing on purpose. The 'Unattributed'
+    row must exist on EVERY cycle of a source that needs it: totals are derived
+    as deltas, so a row that appears on some cycles and not others produces a
+    phantom spike where it appears and a clamped drop where it vanishes — the
+    same artifact as a gap rendering as a dip.
+    """
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT h.source,
+               h.input_tokens + h.output_tokens AS s_total,
+               COALESCE(SUM(m.input_tokens + m.output_tokens), 0) AS m_total
+        FROM usage_history h
+        LEFT JOIN model_usage m
+               ON m.source = h.source AND m.cycle_ts = h.cycle_ts
+              AND m.model_name != 'Unattributed'
+        GROUP BY h.source, h.cycle_ts
+    """)
+    needy = set()
+    for r in cursor.fetchall():
+        s_total = r['s_total'] or 0
+        if not s_total:
+            continue
+        if (s_total - (r['m_total'] or 0)) > max(1000, 0.10 * s_total):
+            needy.add(r['source'])
+    return needy
+
+
+def sources_with_attribution_series(conn: sqlite3.Connection) -> set:
+    """Sources that already carry an 'Unattributed' series in history.
+
+    The poller uses this rather than re-deriving need each cycle: once a source
+    has the series it must keep getting a row every cycle, or the series breaks
+    and the delta artifacts come back.
+    """
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT DISTINCT source FROM model_usage WHERE model_name='Unattributed'")
+    return {r['source'] for r in cursor.fetchall()}
+
+
+def backfill_unattributed(conn: sqlite3.Connection, sources=None,
+                          cycle_ts: int = None) -> dict:
+    """One-time history pass: give every cycle of every needing source an
+    'Unattributed' row, so the series is continuous end to end.
+
+    Writes a row even when that cycle's gap is zero. A zero row contributes a
+    zero delta and keeps the series unbroken, which is the whole point.
+    """
+    if sources is None:
+        sources = sources_needing_attribution(conn)
+    if not sources:
+        return {'sources': [], 'cycles_written': 0}
+
+    cursor = conn.cursor()
+    written = 0
+    marks = ','.join('?' * len(sources))
+    params = list(sorted(sources))
+    cycle_clause = ''
+    if cycle_ts is not None:
+        cycle_clause = ' AND h.cycle_ts = ?'
+        params.append(cycle_ts)
+    cursor.execute(f"""
+        SELECT h.source, h.cycle_ts,
+               h.input_tokens AS s_in, h.output_tokens AS s_out, h.cache_read AS s_cache,
+               COALESCE(SUM(m.input_tokens), 0)  AS m_in,
+               COALESCE(SUM(m.output_tokens), 0) AS m_out,
+               COALESCE(SUM(m.cache_read), 0)    AS m_cache
+        FROM usage_history h
+        LEFT JOIN model_usage m
+               ON m.source = h.source AND m.cycle_ts = h.cycle_ts
+              AND m.model_name != 'Unattributed'
+        WHERE h.source IN ({marks}){cycle_clause}
+        GROUP BY h.source, h.cycle_ts
+    """, tuple(params))
+
+    for r in cursor.fetchall():
+        d_in = max(0, (r['s_in'] or 0) - (r['m_in'] or 0))
+        d_out = max(0, (r['s_out'] or 0) - (r['m_out'] or 0))
+        d_cache = max(0, (r['s_cache'] or 0) - (r['m_cache'] or 0))
+        ts_str = datetime.fromtimestamp(r['cycle_ts'], tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+        conn.execute(
+            "INSERT INTO model_usage (timestamp, source, cycle_ts, model_name, messages,"
+            " input_tokens, output_tokens, cache_read, cache_write, cost)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?)"
+            " ON CONFLICT(source, cycle_ts, model_name) DO UPDATE SET"
+            "   input_tokens=excluded.input_tokens,"
+            "   output_tokens=excluded.output_tokens,"
+            "   cache_read=excluded.cache_read",
+            (ts_str, r['source'], r['cycle_ts'], 'Unattributed', 0,
+             d_in, d_out, d_cache, 0, 0.0))
+        written += 1
+
+    conn.commit()
+    return {'sources': sorted(sources), 'cycles_written': written}
+
+
 def _capped_warnings(findings, formatter, label):
     """Render at most _WARNING_CAP warning lines for a findings list
     (assumed ordered oldest->newest; the most recent ones are shown), plus a
