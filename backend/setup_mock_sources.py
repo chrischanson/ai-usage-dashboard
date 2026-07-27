@@ -75,6 +75,10 @@ def setup_mock_agy_quota():
     dbmod.init_schema(conn)
     cycle_ts = int(time.time())
     dbmod.record_quota(conn, 'agy', cycle_ts, {
+        # The plan badge comes from the same live RPC that can't run in CI, so
+        # seed it here too. Without it /api/quota/latest returns agy with no
+        # `_plan` and verify.py's plan-badge check fails.
+        '_plan': 'Gemini Code Assist',
         'gemini_models': {
             'weekly_limit': {'used': 20.0, 'total': 100.0, 'remaining_pct': 80.0, 'refreshes_in': 500000},
             'five_hour_limit': {'used': 5.0, 'total': 100.0, 'remaining_pct': 95.0, 'refreshes_in': 15000},
@@ -207,7 +211,53 @@ def setup_mock_opencode(bin_dir):
         print(f"  Not running under GitHub Actions — add {bin_dir} to PATH yourself if testing locally")
 
 
+def _refuse_outside_ci():
+    """Refuse to run anywhere that isn't a disposable CI runner.
+
+    This script is destructive against $HOME. It deletes and recreates
+    ~/.codex/state_5.sqlite, ~/.codex/logs_2.sqlite and ~/.codex/auth.json
+    (destroying real OpenAI credentials), and drops fake conversation DBs into
+    ~/.gemini/*/conversations/ where the AGY parser will count them as real
+    usage. None of it is backed up, and none of it is recoverable.
+
+    On 2026-07-26 that happened on a developer machine: real Codex auth and
+    logs were destroyed, and a poll ingested 90,000 fabricated AGY tokens into
+    the live database before the mocks were removed. The script did print
+    "Not running under GitHub Actions" — but only after it had already
+    overwritten everything, which is no guard at all.
+
+    So: bail out first, and make the override explicit and awkward to type.
+    """
+    if os.environ.get('GITHUB_ACTIONS') == 'true':
+        return
+    if os.environ.get('USAGE_ALLOW_DESTRUCTIVE_HOME_MOCKS') == 'yes-i-am-in-a-sandbox':
+        print("  ! override set — writing mocks into HOME=%s" % os.path.expanduser('~'))
+        return
+
+    sys.stderr.write(
+        "\nREFUSING TO RUN: this script overwrites real files in your home directory.\n"
+        f"  HOME is currently {os.path.expanduser('~')}\n\n"
+        "  It will DELETE and replace:\n"
+        "    ~/.codex/auth.json         (your real OpenAI credentials)\n"
+        "    ~/.codex/state_5.sqlite\n"
+        "    ~/.codex/logs_2.sqlite\n"
+        "  and add fake conversation DBs under:\n"
+        "    ~/.gemini/antigravity-{cli,ide}/conversations/conv_test.db\n"
+        "  which the AGY parser will then count as real usage.\n\n"
+        "  It is meant for a disposable GitHub Actions runner only.\n\n"
+        "  To run it locally, isolate HOME first — e.g.\n"
+        "    bwrap --dev-bind / / --bind $(mktemp -d) \"$HOME\" \\\n"
+        "      env USAGE_ALLOW_DESTRUCTIVE_HOME_MOCKS=yes-i-am-in-a-sandbox \\\n"
+        "      python3 backend/setup_mock_sources.py\n\n"
+    )
+    return 2
+
+
 def main():
+    refused = _refuse_outside_ci()
+    if refused:
+        return refused
+
     print("Setting up mock source files for CI...")
     if os.path.exists(os.path.join(os.path.dirname(__file__), '.ci_mocks')):
         shutil.rmtree(os.path.join(os.path.dirname(__file__), '.ci_mocks'))
