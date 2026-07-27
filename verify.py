@@ -401,17 +401,22 @@ if status == 200:
 else:
     fail('index.css check')
 
-# ── 14. Regression: Sessions/Messages same row ──
-heading(14, 'Regression: Sessions/Messages layout')
+# ── 14. Overview: one card per metric ──
+heading(14, 'Overview: one card per metric')
+# Sessions/Messages and Input/Output used to share a card, two figures either
+# side of a slash. Each metric now gets its own box, so the old card-row check
+# is replaced by one that every metric is present and separately carded.
 html, _ = get('/static/index.html')
-if 'class="card-row"' in html:
-    ok('Sessions/Messages uses card-row flex layout')
-else:
-    fail('Sessions/Messages card-row missing')
-if '<p id="total-messages"' in html:
-    fail('total-messages is still a <p> element')
-else:
-    ok('total-messages is not a <p> (uses card-row)')
+for card_id, value_id in (('card-sessions', 'total-sessions'),
+                          ('card-messages', 'total-messages'),
+                          ('card-input', 'input-tokens'),
+                          ('card-output', 'output-tokens'),
+                          ('card-cache', 'cache-reads'),
+                          ('card-cost', 'total-cost')):
+    if f'id="{card_id}"' in html and f'id="{value_id}"' in html:
+        ok(f'Overview: {value_id} has its own card')
+    else:
+        fail(f'Overview: {value_id} card missing')
 
 # ── 15. Regression: XSS prevention ──
 heading(15, 'Regression: XSS prevention')
@@ -462,8 +467,8 @@ if '@media (max-width: 640px)' in css:
 else:
     fail('Mobile breakpoint at 640px missing')
 for pattern, msg in [
-    ('.card-row', 'card-row CSS defined'),
-    ('.card-sep', 'card-sep CSS defined'),
+    ('.overview-cards', 'overview card grid defined'),
+    ('grid-template-rows', 'overview grid sets explicit rows'),
     ('overflow-x: auto', 'Tabs horizontally scrollable on mobile'),
     ('.charts-section', 'Charts section mobile override'),
 ]:

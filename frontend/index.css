@@ -344,11 +344,13 @@
     /* Overview cards (KPI strip - 4 across on desktop) */
     /* Two-up: the overview shares its row with the quota rail, so four across
        would overflow the column. */
+    /* Six single-metric cards, two across. Each figure gets its own box so
+       nothing has to share a line with a slash between it. */
     .overview-cards {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        grid-template-rows: repeat(2, 1fr);
-        gap: 0.75rem;
+        grid-template-rows: repeat(3, 1fr);
+        gap: 0.6rem;
     }
 
     .overview-cards .card {
@@ -385,22 +387,6 @@
         color: var(--ink);
         margin-top: 0.25rem;
         font-variant-numeric: tabular-nums;
-    }
-
-    .card-row {
-        display: flex;
-        align-items: baseline;
-        gap: 0.4rem;
-        font-size: var(--text-kpi);
-        font-weight: 500;
-        color: var(--ink);
-        font-family: 'IBM Plex Mono', monospace;
-        font-variant-numeric: tabular-nums;
-    }
-
-    .card-sep {
-        color: var(--ink-dim);
-        font-weight: 400;
     }
 
     /* Section titles */
@@ -1192,7 +1178,7 @@
        than leaving a gap under themselves. */
     .stats-row {
         display: grid;
-        grid-template-columns: 1.35fr 1fr;
+        grid-template-columns: 1fr 1.28fr;
         gap: 1rem;
         margin-bottom: 1rem;
         align-items: stretch;
