@@ -131,11 +131,15 @@
                             <button class="mode-btn" data-mode="rate" aria-label="Rate mode, individual line graphs">Rate</button>
                         </div>
                     </div>
-                    <canvas id="historyChart" role="img" aria-label="Historical token usage over time. The Models table below lists the same figures."></canvas>
+                    <div class="chart-canvas">
+                        <canvas id="historyChart" role="img" aria-label="Historical token usage over time. The Models table below lists the same figures."></canvas>
+                    </div>
                 </div>
                 <div class="chart-container chart-donut">
                     <h2>Model Distribution</h2>
-                    <canvas id="modelChart" role="img" aria-label="Share of tokens by model. The Models table below lists the same figures."></canvas>
+                    <div class="chart-canvas">
+                        <canvas id="modelChart" role="img" aria-label="Share of tokens by model. The Models table below lists the same figures."></canvas>
+                    </div>
                 </div>
             </section>
 

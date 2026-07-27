@@ -347,15 +347,15 @@
     .overview-cards {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
+        grid-template-rows: repeat(2, 1fr);
         gap: 0.75rem;
-        align-items: start;
-        align-content: start;
     }
 
     .overview-cards .card {
         padding: 0.7rem 0.9rem;
         display: flex;
         flex-direction: column;
+        justify-content: center;
         justify-content: flex-start;
     }
 
@@ -1187,12 +1187,15 @@
 
     /* ── Rows ──────────────────────────────────────────────────────────────
        overview | quota      history | donut      models (full width) */
+    /* Overview and quota are one row and read as one band, so they match
+       height: the KPI cards grow into whatever the quota rail needs rather
+       than leaving a gap under themselves. */
     .stats-row {
         display: grid;
         grid-template-columns: 1.35fr 1fr;
         gap: 1rem;
         margin-bottom: 1rem;
-        align-items: start;
+        align-items: stretch;
         container-type: inline-size;
     }
 
@@ -1215,10 +1218,21 @@
         height: clamp(280px, 38vh, 400px);
     }
 
-    .chart-history canvas,
-    .chart-donut canvas {
+    /* Chart.js's documented sizing pattern: a relatively-positioned wrapper
+       owns the height, and the canvas fills it. Putting flex:1 on the canvas
+       instead makes the rendered box disagree with the bitmap Chart.js sized
+       (measured 460x292 bitmap in a 461x257 box), and the drawing is scaled
+       non-uniformly into it — which is why the donut rendered as an ellipse. */
+    .chart-canvas {
+        position: relative;
         flex: 1;
         min-height: 0;
+        width: 100%;
+    }
+
+    .chart-canvas canvas {
+        position: absolute;
+        inset: 0;
     }
 
     .models-list .table-wrapper {
