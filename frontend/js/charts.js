@@ -201,7 +201,14 @@ export function renderHistoryChart(history) {
 
         // Forward-fill: for each unified timestamp, carry forward the last known
         // value from each source so gaps don't cause dips in stacked charts.
-        const MS_TOLERANCE = 30 * 60 * 1000; // 30 minutes
+        //
+        // There is no time limit on the carry. These are LIFETIME CUMULATIVE
+        // counters: when a source stops reporting, its total does not fall to
+        // zero, it simply stops growing. Dropping the series to 0 across a gap
+        // renders a cliff in the stacked chart that reads as "all that usage
+        // disappeared", which is the one thing the number can't mean. A
+        // previous 30-minute tolerance meant any outage longer than three poll
+        // cycles punched a visible hole in the history.
         function buildFilledLookup(data) {
             const lookup = new Map();
             let lastEntry = null;
@@ -218,12 +225,11 @@ export function renderHistoryChart(history) {
                         break;
                     }
                 }
-                // Only use if within tolerance of a real data point
+                // Carry the last known reading forward for as long as the gap
+                // lasts. Before the source's first observation lastEntry is
+                // still null, so it contributes nothing rather than a fake zero.
                 if (lastEntry) {
-                    const lastTs = parseTs(lastEntry.timestamp);
-                    if (lastTs && Math.abs(lastTs.getTime() - t) <= MS_TOLERANCE) {
-                        lookup.set(ts, lastEntry);
-                    }
+                    lookup.set(ts, lastEntry);
                 }
             }
             return lookup;

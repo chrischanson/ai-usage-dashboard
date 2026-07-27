@@ -108,15 +108,12 @@ class Poller:
             if entry.quota_collector:
                 self._poll_quota_source(conn, cycle_ts, name, entry.quota_collector)
 
-        # Reconcile the model breakdown against the source totals for the cycle
-        # just written. Runs here, once per cycle, rather than inside
-        # check_integrity — /metrics is served on every dashboard refresh and
-        # must stay read-only.
-        try:
-            from integrity import reconcile_model_sums
-            reconcile_model_sums(conn, cycle_ts=cycle_ts)
-        except Exception as e:
-            print(f"[poller] reconcile error: {e}")
+        # NOTE: reconcile_model_sums() is deliberately NOT called here.
+        # Introducing an 'Unattributed' row for new cycles only would create a
+        # one-time phantom delta the size of the whole historical gap (~50M),
+        # because the row is absent at cycle N-1 and present at N. It is only
+        # safe to enable alongside a full backfill of history, so it stays an
+        # explicit operation rather than something the poller does silently.
 
         prune(conn, self.cfg.retention_days)
 

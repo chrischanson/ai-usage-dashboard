@@ -569,18 +569,24 @@ if 'buildFilledLookup' in js:
     ok('Combined chart uses forward-fill timestamp matching')
 else:
     fail('Combined chart missing buildFilledLookup function')
-if 'MS_TOLERANCE' in js:
-    ok('Combined chart has MS_TOLERANCE tolerance window')
+# The old 30-minute MS_TOLERANCE is deliberately gone. These are lifetime
+# cumulative counters: when a source stops reporting its total does not fall to
+# zero, so any outage longer than three poll cycles punched a visible hole in
+# the stacked chart. The carry is now unbounded.
+if 'MS_TOLERANCE' not in js:
+    ok('No bounded forward-fill window (cumulative counters carry indefinitely)')
 else:
-    fail('Combined chart missing MS_TOLERANCE')
+    fail('MS_TOLERANCE reintroduced — gaps will render as dips again')
 if 'list.find(d => d.timestamp === ts)' not in js and 'list.find(d.timestamp' not in js.replace(' ', ''):
     ok('No exact timestamp === match in combined chart')
 else:
     fail('Combined chart still uses exact timestamp match')
-if 'Math.abs(lastTs.getTime() - t) <= MS_TOLERANCE' in js:
-    ok('buildFilledLookup returns null when outside tolerance window')
+# Before a source's first observation lastEntry is still null, so it must
+# contribute nothing rather than a fabricated zero.
+if 'if (lastEntry) {' in js:
+    ok('buildFilledLookup carries the last reading and skips pre-first-observation')
 else:
-    fail('buildFilledLookup missing tolerance boundary check')
+    fail('buildFilledLookup missing the lastEntry guard')
 
 # ── 26. Regression: Model panel respects time range ──
 heading(26, 'Regression: Model panel respects time range')
