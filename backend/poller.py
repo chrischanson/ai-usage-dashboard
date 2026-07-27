@@ -108,6 +108,16 @@ class Poller:
             if entry.quota_collector:
                 self._poll_quota_source(conn, cycle_ts, name, entry.quota_collector)
 
+        # Reconcile the model breakdown against the source totals for the cycle
+        # just written. Runs here, once per cycle, rather than inside
+        # check_integrity — /metrics is served on every dashboard refresh and
+        # must stay read-only.
+        try:
+            from integrity import reconcile_model_sums
+            reconcile_model_sums(conn, cycle_ts=cycle_ts)
+        except Exception as e:
+            print(f"[poller] reconcile error: {e}")
+
         prune(conn, self.cfg.retention_days)
 
     def _loop(self):

@@ -285,8 +285,12 @@ class AgyParser(Parser):
             )
 
         if active_state is None:
+            files_with_seen = {}
+            for path, usage in current_files.items():
+                files_with_seen[path] = dict(usage)
+                files_with_seen[path]['seen'] = 1
             active_state = {
-                'files': current_files,
+                'files': files_with_seen,
                 'cumulative': {
                     'sessions': len(current_files),
                     'messages': len(current_files),
@@ -317,18 +321,35 @@ class AgyParser(Parser):
                 m = fval.get('model', '')
                 if m.startswith(('used_', 'use_', 'enable-', 'disable-')) or 'used_claude' in m:
                     fval['model'] = 'Gemini 3.5 Flash (Low)'
-            cum['models'] = {}
-            for usage in current_files.values():
-                model = usage['model']
-                if model.startswith(('used_', 'use_', 'enable-', 'disable-')) or 'used_claude' in model:
-                    model = 'Gemini 3.5 Flash (Low)'
-                m_cum = cum['models'].setdefault(model, {
-                    'messages': 0, 'input_tokens': 0, 'output_tokens': 0, 'cache_read': 0
-                })
-                m_cum['messages'] += 1
-                m_cum['input_tokens'] += usage['input_tokens']
-                m_cum['output_tokens'] += usage['output_tokens']
-                m_cum['cache_read'] += usage['cache_read']
+            # Remap stale keys in-place, preserving accumulated totals
+            target = 'Gemini 3.5 Flash (Low)'
+            for bad_key in stale_keys:
+                dst = cum['models'].setdefault(target, {'messages': 0, 'input_tokens': 0, 'output_tokens': 0, 'cache_read': 0})
+                for f in ('messages', 'input_tokens', 'output_tokens', 'cache_read'):
+                    dst[f] += cum['models'][bad_key][f]
+                del cum['models'][bad_key]
+
+        # Handle files that disappear: if a file was seen < 2 times,
+        # un-retire it from cumulative (it was never established as real)
+        for path, prev in prev_files.items():
+            if path not in current_files:
+                # File has disappeared. Treat missing 'seen' as established (large number).
+                seen_count = prev.get('seen', 999999)
+                if seen_count < 2:
+                    # This file never proved it was real; subtract its contribution
+                    cum['sessions'] = max(0, cum['sessions'] - 1)
+                    cum['messages'] = max(0, cum['messages'] - 1)
+                    cum['input_tokens'] = max(0, cum['input_tokens'] - prev.get('input_tokens', 0))
+                    cum['output_tokens'] = max(0, cum['output_tokens'] - prev.get('output_tokens', 0))
+                    cum['cache_read'] = max(0, cum['cache_read'] - prev.get('cache_read', 0))
+
+                    # Also subtract from the model's cumulative
+                    model = prev.get('model', '')
+                    if model in cum['models']:
+                        cum['models'][model]['messages'] = max(0, cum['models'][model]['messages'] - 1)
+                        cum['models'][model]['input_tokens'] = max(0, cum['models'][model]['input_tokens'] - prev.get('input_tokens', 0))
+                        cum['models'][model]['output_tokens'] = max(0, cum['models'][model]['output_tokens'] - prev.get('output_tokens', 0))
+                        cum['models'][model]['cache_read'] = max(0, cum['models'][model]['cache_read'] - prev.get('cache_read', 0))
 
         delta_sessions = 0
         delta_messages = 0
@@ -380,7 +401,17 @@ class AgyParser(Parser):
             m_cum['output_tokens'] += md['output_tokens']
             m_cum['cache_read'] += md['cache_read']
 
-        active_state['files'] = current_files
+        # Update 'seen' counter for each file in current state
+        files_with_seen = {}
+        for path, usage in current_files.items():
+            files_with_seen[path] = dict(usage)
+            if path in prev_files and 'seen' in prev_files[path]:
+                # File was present before; increment its seen count
+                files_with_seen[path]['seen'] = prev_files[path]['seen'] + 1
+            else:
+                # New file; start at 1
+                files_with_seen[path]['seen'] = 1
+        active_state['files'] = files_with_seen
 
         res = ParserResult(
             sessions=cum['sessions'],

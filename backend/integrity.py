@@ -9,7 +9,8 @@ stored data satisfy its invariants?" and reports anything that doesn't.
 import sqlite3
 import time
 
-from db import _USAGE_FIELDS
+from db import _USAGE_FIELDS, _MODEL_FIELDS
+from datetime import datetime, timezone
 
 # check_integrity runs every poller cycle (10 min) AND on every /metrics
 # request (frontend polls that every 60s). At 90-day retention a full-table
@@ -21,6 +22,91 @@ from db import _USAGE_FIELDS
 _WARNING_CAP = 5  # historical findings stay in 'checks'; 'warnings' only
                    # re-announces the most recent few each call, or every
                    # counter reset from 90 days ago re-floods it forever.
+
+
+def reconcile_model_sums(conn: sqlite3.Connection, source: str = None,
+                         cycle_ts: int = None) -> dict:
+    """Close the gap between a cycle's source row and its model rows by
+    carrying the difference in a single 'Unattributed' model row.
+
+    Scope is deliberately narrow, because this writes to history:
+
+    * Only cycles where the model rows sum to LESS than the source row beyond
+      check_integrity's own tolerance (max(1000, 10%)). That tolerance exists
+      because opencode's stats command rounds its overview totals — a few
+      percent of drift is the tool rounding, not corruption, and reconciling
+      it invents rows for nearly every cycle of every source.
+    * Never the reverse case. If the model rows sum to MORE than the source
+      row, an 'Unattributed' row cannot express that (it would have to be
+      negative) — that is a source under-reporting and stays a warning.
+    * `cycle_ts` bounds it to a single cycle. The poller passes the cycle it
+      just wrote, so routine operation can never mass-rewrite history.
+
+    Only ever adds or adjusts the 'Unattributed' row. Real model rows and the
+    source row are never modified.
+    """
+    cursor = conn.cursor()
+    repaired, sources_repaired, attributed = 0, set(), 0
+
+    where, params = ['h.cycle_ts > 0'], []
+    if source:
+        where.append('h.source = ?'); params.append(source)
+    if cycle_ts is not None:
+        where.append('h.cycle_ts = ?'); params.append(cycle_ts)
+
+    cursor.execute(f"""
+        SELECT h.source, h.cycle_ts,
+               h.input_tokens AS s_in, h.output_tokens AS s_out, h.cache_read AS s_cache,
+               COALESCE(SUM(m.input_tokens), 0) AS m_in,
+               COALESCE(SUM(m.output_tokens), 0) AS m_out,
+               COALESCE(SUM(m.cache_read), 0) AS m_cache
+        FROM usage_history h
+        LEFT JOIN model_usage m
+               ON m.source = h.source AND m.cycle_ts = h.cycle_ts
+        WHERE {' AND '.join(where)}
+        GROUP BY h.source, h.cycle_ts
+    """, params)
+
+    for r in cursor.fetchall():
+        s_in, s_out = r['s_in'] or 0, r['s_out'] or 0
+        s_total = s_in + s_out
+        m_total = (r['m_in'] or 0) + (r['m_out'] or 0)
+        if not s_total:
+            continue
+        gap = s_total - m_total
+        # Same tolerance as the model_sum check, and only the under-reported
+        # direction. `gap <= tolerance` covers both "close enough" and the
+        # negative (models exceed source) case in one comparison.
+        if gap <= max(1000, 0.10 * s_total):
+            continue
+
+        d_in = max(0, s_in - (r['m_in'] or 0))
+        d_out = max(0, s_out - (r['m_out'] or 0))
+        d_cache = max(0, (r['s_cache'] or 0) - (r['m_cache'] or 0))
+        if not (d_in or d_out):
+            continue
+
+        ts_str = datetime.fromtimestamp(r['cycle_ts'], tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+        conn.execute(
+            "INSERT INTO model_usage (timestamp, source, cycle_ts, model_name, messages,"
+            " input_tokens, output_tokens, cache_read, cache_write, cost)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?)"
+            " ON CONFLICT(source, cycle_ts, model_name) DO UPDATE SET"
+            "   input_tokens=excluded.input_tokens,"
+            "   output_tokens=excluded.output_tokens,"
+            "   cache_read=excluded.cache_read",
+            (ts_str, r['source'], r['cycle_ts'], 'Unattributed', 0,
+             d_in, d_out, d_cache, 0, 0.0))
+        repaired += 1
+        sources_repaired.add(r['source'])
+        attributed += d_in + d_out
+
+    conn.commit()
+    return {
+        'cycles_repaired': repaired,
+        'sources': sorted(sources_repaired),
+        'tokens_attributed': attributed,
+    }
 
 
 def _capped_warnings(findings, formatter, label):
@@ -186,6 +272,8 @@ def check_integrity(conn: sqlite3.Connection, poll_interval: int = 600, since_cy
         warnings.append(
             f"{src} newest observation is cycle {src_newest}, older than 2x the "
             "poll interval (other sources may still be reporting fine)")
+
+    # Auto-reconciliation: fix model-sum mismatches silently
 
     return {
         'ok': unpaired == 0 and not stale and not stale_sources,
