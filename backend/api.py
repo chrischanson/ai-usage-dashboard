@@ -10,9 +10,7 @@ from fastapi.responses import RedirectResponse, JSONResponse
 from db import latest_usage, history, latest_quota, metrics
 from db import connect as _db_connect, DB_PATH, init_schema
 from util import parse_iso_seconds
-from source_registry import get_all_names
-
-_VALID_SOURCES = set(get_all_names())
+from source_registry import get_all_names, is_valid_source
 
 
 def error_response(code: str, message: str, status: int = 400):
@@ -145,7 +143,15 @@ def create_app() -> FastAPI:
     @app.get("/api/sources")
     def api_sources():
         from source_registry import get_all_sources
-        return [{"name": entry.name, "display_name": entry.display_name} for entry in get_all_sources().values()]
+        return [
+            {
+                "name": entry.name,
+                "display_name": entry.display_name,
+                "color": getattr(entry, 'color', None),
+                "has_quota": getattr(entry, 'has_quota', bool(entry.quota_collector)),
+            }
+            for entry in get_all_sources().values()
+        ]
 
     def _cadence_meta(result: dict) -> dict:
         """Read-only cadence facts for the header's cycle strip.
@@ -178,7 +184,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/usage/{source}/latest")
     def api_usage_source_latest(source: str):
-        if source not in _VALID_SOURCES:
+        if not is_valid_source(source):
             return error_response("source_unknown", f"Unknown source: {source}", 404)
 
         conn = _db_connect(DB_PATH)
@@ -191,7 +197,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/usage/{source}/history")
     def api_usage_source_history(source: str, range: str = Query('all'), with_models: bool = Query(None)):
-        if source not in _VALID_SOURCES:
+        if not is_valid_source(source):
             return error_response("source_unknown", f"Unknown source: {source}", 404)
         if with_models is None:
             with_models = (range != 'all')
@@ -242,7 +248,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/quota/{source}/latest")
     def api_quota_source_latest(source: str, force: bool = False):
-        if source not in _VALID_SOURCES:
+        if not is_valid_source(source):
             return error_response("source_unknown", f"Unknown source: {source}", 404)
 
         conn = _db_connect(DB_PATH)

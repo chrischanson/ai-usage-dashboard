@@ -1,4 +1,5 @@
 export const state = {
+  sources: [],
   currentSource: 'combined',
   timeRange: 'all',
   mode: 'total',

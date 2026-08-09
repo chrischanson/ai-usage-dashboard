@@ -341,15 +341,15 @@
         flex: 1;
     }
 
-    /* Overview cards (KPI strip - 4 across on desktop) */
+    /* Overview cards (KPI strip — 2×2 on desktop) */
     /* Two-up: the overview shares its row with the quota rail, so four across
        would overflow the column. */
-    /* Six single-metric cards, two across. Each figure gets its own box so
-       nothing has to share a line with a slash between it. */
+    /* Four cards, two across: combined Sessions/Messages, combined
+       Input/Output Tokens, Cache Reads, Total Cost. */
     .overview-cards {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        grid-template-rows: repeat(3, 1fr);
+        grid-template-rows: repeat(2, 1fr);
         gap: 0.6rem;
     }
 
@@ -385,8 +385,18 @@
         font-size: var(--text-kpi);
         font-weight: 500;
         color: var(--ink);
-        margin-top: 0.25rem;
+        margin-top: 0.15rem;
         font-variant-numeric: tabular-nums;
+    }
+
+    .overview-cards .card .card-label {
+        font-family: 'IBM Plex Sans', sans-serif;
+        font-size: 0.6rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--ink-dim);
+        margin-right: 0.3rem;
     }
 
     /* Section titles */
@@ -830,9 +840,17 @@
     }
 
     .quota-column {
-        display: flex;
-        flex-direction: column;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
         gap: 1rem;
+    }
+
+    .quota-column > .quota-group {
+        flex: 1;
+    }
+
+    .quota-column > .quota-group--wide {
+        grid-column: 1 / -1;
     }
 
     .quota-group {
@@ -1179,7 +1197,7 @@
        than leaving a gap under themselves. */
     .stats-row {
         display: grid;
-        grid-template-columns: 0.78fr 1.4fr;
+        grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.4fr);
         gap: 1rem;
         margin-bottom: 1rem;
         align-items: stretch;
@@ -1438,6 +1456,10 @@
             grid-auto-flow: row;
             grid-template-columns: 1fr;
             overflow-x: visible;
+        }
+
+        .quota-column {
+            grid-template-columns: 1fr;
         }
 
         /* Models table and cards: show cards, hide table */

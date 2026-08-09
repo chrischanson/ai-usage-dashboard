@@ -87,8 +87,9 @@ export function renderQuota(data, source) {
                 renderCodexQuota(targetContainer, rateLimit, plan);
             }
         } else if (src === 'claude') {
-            const targetContainer = (source === 'combined' || source === 'all') ? getCompactColumn() : container;
-            renderClaudeQuota(targetContainer, quotaData);
+            const inCompactColumn = (source === 'combined' || source === 'all');
+            const targetContainer = inCompactColumn ? getCompactColumn() : container;
+            renderClaudeQuota(targetContainer, quotaData, inCompactColumn);
         } else if (src === 'agy') {
             renderAgyQuota(container, quotaData);
         } else {
@@ -320,9 +321,9 @@ export function renderCodexQuota(container, rateLimit, planType) {
     container.appendChild(card);
 }
 
-export function renderClaudeQuota(container, data) {
+export function renderClaudeQuota(container, data, wide) {
     const card = document.createElement('div');
-    card.className = 'quota-group';
+    card.className = wide ? 'quota-group quota-group--wide' : 'quota-group';
 
     const plan = data._plan || 'Claude Pro';
 

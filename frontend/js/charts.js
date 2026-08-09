@@ -1,6 +1,7 @@
 import { state } from './state.js';
 import { formatModelName, parseTs, formatLabel, formatNum } from './format.js';
 import { COLORS, TOKENS } from './colors.js';
+import { getSources, getSourceNames, getSourceDisplayName } from './sources.js';
 
 // Mutable chart instances that can be accessed and modified from other modules
 export const charts = {
@@ -60,12 +61,11 @@ export function renderModelChart(models) {
     // etc.; assigning those same hues by rank here would contradict it. Models
     // sharing a source step through tints of that source's hue.
     const SOURCE_HUE = {
-        agy: tokens.agyColor,
-        opencode: tokens.opencodeColor,
-        codex: tokens.codexColor,
-        claude: tokens.claudeColor,
         combined: tokens.signal,
     };
+    getSources().forEach(src => {
+        SOURCE_HUE[src.name] = tokens[`${src.name}Color`];
+    });
     const seenPerSource = {};
     const palette = labels.map((label, i) => {
         if (label.startsWith('Other (')) return tokens.dvOther;
@@ -164,26 +164,17 @@ export function renderHistoryChart(history) {
     let unitLabel = isTotal ? 'Tokens' : 'Δ tokens';
 
     if (state.currentSource === 'combined') {
-        const agyFull = history.agy || [];
-        const opencodeFull = history.opencode || [];
-        const codexFull = history.codex || [];
-        const claudeFull = history.claude || [];
+        const sourceNames = getSourceNames();
+        const sourcesData = {};
+        sourceNames.forEach(name => {
+            sourcesData[name] = filterByTimeRangeLocal(history[name] || [], state.timeRange);
+        });
 
-        // The API serves cumulative-since-first-observation totals in
-        // input_tokens/output_tokens and per-cycle increments in
-        // delta_input_tokens/delta_output_tokens (derived in db.py from
-        // the raw stored observations) — plot them as-is.
-        let agy = filterByTimeRangeLocal(agyFull, state.timeRange);
-        let opencode = filterByTimeRangeLocal(opencodeFull, state.timeRange);
-        let codex = filterByTimeRangeLocal(codexFull, state.timeRange);
-        let claude = filterByTimeRangeLocal(claudeFull, state.timeRange);
-
-        const allTimes = Array.from(new Set([
-            ...agy.map(d => d.timestamp),
-            ...opencode.map(d => d.timestamp),
-            ...codex.map(d => d.timestamp),
-            ...claude.map(d => d.timestamp)
-        ])).sort();
+        const allTimesSet = new Set();
+        sourceNames.forEach(name => {
+            sourcesData[name].forEach(d => allTimesSet.add(d.timestamp));
+        });
+        const allTimes = Array.from(allTimesSet).sort();
 
         labels = allTimes.map(formatLabel);
 
@@ -235,10 +226,10 @@ export function renderHistoryChart(history) {
             return lookup;
         }
 
-        const agyLookup = buildFilledLookup(agy);
-        const opencodeLookup = buildFilledLookup(opencode);
-        const codexLookup = buildFilledLookup(codex);
-        const claudeLookup = buildFilledLookup(claude);
+        const lookups = {};
+        sourceNames.forEach(name => {
+            lookups[name] = buildFilledLookup(sourcesData[name]);
+        });
 
         const mapFromLookup = (lookup, key) => {
             return allTimes.map(ts => {
@@ -270,67 +261,27 @@ export function renderHistoryChart(history) {
         });
 
         if (isTotal) {
-            datasets = [
-                {
-                    label: 'AGY',
-                    data: mapTotalFromLookup(agyLookup),
-                    borderColor: tokens.agyColor,
-                    backgroundColor: `color-mix(in oklch, ${tokens.agyColor} 18%, transparent)`,
+            datasets = sourceNames.map(name => {
+                const color = tokens[`${name}Color`];
+                return {
+                    label: getSourceDisplayName(name),
+                    data: mapTotalFromLookup(lookups[name]),
+                    borderColor: color,
+                    backgroundColor: `color-mix(in oklch, ${color} 18%, transparent)`,
                     fill: true, tension: 0.4, spanGaps: true, pointRadius: 2, stack: 'stack0',
-                },
-                {
-                    label: 'OpenCode',
-                    data: mapTotalFromLookup(opencodeLookup),
-                    borderColor: tokens.opencodeColor,
-                    backgroundColor: `color-mix(in oklch, ${tokens.opencodeColor} 18%, transparent)`,
-                    fill: true, tension: 0.4, spanGaps: true, pointRadius: 2, stack: 'stack0',
-                },
-                {
-                    label: 'Codex',
-                    data: mapTotalFromLookup(codexLookup),
-                    borderColor: tokens.codexColor,
-                    backgroundColor: `color-mix(in oklch, ${tokens.codexColor} 18%, transparent)`,
-                    fill: true, tension: 0.4, spanGaps: true, pointRadius: 2, stack: 'stack0',
-                },
-                {
-                    label: 'Claude',
-                    data: mapTotalFromLookup(claudeLookup),
-                    borderColor: tokens.claudeColor,
-                    backgroundColor: `color-mix(in oklch, ${tokens.claudeColor} 18%, transparent)`,
-                    fill: true, tension: 0.4, spanGaps: true, pointRadius: 2, stack: 'stack0',
-                },
-            ];
+                };
+            });
         } else {
-            datasets = [
-                {
-                    label: 'AGY',
-                    data: mapRateTotalFromLookup(agyLookup),
-                    borderColor: tokens.agyColor,
-                    backgroundColor: `color-mix(in oklch, ${tokens.agyColor} 6%, transparent)`,
+            datasets = sourceNames.map(name => {
+                const color = tokens[`${name}Color`];
+                return {
+                    label: getSourceDisplayName(name),
+                    data: mapRateTotalFromLookup(lookups[name]),
+                    borderColor: color,
+                    backgroundColor: `color-mix(in oklch, ${color} 6%, transparent)`,
                     fill: true, tension: 0.4, spanGaps: true, pointRadius: 2,
-                },
-                {
-                    label: 'OpenCode',
-                    data: mapRateTotalFromLookup(opencodeLookup),
-                    borderColor: tokens.opencodeColor,
-                    backgroundColor: `color-mix(in oklch, ${tokens.opencodeColor} 6%, transparent)`,
-                    fill: true, tension: 0.4, spanGaps: true, pointRadius: 2,
-                },
-                {
-                    label: 'Codex',
-                    data: mapRateTotalFromLookup(codexLookup),
-                    borderColor: tokens.codexColor,
-                    backgroundColor: `color-mix(in oklch, ${tokens.codexColor} 6%, transparent)`,
-                    fill: true, tension: 0.4, spanGaps: true, pointRadius: 2,
-                },
-                {
-                    label: 'Claude',
-                    data: mapRateTotalFromLookup(claudeLookup),
-                    borderColor: tokens.claudeColor,
-                    backgroundColor: `color-mix(in oklch, ${tokens.claudeColor} 6%, transparent)`,
-                    fill: true, tension: 0.4, spanGaps: true, pointRadius: 2,
-                },
-            ];
+                };
+            });
         }
     } else {
         let series = filterByTimeRangeLocal(history || [], state.timeRange);
@@ -487,9 +438,10 @@ if (canvas) {
     });
 }
 
-// Initialize Chart.js defaults
+// Set the font default eagerly (it doesn't depend on CSS tokens).
+// The color default (tokens.inkDim) is set from main.js AFTER sourcesReady
+// resolves — calling TOKENS() here would poison the cache because
+// getSources() returns [] while the /api/sources fetch is still in-flight.
 if (typeof Chart !== 'undefined') {
-    const tokens = TOKENS();
     Chart.defaults.font.family = "'IBM Plex Sans', system-ui, sans-serif";
-    Chart.defaults.color = tokens.inkDim;
 }

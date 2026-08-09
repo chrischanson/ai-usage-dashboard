@@ -10,6 +10,12 @@ from poller import Poller
 
 def main():
     cfg = load_config()
+
+    # Load YAML-based providers (replaces hardcoded sources if providers/ exists)
+    import os
+    providers_dir = os.path.join(os.path.dirname(__file__), 'providers')
+    from source_registry import load_from_providers
+    load_from_providers(providers_dir, cfg)
     logging.basicConfig(
         level=getattr(logging, cfg.log_level, logging.INFO),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",

@@ -8,6 +8,8 @@ import { fetchLatest, fetchHistory, fetchQuota, fetchIntegrity } from './api.js'
 import { computeOverviewFromHistory } from './derive.js';
 import { renderHistoryChart, renderModelChart, charts } from './charts.js';
 import { render as renderCycleStrip } from './ui/strip.js';
+import { ready as sourcesReady, getSources } from './sources.js';
+import { resetCache, TOKENS } from './colors.js';
 
 // Main refresh function - called by various event handlers
 export async function refresh(force = false) {
@@ -55,6 +57,35 @@ function playSourceSwitch() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+    await sourcesReady;
+
+    // The token/color caches in colors.js are populated lazily on first
+    // access, but any earlier call to TOKENS() or COLORS[…] — even from
+    // another DOMContentLoaded listener that registered before this one —
+    // would have seen getSources() return [] (the async fetch hadn't
+    // resolved yet) and permanently cached tokens WITHOUT source colors.
+    // Flushing here guarantees the next access rebuilds them with the
+    // full source list.
+    resetCache();
+    if (typeof Chart !== 'undefined') {
+        Chart.defaults.color = TOKENS().inkDim;
+    }
+    
+    // dynamically create tabs
+    const tabsContainer = document.getElementById('source-tabs');
+    const sources = getSources();
+    sources.forEach(src => {
+        const btn = document.createElement('button');
+        btn.className = 'tab';
+        btn.dataset.source = src.name;
+        btn.id = `tab-${src.name}`;
+        btn.role = 'tab';
+        btn.setAttribute('aria-selected', 'false');
+        btn.setAttribute('aria-controls', 'panel-main');
+        btn.textContent = src.display_name;
+        tabsContainer.appendChild(btn);
+    });
+
     setRetryHandler(refresh);
     // Try to restore time range from localStorage
     try {

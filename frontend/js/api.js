@@ -5,6 +5,7 @@ import { renderOverview } from './ui/kpis.js';
 import { renderQuota } from './ui/quota.js';
 import { renderHistoryChart, charts } from './charts.js';
 import { setCadence, setIntegrityWarnings } from './ui/strip.js';
+import { getSourceNames, getSourceDisplayName } from './sources.js';
 
 export async function fetchIntegrity() {
     try {
@@ -34,40 +35,44 @@ export async function fetchLatest() {
             if (!resp.ok) throw new Error('HTTP ' + resp.status);
             const raw = await resp.json();
             setCadence(raw._meta, null);
-            const agy = raw.agy || {};
-            const opencode = raw.opencode || {};
-            const codex = raw.codex || {};
-            const claude = raw.claude || {};
-
-            // Newest poll cycle across all four sources — used by refresh()
+            const sourceNames = getSourceNames();
+            
+            // Newest poll cycle across all sources — used by refresh()
             // to decide whether the history series actually has new data.
-            state.latestObservedCycleTs = [agy.cycle_ts, opencode.cycle_ts, codex.cycle_ts, claude.cycle_ts]
-                .filter(v => v != null)
-                .reduce((max, v) => (max == null || v > max) ? v : max, null);
+            const cycleTss = sourceNames.map(name => (raw[name] || {}).cycle_ts).filter(v => v != null);
+            state.latestObservedCycleTs = cycleTss.reduce((max, v) => (max == null || v > max) ? v : max, null);
 
             data = {
-                sessions: (agy.sessions || 0) + (opencode.sessions || 0) + (codex.sessions || 0) + (claude.sessions || 0),
-                messages: (agy.messages || 0) + (opencode.messages || 0) + (codex.messages || 0) + (claude.messages || 0),
-                input_tokens: (agy.input_tokens || 0) + (opencode.input_tokens || 0) + (codex.input_tokens || 0) + (claude.input_tokens || 0),
-                output_tokens: (agy.output_tokens || 0) + (opencode.output_tokens || 0) + (codex.output_tokens || 0) + (claude.output_tokens || 0),
-                cache_read: (agy.cache_read || 0) + (opencode.cache_read || 0) + (codex.cache_read || 0) + (claude.cache_read || 0),
+                sessions: 0,
+                messages: 0,
+                input_tokens: 0,
+                output_tokens: 0,
+                cache_read: 0,
                 models: [],
                 model_deltas: [],
+                _modelDeltas: []
             };
 
-            const agyModelsCumulative = (agy.models || []).map(function(m) { return Object.assign({}, m, { source: 'agy' }); });
-            const opencodeModelsCumulative = (opencode.models || []).map(function(m) { return Object.assign({}, m, { source: 'opencode' }); });
-            const codexModelsCumulative = (codex.models || []).map(function(m) { return Object.assign({}, m, { source: 'codex' }); });
-            const claudeModelsCumulative = (claude.models || []).map(function(m) { return Object.assign({}, m, { source: 'claude' }); });
-            data.models = [...agyModelsCumulative, ...opencodeModelsCumulative, ...codexModelsCumulative, ...claudeModelsCumulative].sort(function(a, b) {
+            sourceNames.forEach(name => {
+                const srcData = raw[name] || {};
+                data.sessions += (srcData.sessions || 0);
+                data.messages += (srcData.messages || 0);
+                data.input_tokens += (srcData.input_tokens || 0);
+                data.output_tokens += (srcData.output_tokens || 0);
+                data.cache_read += (srcData.cache_read || 0);
+
+                const modelsCumulative = (srcData.models || []).map(function(m) { return Object.assign({}, m, { source: name }); });
+                data.models.push(...modelsCumulative);
+
+                const deltas = (srcData.model_deltas || []).map(function(m) { return Object.assign({}, m, { source: name }); });
+                data._modelDeltas.push(...deltas);
+            });
+
+            data.models.sort(function(a, b) {
                 return ((b.input_tokens || 0) + (b.output_tokens || 0)) - ((a.input_tokens || 0) + (a.output_tokens || 0));
             });
 
-            const agyDeltas = (agy.model_deltas || []).map(function(m) { return Object.assign({}, m, { source: 'agy' }); });
-            const opencodeDeltas = (opencode.model_deltas || []).map(function(m) { return Object.assign({}, m, { source: 'opencode' }); });
-            const codexDeltas = (codex.model_deltas || []).map(function(m) { return Object.assign({}, m, { source: 'codex' }); });
-            const claudeDeltas = (claude.model_deltas || []).map(function(m) { return Object.assign({}, m, { source: 'claude' }); });
-            data._modelDeltas = [...agyDeltas, ...opencodeDeltas, ...codexDeltas, ...claudeDeltas].sort(function(a, b) {
+            data._modelDeltas.sort(function(a, b) {
                 return ((b.input_tokens || 0) + (b.output_tokens || 0)) - ((a.input_tokens || 0) + (a.output_tokens || 0));
             });
         } else {
@@ -109,59 +114,48 @@ export async function fetchHistory() {
     try {
         const rangeParam = '?range=' + state.timeRange;
         if (state.currentSource === 'combined') {
-            const results = await Promise.allSettled([
-                fetch('/api/usage/agy/history' + rangeParam),
-                fetch('/api/usage/opencode/history' + rangeParam),
-                fetch('/api/usage/codex/history' + rangeParam),
-                fetch('/api/usage/claude/history' + rangeParam)
-            ]);
-            let agyData = [], opencodeData = [], codexData = [], claudeData = [];
-            if (results[0].status === 'fulfilled') {
-                try { if (results[0].value.ok) agyData = await results[0].value.json(); } catch (_) {}
-            }
-            if (results[1].status === 'fulfilled') {
-                try { if (results[1].value.ok) opencodeData = await results[1].value.json(); } catch (_) {}
-            }
-            if (results[2].status === 'fulfilled') {
-                try { if (results[2].value.ok) codexData = await results[2].value.json(); } catch (_) {}
-            }
-            if (results[3].status === 'fulfilled') {
-                try { if (results[3].value.ok) claudeData = await results[3].value.json(); } catch (_) {}
-            }
+            const sourceNames = getSourceNames();
+            const results = await Promise.allSettled(
+                sourceNames.map(name => fetch(`/api/usage/${name}/history` + rangeParam))
+            );
 
-            let agy = agyData;
-            let opencode = opencodeData;
-            let codex = codexData;
-            let claude = claudeData;
+            const parsedResults = await Promise.all(results.map(async (res) => {
+                if (res.status === 'fulfilled' && res.value.ok) {
+                    try { return await res.value.json(); } catch (_) {}
+                }
+                return [];
+            }));
 
-            const agySet = new Set(agy.map(d => d.timestamp));
-            const opencodeSet = new Set(opencode.map(d => d.timestamp));
-            const codexSet = new Set(codex.map(d => d.timestamp));
-            const claudeSet = new Set(claude.map(d => d.timestamp));
+            const historyData = {};
+            sourceNames.forEach((name, i) => {
+                historyData[name] = parsedResults[i] || [];
+            });
 
-            let latestTs = null;
-            for (const ts of agySet) {
-                if (opencodeSet.has(ts) && codexSet.has(ts) && claudeSet.has(ts)) {
-                    if (latestTs === null || ts > latestTs) {
-                        latestTs = ts;
+            if (sourceNames.length > 0) {
+                const sets = sourceNames.map(name => new Set(historyData[name].map(d => d.timestamp)));
+                const firstSet = sets[0];
+                let latestTs = null;
+                for (const ts of firstSet) {
+                    if (sets.every(set => set.has(ts))) {
+                        if (latestTs === null || ts > latestTs) {
+                            latestTs = ts;
+                        }
                     }
+                }
+
+                if (latestTs !== null) {
+                    state.latestCompleteTimestamp = latestTs;
+                    sourceNames.forEach(name => {
+                        historyData[name] = historyData[name].filter(d => d.timestamp <= latestTs);
+                    });
+                } else {
+                    sourceNames.forEach(name => {
+                        historyData[name] = [];
+                    });
                 }
             }
 
-            if (latestTs !== null) {
-                state.latestCompleteTimestamp = latestTs;
-                agy = agy.filter(d => d.timestamp <= latestTs);
-                opencode = opencode.filter(d => d.timestamp <= latestTs);
-                codex = codex.filter(d => d.timestamp <= latestTs);
-                claude = claude.filter(d => d.timestamp <= latestTs);
-            } else {
-                agy = [];
-                opencode = [];
-                codex = [];
-                claude = [];
-            }
-
-            state.cachedHistory = { agy, opencode, codex, claude };
+            state.cachedHistory = historyData;
             renderHistoryChart(state.cachedHistory);
         } else {
             const resp = await fetch(`/api/usage/${state.currentSource}/history` + rangeParam);
@@ -192,15 +186,14 @@ export async function fetchQuota(force = false) {
         if (force) {
             url += (url.includes('?') ? '&' : '?') + 'force=true';
         }
-        const titleMap = {
-            combined: 'Quota Limits',
-            agy: 'AGY Quota Limits',
-            opencode: 'OpenCode CLI Spending',
-            codex: 'Codex Usage Limits',
-            claude: 'Claude Usage Limits',
-        };
         const titleEl = document.getElementById('quota-title');
-        if (titleEl) titleEl.textContent = titleMap[state.currentSource] || 'Quota Limits';
+        if (titleEl) {
+            if (state.currentSource === 'combined') {
+                titleEl.textContent = 'Quota Limits';
+            } else {
+                titleEl.textContent = `${getSourceDisplayName(state.currentSource)} Quota Limits`;
+            }
+        }
         const resp = await fetch(url);
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         const data = await resp.json();

@@ -1,5 +1,6 @@
 import { state } from './state.js';
 import { filterByTimeRange } from './format.js';
+import { getSourceNames } from './sources.js';
 
 export function computeOverviewFromHistory(history, range) {
     if (range === 'all' || !history) return null;
@@ -18,17 +19,27 @@ export function computeOverviewFromHistory(history, range) {
         };
     }
     if (state.currentSource === 'combined') {
-        const agy = sourceDelta(history.agy);
-        const opencode = sourceDelta(history.opencode);
-        const codex = sourceDelta(history.codex);
-        const claude = sourceDelta(history.claude);
-        return {
-            sessions: (agy?.sessions || 0) + (opencode?.sessions || 0) + (codex?.sessions || 0) + (claude?.sessions || 0),
-            messages: (agy?.messages || 0) + (opencode?.messages || 0) + (codex?.messages || 0) + (claude?.messages || 0),
-            input_tokens: (agy?.input_tokens || 0) + (opencode?.input_tokens || 0) + (codex?.input_tokens || 0) + (claude?.input_tokens || 0),
-            output_tokens: (agy?.output_tokens || 0) + (opencode?.output_tokens || 0) + (codex?.output_tokens || 0) + (claude?.output_tokens || 0),
-            cache_read: (agy?.cache_read || 0) + (opencode?.cache_read || 0) + (codex?.cache_read || 0) + (claude?.cache_read || 0),
+        const sourceNames = getSourceNames();
+        const overview = {
+            sessions: 0,
+            messages: 0,
+            input_tokens: 0,
+            output_tokens: 0,
+            cache_read: 0,
         };
+        
+        sourceNames.forEach(name => {
+            const delta = sourceDelta(history[name]);
+            if (delta) {
+                overview.sessions += (delta.sessions || 0);
+                overview.messages += (delta.messages || 0);
+                overview.input_tokens += (delta.input_tokens || 0);
+                overview.output_tokens += (delta.output_tokens || 0);
+                overview.cache_read += (delta.cache_read || 0);
+            }
+        });
+        
+        return overview;
     }
     return sourceDelta(history) || null;
 }
@@ -70,15 +81,14 @@ export function computeModelsFromHistory(history, range) {
         return deltas.length > 0 ? deltas : null;
     }
     if (state.currentSource === 'combined') {
-        const agy = sourceModels(history.agy);
-        const opencode = sourceModels(history.opencode);
-        const codex = sourceModels(history.codex);
-        const claude = sourceModels(history.claude);
         const combined = [];
-        (agy || []).forEach(function(m) { combined.push(Object.assign({}, m, { source: 'agy' })); });
-        (opencode || []).forEach(function(m) { combined.push(Object.assign({}, m, { source: 'opencode' })); });
-        (codex || []).forEach(function(m) { combined.push(Object.assign({}, m, { source: 'codex' })); });
-        (claude || []).forEach(function(m) { combined.push(Object.assign({}, m, { source: 'claude' })); });
+        const sourceNames = getSourceNames();
+        sourceNames.forEach(name => {
+            const models = sourceModels(history[name]);
+            (models || []).forEach(m => {
+                combined.push(Object.assign({}, m, { source: name }));
+            });
+        });
         return combined.sort(function(a, b) {
             return ((b.input_tokens || 0) + (b.output_tokens || 0)) - ((a.input_tokens || 0) + (a.output_tokens || 0));
         });

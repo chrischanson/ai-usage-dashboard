@@ -15,15 +15,17 @@ from parsers.base import ParserResult
 
 
 class _SourceEntry:
-    __slots__ = ('name', 'parser', 'quota_collector', 'quota_normalizer', 'display_name')
+    __slots__ = ('name', 'parser', 'quota_collector', 'quota_normalizer', 'display_name', 'color', 'has_quota')
 
     def __init__(self, name, parser=None, quota_collector=None,
-                 quota_normalizer=None, display_name=None):
+                 quota_normalizer=None, display_name=None, color=None, has_quota=False):
         self.name = name
         self.parser = parser
         self.quota_collector = quota_collector
         self.quota_normalizer = quota_normalizer
         self.display_name = display_name or name.title()
+        self.color = color
+        self.has_quota = has_quota
 
 
 def _make_opencode_parser():
@@ -242,3 +244,22 @@ def get_all_display_names() -> dict[str, str]:
 
 def is_valid_source(name: str) -> bool:
     return name in _SOURCES
+
+
+def load_from_providers(providers_dir: str, cfg) -> None:
+    """Replace the hardcoded registry with providers loaded from YAML files.
+
+    If the *providers_dir* exists and contains at least one valid provider,
+    the current registry is cleared and repopulated from YAML. Otherwise
+    the hardcoded fallback entries (above) remain active.
+    """
+    import os
+    from provider_loader import load_providers
+
+    if os.path.isdir(providers_dir):
+        new_sources = load_providers(providers_dir, cfg)
+        if new_sources:
+            _SOURCES.clear()
+            for name, entry in new_sources.items():
+                _register(entry)
+

@@ -1,8 +1,12 @@
-export function setCard(id, val) {
+export function setCard(id, val, label) {
     const el = document.getElementById(id);
     if (el) {
         el.classList.remove('skeleton', 'skeleton-text');
-        el.textContent = val;
+        if (label) {
+            el.innerHTML = `<span class="card-label">${label}</span>${val}`;
+        } else {
+            el.textContent = val;
+        }
     }
 }
 

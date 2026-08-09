@@ -1,0 +1,17 @@
+# Human-readable name shown in dashboard tabs
+display_name: "OpenCode"
+# Chart color in oklch() format
+color: "oklch(0.527 0.135 250)"
+
+# Defines how to fetch and parse usage data
+usage:
+  # The adapter type to use (subprocess, http_json, sqlite_query, python_script)
+  type: python_script
+  # Module path for python_script adapter containing create_parser()
+  module: "providers.scripts.opencode_usage"
+
+# Defines how to fetch and parse quota/limit data (optional)
+quota:
+  type: python_script
+  # Module path for python_script adapter containing collect() and normalize()
+  module: "providers.scripts.opencode_quota"

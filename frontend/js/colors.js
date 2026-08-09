@@ -1,6 +1,8 @@
 // Reads CSS custom properties from the DOM once at init and exposes the COLORS map,
 // plus the resolved token values for Chart.js defaults.
 
+import { getSources } from './sources.js';
+
 let cachedColors = null;
 let cachedTokens = null;
 
@@ -23,15 +25,16 @@ function initializeTokens() {
         surface: getToken('--surface'),
         surface2: getToken('--surface-2'),
         signal: getToken('--signal'),
-        agyColor: getToken('--src-agy'),
-        opencodeColor: getToken('--src-opencode'),
-        codexColor: getToken('--src-codex'),
-        claudeColor: getToken('--src-claude'),
         dv5: getToken('--dv-5'),
         dv6: getToken('--dv-6'),
         dv7: getToken('--dv-7'),
         dvOther: getToken('--dv-other'),
     };
+
+    const sources = getSources();
+    sources.forEach(src => {
+        tokens[`${src.name}Color`] = src.color || getToken(`--src-${src.name}`);
+    });
 
     cachedTokens = tokens;
     return tokens;
@@ -46,43 +49,31 @@ function initializeColors() {
     // Helper to create lineFill with 14% opacity using color-mix
     const makeLineFill = (color) => `color-mix(in oklch, ${color} 14%, transparent)`;
 
-    const colors = {
-        agy: {
-            accent: tokens.agyColor,
-            line: tokens.agyColor,
-            lineFill: makeLineFill(tokens.agyColor),
-            outLine: tokens.opencodeColor,
-            outFill: makeLineFill(tokens.opencodeColor),
-            donut: [tokens.agyColor, tokens.opencodeColor, tokens.codexColor, tokens.claudeColor, tokens.dv5, tokens.dv6, tokens.dv7],
-        },
-        opencode: {
-            accent: tokens.opencodeColor,
-            line: tokens.opencodeColor,
-            lineFill: makeLineFill(tokens.opencodeColor),
-            outLine: tokens.codexColor,
-            outFill: makeLineFill(tokens.codexColor),
-            donut: [tokens.agyColor, tokens.opencodeColor, tokens.codexColor, tokens.claudeColor, tokens.dv5, tokens.dv6, tokens.dv7],
-        },
-        codex: {
-            accent: tokens.codexColor,
-            line: tokens.codexColor,
-            lineFill: makeLineFill(tokens.codexColor),
-            outLine: tokens.claudeColor,
-            outFill: makeLineFill(tokens.claudeColor),
-            donut: [tokens.agyColor, tokens.opencodeColor, tokens.codexColor, tokens.claudeColor, tokens.dv5, tokens.dv6, tokens.dv7],
-        },
-        claude: {
-            accent: tokens.claudeColor,
-            line: tokens.claudeColor,
-            lineFill: makeLineFill(tokens.claudeColor),
-            outLine: tokens.agyColor,
-            outFill: makeLineFill(tokens.agyColor),
-            donut: [tokens.agyColor, tokens.opencodeColor, tokens.codexColor, tokens.claudeColor, tokens.dv5, tokens.dv6, tokens.dv7],
-        },
-        combined: {
-            accent: tokens.signal,
-            donut: [tokens.agyColor, tokens.opencodeColor, tokens.codexColor, tokens.claudeColor, tokens.dv5, tokens.dv6, tokens.dv7],
-        },
+    const colors = {};
+    const sources = getSources();
+    
+    // Build the dynamic donut palette
+    const donutPalette = sources.map(src => tokens[`${src.name}Color`]);
+    donutPalette.push(tokens.dv5, tokens.dv6, tokens.dv7);
+
+    sources.forEach((src, index) => {
+        const nextSrc = sources[(index + 1) % sources.length];
+        const srcColor = tokens[`${src.name}Color`];
+        const nextSrcColor = tokens[`${nextSrc.name}Color`];
+        
+        colors[src.name] = {
+            accent: srcColor,
+            line: srcColor,
+            lineFill: makeLineFill(srcColor),
+            outLine: nextSrcColor,
+            outFill: makeLineFill(nextSrcColor),
+            donut: donutPalette,
+        };
+    });
+
+    colors.combined = {
+        accent: tokens.signal,
+        donut: donutPalette,
     };
 
     cachedColors = colors;
@@ -100,4 +91,13 @@ export const COLORS = new Proxy({}, {
 // Export function to get resolved token values
 export function TOKENS() {
     return initializeTokens();
+}
+
+// Flush the caches so the next call to TOKENS() / COLORS[…] re-reads from
+// the live DOM and the (now populated) sources list.  Must be called after
+// sourcesReady resolves — the initial cache is often poisoned because
+// getSources() returns [] while the /api/sources fetch is still in-flight.
+export function resetCache() {
+    cachedTokens = null;
+    cachedColors = null;
 }
