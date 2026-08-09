@@ -72,6 +72,31 @@ Every source is **optional and isolated** — if a source is absent or fails, th
 
 ---
 
+## Adding a New Source
+
+You can add your own data sources by simply dropping a YAML file into `backend/providers/` and restarting the server. 
+
+The dashboard supports declarative adapters for parsing output from HTTP APIs, local SQLite databases, or subprocess commands. Complex custom integrations are also possible via Python scripts.
+
+**Example (HTTP JSON):**
+```yaml
+display_name: "My Custom Source"
+color: "oklch(0.6 0.15 250)"
+
+usage:
+  type: http_json
+  url: "https://api.example.com/v1/usage"
+  headers:
+    Authorization: "Bearer ${MY_API_KEY}"
+  mapping:
+    input_tokens: ".data.total_input"
+    output_tokens: ".data.total_output"
+```
+
+For the complete schema, advanced mapping options, and instructions for all adapter types (`subprocess`, `http_json`, `sqlite_query`, `python_script`), please see the **[Provider System Reference](docs/providers.md)**.
+
+---
+
 ## Configuration
 
 All settings via environment variables (all have sensible defaults):
