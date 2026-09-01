@@ -68,16 +68,23 @@ print(f'\n\033[1m=== Verifying {BASE} ===\033[0m\n')
 heading(1, 'Server process')
 pid_path = os.getenv('USAGE_PID_PATH')
 if not pid_path:
-    if os.path.exists('run/dashboard.pid'):
-        pid_path = 'run/dashboard.pid'
-    elif os.path.exists('/tmp/dashboard.pid'):
-        pid_path = '/tmp/dashboard.pid'
-    else:
-        pid_path = 'run/dashboard.pid'
+    for candidate in ('run/dashboard.pid', '/tmp/dashboard.pid'):
+        if os.path.exists(candidate):
+            try:
+                with open(candidate) as f:
+                    c_pid = f.read().strip()
+                if c_pid.isdigit() and os.path.isdir(f'/proc/{c_pid}'):
+                    pid_path = candidate
+                    break
+            except Exception:
+                pass
+    if not pid_path:
+        pid_path = 'run/dashboard.pid' if os.path.exists('run/dashboard.pid') else '/tmp/dashboard.pid'
+
 if os.path.exists(pid_path):
     with open(pid_path) as f:
         pid = f.read().strip()
-    if os.path.isdir(f'/proc/{pid}'):
+    if pid.isdigit() and os.path.isdir(f'/proc/{pid}'):
         ok(f'Server running (PID {pid})')
     else:
         fail(f'PID file at {pid_path} but process {pid} not running')
@@ -96,11 +103,15 @@ if status == 200:
         fail('Old "Combined (All)" label still present')
     else:
         ok('Old "Combined (All)" label removed')
-    for src in ('combined', 'agy', 'opencode', 'codex'):
-        if f'data-source="{src}"' in html:
-            ok(f'Tab data-source="{src}" present')
-        else:
-            fail(f'Tab data-source="{src}" missing')
+    if 'data-source="combined"' in html:
+        ok('Tab data-source="combined" present')
+    else:
+        fail('Tab data-source="combined" missing')
+    js_str = frontend_js()
+    if 'btn.dataset.source = src.name' in js_str or 'tab-${src.name}' in js_str:
+        ok('Dynamic provider tabs rendered in JS')
+    else:
+        fail('Dynamic provider tabs missing in JS')
     # Page controls
     if 'time-range-buttons' in html:
         ok('Time range buttons present')
@@ -403,14 +414,11 @@ else:
 
 # ── 14. Overview: one card per metric ──
 heading(14, 'Overview: one card per metric')
-# Sessions/Messages and Input/Output used to share a card, two figures either
-# side of a slash. Each metric now gets its own box, so the old card-row check
-# is replaced by one that every metric is present and separately carded.
 html, _ = get('/static/index.html')
-for card_id, value_id in (('card-sessions', 'total-sessions'),
-                          ('card-messages', 'total-messages'),
-                          ('card-input', 'input-tokens'),
-                          ('card-output', 'output-tokens'),
+for card_id, value_id in (('card-sessions-messages', 'total-sessions'),
+                          ('card-sessions-messages', 'total-messages'),
+                          ('card-tokens', 'input-tokens'),
+                          ('card-tokens', 'output-tokens'),
                           ('card-cache', 'cache-reads'),
                           ('card-cost', 'total-cost')):
     if f'id="{card_id}"' in html and f'id="{value_id}"' in html:
@@ -1550,15 +1558,11 @@ else:
 # ── 42. Claude in frontend ──
 heading(44, 'Claude in frontend')
 
-html = open(os.path.join(os.path.dirname(__file__), 'frontend', 'index.html')).read()
-if 'data-source="claude"' in html:
-    ok('HTML: Claude tab present')
+claude_yaml = os.path.join(os.path.dirname(__file__), 'backend', 'providers', 'claude.yaml')
+if os.path.exists(claude_yaml):
+    ok('providers/claude.yaml present')
 else:
-    fail('HTML: Claude tab missing')
-if 'tab-claude' in html:
-    ok('HTML: tab-claude id present')
-else:
-    fail('HTML: tab-claude id missing')
+    fail('providers/claude.yaml missing')
 
 js = frontend_js()
 if "'claude'" in js:

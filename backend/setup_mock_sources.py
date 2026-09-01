@@ -211,6 +211,33 @@ def setup_mock_opencode(bin_dir):
         print(f"  Not running under GitHub Actions — add {bin_dir} to PATH yourself if testing locally")
 
 
+def setup_mock_claude():
+    """Create mock Claude Code transcripts in ~/.claude/projects."""
+    claude_dir = os.path.expanduser('~/.claude/projects/mock_project')
+    os.makedirs(claude_dir, exist_ok=True)
+    jsonl_path = os.path.join(claude_dir, 'transcript.jsonl')
+    sample_events = [
+        {
+            "type": "assistant",
+            "message": {
+                "id": "msg_ci_1",
+                "model": "claude-3-5-sonnet-20241022",
+                "usage": {
+                    "input_tokens": 1500,
+                    "output_tokens": 300,
+                    "cache_read_input_tokens": 500,
+                    "cache_creation_input_tokens": 0
+                }
+            },
+            "requestId": "req_ci_1"
+        }
+    ]
+    with open(jsonl_path, 'w') as f:
+        for ev in sample_events:
+            f.write(json.dumps(ev) + '\n')
+    print(f"  Claude mock transcript at {jsonl_path}")
+
+
 def _refuse_outside_ci():
     """Refuse to run anywhere that isn't a disposable CI runner.
 
@@ -266,6 +293,7 @@ def main():
     setup_mock_agy_quota()
     setup_mock_codex()
     setup_mock_opencode(os.path.join(os.path.dirname(__file__), '.ci_mocks', 'bin'))
+    setup_mock_claude()
     print("Done. Mock sources ready.")
     return 0
 
