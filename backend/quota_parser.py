@@ -27,7 +27,13 @@ _FALLBACK_PORTS = [41969, 36465, 44953]
 
 
 def _detect_language_server_pids():
-    """Find all PIDs for the language server using safe pgrep."""
+    """Find all PIDs for the language server or AGY process using safe pgrep.
+
+    Newer versions of Antigravity embed the language server (and its quota
+    RPC endpoint) directly in the ``agy`` binary, so we also look for that
+    process when the legacy ``language_server`` binary isn't running.
+    """
+    # Legacy: separate language_server binary
     for pattern in ('language_server_linux_x64', 'language_server'):
         try:
             out = subprocess.check_output(['pgrep', '-f', pattern], timeout=2)
@@ -36,6 +42,15 @@ def _detect_language_server_pids():
                 return pids
         except Exception:
             pass
+    # Modern: AGY embeds the language server; use -x for exact binary match
+    # to avoid matching shell scripts or unrelated processes.
+    try:
+        out = subprocess.check_output(['pgrep', '-x', 'agy'], timeout=2)
+        pids = [int(p) for p in out.decode().strip().split() if p.isdigit()]
+        if pids:
+            return pids
+    except Exception:
+        pass
     return []
 
 
@@ -135,8 +150,13 @@ def _parse_iso_time(t_str):
         return 0
 
 
-def _try_connect_rpc(port, csrf_token, timeout=3):
-    """Try to call the RetrieveUserQuotaSummary RPC on the given port."""
+def _try_connect_rpc(port, csrf_token=None, timeout=3):
+    """Try to call the RetrieveUserQuotaSummary RPC on the given port.
+
+    *csrf_token* is optional: the legacy language_server binary required it,
+    but newer AGY builds embed the RPC endpoint directly and accept requests
+    without a CSRF token.
+    """
     # Try HTTP first, then HTTPS if needed
     for proto in ('http', 'https'):
         url = f'{proto}://127.0.0.1:{port}{QUOTA_RPC_PATH}'
@@ -152,13 +172,16 @@ def _try_connect_rpc(port, csrf_token, timeout=3):
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
 
+        headers = {
+            'Content-Type': 'application/json',
+            'Connect-Protocol-Version': '1',
+        }
+        if csrf_token:
+            headers['x-codeium-csrf-token'] = csrf_token
+
         req = urllib.request.Request(
             url, data=b'{}',
-            headers={
-                'Content-Type': 'application/json',
-                'Connect-Protocol-Version': '1',
-                'x-codeium-csrf-token': csrf_token,
-            },
+            headers=headers,
         )
         try:
             with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
@@ -227,12 +250,13 @@ def fetch_agy_quota(network_timeout=None):
     rpc_kwargs = {} if network_timeout is None else {'timeout': network_timeout}
 
     plan = _detect_agy_plan(**plan_kwargs)
-    csrf_token = _detect_csrf_token()
-    if not csrf_token:
-        return {'error': 'Language server process or CSRF token not found', 'plan': plan}
+    csrf_token = _detect_csrf_token()  # None when AGY embeds the RPC
 
     raw_data = None
-    for port in _detect_language_server_ports():
+    ports = _detect_language_server_ports()
+    if not ports:
+        return {'error': 'No AGY/language-server ports detected', 'plan': plan}
+    for port in ports:
         try:
             raw_data = _try_connect_rpc(port, csrf_token, **rpc_kwargs)
             if raw_data:
