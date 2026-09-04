@@ -33,7 +33,15 @@ import shutil
 import sqlite3
 from datetime import datetime, timezone, timedelta
 
-DB_PATH = os.getenv('USAGE_DB_PATH') or os.path.join(os.path.dirname(__file__), "usage.db")
+def default_db_path() -> str:
+    """Database path for callers that have no Config to hand.
+
+    Deliberately a function, not a module constant. The constant was read at
+    import time, so anything that set USAGE_DB_PATH afterwards -- a test, a
+    fixture -- kept silently talking to the real database. Config is the
+    source of truth; this is the fallback for the few callers outside it.
+    """
+    return os.getenv('USAGE_DB_PATH') or os.path.join(os.path.dirname(__file__), "usage.db")
 
 _USAGE_FIELDS = ('sessions', 'messages', 'input_tokens', 'output_tokens', 'cache_read', 'cache_write')
 _MODEL_FIELDS = ('messages', 'input_tokens', 'output_tokens', 'cache_read', 'cache_write')
@@ -572,7 +580,7 @@ def rebase_reset_history(conn: sqlite3.Connection, source: str) -> dict:
 
 
 def init_db():
-    conn = connect(DB_PATH)
+    conn = connect(default_db_path())
     init_schema(conn)
     conn.close()
 

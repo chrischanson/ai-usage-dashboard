@@ -131,8 +131,8 @@ class Poller:
             existing = sources_with_attribution_series(conn)
             if existing:
                 backfill_unattributed(conn, sources=existing, cycle_ts=cycle_ts)
-        except Exception as e:
-            print(f"[poller] attribution upkeep error: {e}")
+        except Exception:
+            logger.exception("attribution upkeep failed", extra={'cycle_ts': cycle_ts})
 
         prune(conn, self.cfg.retention_days)
 
@@ -141,8 +141,8 @@ class Poller:
             conn = connect(self.cfg.db_path)
             try:
                 self.run_once(conn)
-            except Exception as e:
-                print(f"[poller] cycle error: {e}")
+            except Exception:
+                logger.exception("poll cycle failed")
             finally:
                 conn.close()
             self._stop.wait(self.cfg.poll_interval)
@@ -166,7 +166,8 @@ class Poller:
                 record_status(conn, source, 'usage', cycle_ts, False,
                               'empty result', (time.time() - start) * 1000)
         except Exception as e:
-            logger.exception("usage poll failed for source=%s", source)
+            logger.exception("usage poll failed", extra={'source': source, 'kind': 'usage',
+                             'cycle_ts': cycle_ts, 'duration_ms': (time.time() - start) * 1000})
             record_status(conn, source, 'usage', cycle_ts, False, type(e).__name__,
                           (time.time() - start) * 1000)
 
@@ -199,9 +200,13 @@ class Poller:
                     # log; it is reported at info level instead. The status row
                     # still records the failure either way.
                     if category in _EXPECTED_UNAVAILABLE:
-                        logger.info("quota unavailable for source=%s: %s", source, partial_error)
+                        logger.info("quota unavailable: %s", partial_error,
+                                    extra={'source': source, 'kind': 'quota',
+                                           'cycle_ts': cycle_ts, 'error_category': category})
                     else:
-                        logger.warning("quota poll degraded for source=%s: %s", source, partial_error)
+                        logger.warning("quota poll degraded: %s", partial_error,
+                                       extra={'source': source, 'kind': 'quota',
+                                              'cycle_ts': cycle_ts, 'error_category': category})
                     # record_quota writes an ok=1 status row at the data layer;
                     # overwrite it so the degraded cycle is not logged as clean.
                     record_status(conn, source, 'quota', cycle_ts, False,
@@ -219,7 +224,8 @@ class Poller:
                         source, fail_count, _TRANSIENT_THRESHOLD, raw_error,
                     )
                 else:
-                    logger.warning("quota poll failed for source=%s: %s", source, raw_error)
+                    logger.warning("quota poll failed: %s", raw_error,
+                                   extra={'source': source, 'kind': 'quota', 'cycle_ts': cycle_ts})
                 # Prefer the collector's own safe failure category over the
                 # blanket 'fetch failed', which says nothing diagnosable.
                 if category:
@@ -235,7 +241,8 @@ class Poller:
             record_status(conn, source, 'quota', cycle_ts, True, None,
                           (time.time() - start) * 1000)
         except Exception as e:
-            logger.exception("quota poll failed for source=%s", source)
+            logger.exception("quota poll failed", extra={'source': source, 'kind': 'quota',
+                             'cycle_ts': cycle_ts, 'duration_ms': (time.time() - start) * 1000})
             record_status(conn, source, 'quota', cycle_ts, False, type(e).__name__,
                           (time.time() - start) * 1000)
 

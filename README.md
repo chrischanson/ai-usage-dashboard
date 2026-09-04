@@ -174,10 +174,10 @@ Full design decisions: [DESIGN.md](DESIGN.md)
 ## Testing
 
 ```bash
-# 322-check integration suite
+# 328-check integration suite
 PYTHONPATH=backend python3 verify.py
 
-# 294 unit tests (plus subtests) — install the dev extra first
+# 305 unit tests (plus subtests) — install the dev extra first
 pip install -e '.[dev]'   # or: pip install -r requirements-dev.txt
 PYTHONPATH=backend python3 -m pytest -q backend/tests
 ```
@@ -208,7 +208,7 @@ frontend/
   chart.js, hammer.js, chartjs-plugin-zoom.js  (vendored)
 install/          systemd service + SysVinit scripts
 DESIGN.md         Architecture, data model, API spec, build order
-verify.py         Integration test suite (322 checks)
+verify.py         Integration test suite (328 checks)
 run.sh            Convenience launcher (creates venv, installs deps)
 ```
 

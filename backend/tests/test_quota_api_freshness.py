@@ -1,12 +1,14 @@
 """Freshness/force-refresh behaviour of /api/quota/{source}/latest for Codex.
 
-Uses a real FastAPI TestClient against a temp DB (api.DB_PATH is patched, the
-way api.py's routes look it up at request time), and patches the 'codex'
+Uses a real FastAPI TestClient against a temp DB, supplied by handing
+create_app() a Config that points at it -- no global to monkeypatch -- and
+patches the 'codex'
 source-registry entry's quota_collector so no real `codex` subprocess is ever
 spawned. The collector is the seam between the App Server client and
 everything downstream, so faking it here is exactly what the app-server tests
 in test_codex_app_server.py already establish is safe to trust.
 """
+import dataclasses
 import json
 import os
 import sys
@@ -23,6 +25,7 @@ import api
 import db
 import source_registry
 from api import create_app
+from config import load_config
 
 
 def _codex_quota(used_pct=25.0, reset_at=None, plan='Codex (Free)'):
@@ -56,8 +59,9 @@ class _CodexQuotaFreshnessBase(unittest.TestCase):
     def setUp(self):
         self.tmp_fd, self.db_path = tempfile.mkstemp(suffix='.db')
         os.close(self.tmp_fd)
-        self.db_patch = patch('api.DB_PATH', self.db_path)
-        self.db_patch.start()
+        # Config is the single source of truth for the database path, so the
+        # temp DB is injected rather than patched over a module global.
+        self.cfg = dataclasses.replace(load_config(), db_path=self.db_path)
 
         api._quota_cache.clear()
 
@@ -65,13 +69,12 @@ class _CodexQuotaFreshnessBase(unittest.TestCase):
         self.assertIsNotNone(self.entry, 'codex source entry missing from registry')
         self._orig_collector = self.entry.quota_collector
 
-        self.app = create_app()
+        self.app = create_app(self.cfg)
         self.client = TestClient(self.app)
 
     def tearDown(self):
         self.entry.quota_collector = self._orig_collector
         api._quota_cache.clear()
-        self.db_patch.stop()
         try:
             os.unlink(self.db_path)
         except OSError:

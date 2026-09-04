@@ -71,7 +71,7 @@ def setup_mock_agy_quota():
     import time
     import db as dbmod
 
-    conn = dbmod.connect(dbmod.DB_PATH)
+    conn = dbmod.connect(dbmod.default_db_path())
     dbmod.init_schema(conn)
     cycle_ts = int(time.time())
     dbmod.record_quota(conn, 'agy', cycle_ts, {
@@ -89,7 +89,7 @@ def setup_mock_agy_quota():
         },
     })
     conn.close()
-    print(f"  AGY quota snapshot seeded in {dbmod.DB_PATH}")
+    print(f"  AGY quota snapshot seeded in {dbmod.default_db_path()}")
 
 
 def setup_mock_codex():

@@ -482,7 +482,7 @@ Two layers, each runnable independently:
    network. Parser fixtures live in `backend/tests/fixtures/`. Install the
    `dev` extra (`pip install -e '.[dev]'`, or `pip install -r
    requirements-dev.txt`) to get `pytest` alongside the pinned runtime deps.
-   294 tests (plus subtests) as of this writing; CI runs this exact suite.
+   305 tests (plus subtests) as of this writing; CI runs this exact suite.
 2. **`verify.py`** — end-to-end verifier covering server health, HTML
    structure, JS functions, CSS rules, all API endpoints, accessibility, and
    regressions (XSS escaping, cache clearing on tab switch, data-relative date
@@ -495,7 +495,7 @@ Two layers, each runnable independently:
 
    The `a11y` group computes the contrast ratio of the defined color tokens so
    AA compliance is checked, not just asserted. Default run executes all
-   groups: 322 checks as of this writing.
+   groups: 328 checks as of this writing.
 
 A real Codex App Server query (spawning `codex app-server --stdio` against an
 installed CLI and reading a live account's rate limits) is a manual smoke
@@ -704,6 +704,11 @@ models)` / `ParserResult` contract:
 Findings from reading the code (ordered by impact). Each is a discrete,
 independently verifiable change.
 
+> **Audited 2026-09-04. All items are now resolved**, though R4 was resolved by
+> a different route than the one proposed below and R7's `?limit=` clause was
+> made obsolete by a later revision of the API table above. Each item carries
+> its status; the original text is left intact so the reasoning stays readable.
+
 #### R1. Unit tests don't cover the production parse path (highest impact)
 `backend/tests/test_parsers.py` tests the `parsers/` package
 (`OpenCodeParser`, `AgyParser`, `CodexParser`), but the poller actually
@@ -712,6 +717,9 @@ Two parallel implementations; the tested one is dead code in production.
 **Fix**: pick one home (the `parsers/` package, per DESIGN), port the flat
 modules' logic into it, make the poller consume it, delete the duplicates.
 The Claude parser then lands in the consolidated location from day one.
+**Status: done.** The flat modules are gone; `parsers/` holds `agy`, `claude`,
+`codex`, `opencode` and `base`, and both `source_registry` and
+`provider_loader` import only from there.
 
 #### R2. `collection_status` collisions hide failures
 `record_status` is called twice per source per cycle (usage, then quota)
@@ -721,12 +729,15 @@ successful quota fetch reports `ok=1`. `/metrics` and `/ready` lie.
 **Fix**: add a `kind` column (`usage`/`quota`) to the unique key (or record
 quota as `source='<src>:quota'`); surface both in `/metrics`. Also drop the
 dual-signature back-compat shim in `record_status`.
+**Status: done.** `UNIQUE(source, kind, cycle_ts)`, migrated in schema v2.
+`record_status` takes `kind` explicitly and the shim is gone; `metrics()`
+groups by `(source, kind)`.
 
 #### R3. Retention is never enforced
 `db.prune()` exists, is tested in verify.py, and is **never called** by the
 poller — `USAGE_RETENTION_DAYS` does nothing and the DB grows without bound
 (DESIGN requires prune once per cycle). **Fix**: call it at the end of
-`run_once`.
+`run_once`. **Status: done.**
 
 #### R4. Integrity monitor can fabricate data indefinitely
 `fix_cycle_integrity` carries the last row forward whenever a source misses
@@ -738,6 +749,13 @@ frontend can render gaps differently / show the stale badge); cap
 carry-forward at N consecutive cycles (e.g. 6 = 1 h), after which the gap is
 real and the source shows unavailable. Don't carry quota snapshots forward —
 the stale-fallback path already covers quota.
+**Status: resolved, by removal rather than by this fix.** Schema v3 made the
+poller the only writer and stores raw observations, deriving totals and deltas
+at read time, so there is nothing to carry forward and `fix_cycle_integrity`
+no longer exists. `integrity.py` is now a *validating* checker
+(`check_integrity`) plus attribution reconciliation, which does write
+`model_usage` rows — a separate, deliberate mechanism, not cycle fabrication.
+No `carried_forward` column was needed.
 
 #### R5. Poller silently drops data and mis-reports success
 `_poll_source` only inserts when `sessions or messages` is truthy, but still
@@ -745,6 +763,7 @@ records `ok=True` — an all-zero (or shape-mismatched) result looks
 successful while writing nothing, which then triggers R4's fabrication.
 **Fix**: record a distinct status (`ok=False, error='empty result'`) or
 insert the zero row honestly; decide per source and test it.
+**Status: done.** `_poll_usage` records `ok=False, error='empty result'`.
 
 #### R6. Live collector calls inside request handlers
 `/api/quota/*` handlers call `fetch_agy_quota()` / `fetch_codex_quota()` /
@@ -771,6 +790,11 @@ normalizer) consumed by poller and API; routes become
 `source_unknown`. Adding Claude (or removing a source) becomes a one-line
 registry change. Frontend similarly derives tabs from a config array instead
 of hardcoded `agy` special cases where practical.
+**Status: done.** `source_registry` (and YAML providers via `provider_loader`)
+is consumed by both poller and API; unknown sources return the
+`source_unknown` envelope; `?range=` is implemented. The frontend injects tabs
+from `/api/sources` — only the "All" tab is static markup. The `?limit=`
+clause is **obsolete**: the API table above no longer specifies it.
 
 #### R8. Config isn't actually the single source of truth
 `db.py` reads `USAGE_DB_PATH` into a module-global `DB_PATH` at import time
@@ -779,21 +803,34 @@ their own ad-hoc connections via `connect(DB_PATH)`. Tests that set a temp
 DB path can silently hit the real DB.
 **Fix**: thread one `Config` through `create_app(cfg)`/db calls; kill the
 module-global.
+**Status: done.** `db.DB_PATH` is gone, replaced by `default_db_path()` which
+resolves at call time for the few callers without a Config.
+`create_app(cfg=None, poller=None)` closes over `cfg.db_path`; `cfg` stays
+optional so the zero-arg form still works. The freshness tests now inject a
+temp-DB Config instead of monkeypatching a global, and both `verify.py` and
+`test_app_wiring.py` assert the global stays gone.
 
 #### R9. Operational polish (small, do opportunistically)
-- `/ready` and `/metrics` run `init_schema()` on every request — move to startup.
-- Poller logs with `print()`; DESIGN promises structured JSON logs — use
-  `logging` with the JSON formatter, include `source`, `cycle_ts`, `duration_ms`.
-- `main.py` installs SIGTERM handlers that `sys.exit()` while uvicorn also
-  manages signals — poller shutdown ordering is unreliable; use uvicorn's
-  lifespan/shutdown hook to stop the poller.
-- `config.py` error message bug: `''.join(sorted(_VALID_LOG_LEVELS))` prints
-  `DEBUGERRORINFOWARNING` — use `', '.join`.
-- Repo hygiene: `dashboard.log`, `usage.db.bak` in the working tree —
-  confirm `.gitignore` covers them; prune orphan scripts (`poll_once.py`,
-  `seed_test_data.py`, `setup_mock_sources.py`, `migrate_db.py`) or move to
-  a `scripts/` dir; sync README (`USAGE_HOST` default 127.0.0.1) with DESIGN
-  (0.0.0.0).
+- ~~`/ready` and `/metrics` run `init_schema()` on every request~~ — **done**,
+  moved into `create_app()` at startup.
+- ~~Poller logs with `print()`~~ — **done**. `config.setup_logging()` installs
+  `JsonLogFormatter` (one JSON object per line, exception as a single `exc`
+  field), poller log calls carry `source`/`cycle_ts`/`duration_ms`/`kind` via
+  `extra=`, and `main.py` passes `log_config=None` so uvicorn's own lines go
+  through the same formatter instead of printing plain text alongside.
+- ~~`main.py` installs SIGTERM handlers that `sys.exit()`~~ — **done**. The
+  handlers were in fact dead: uvicorn installs its own during startup, so
+  `poller.stop()` never ran. `create_app(cfg, poller=...)` now owns the poller
+  in the app lifespan, `main.py` installs no handlers, and both `verify.py`
+  and `test_app_wiring.py` assert they are not reintroduced.
+- ~~`config.py` error message bug~~ — **done**, uses `', '.join`.
+- Repo hygiene — **mostly done**: `usage.db.bak`, `poll_once.py`,
+  `seed_test_data.py` and `migrate_db.py` are gone; `dashboard.log` is
+  gitignored; README and DESIGN now agree that `USAGE_HOST` defaults to
+  `127.0.0.1`. **Not done**: `setup_mock_sources.py` still lives in `backend/`
+  rather than a `scripts/` dir — deliberately, since it is not an orphan
+  (`.github/workflows/test.yml` invokes it by that path) and moving it would
+  churn CI for a cosmetic gain.
 
 ---
 

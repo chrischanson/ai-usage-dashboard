@@ -2,13 +2,14 @@
 import os
 import threading
 import time
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Query
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, JSONResponse
 
 from db import latest_usage, history, latest_quota, metrics
-from db import connect as _db_connect, DB_PATH, init_schema
+from db import connect as _db_connect, init_schema
 from util import parse_iso_seconds
 from source_registry import get_all_names, is_valid_source
 
@@ -122,7 +123,7 @@ def _error_category(raw) -> str | None:
     return None
 
 
-def _persist_forced_quota(source: str, normalized: dict) -> None:
+def _persist_forced_quota(db_path: str, cfg, source: str, normalized: dict) -> None:
     """Store a manually forced reading so it survives the next page load.
 
     Best-effort: a write failure here must not turn a successful live read
@@ -130,12 +131,11 @@ def _persist_forced_quota(source: str, normalized: dict) -> None:
     """
     try:
         from db import record_quota
-        from config import load_config
         # Snap to the poller's cycle grid so a forced read updates the current
         # cycle's row instead of littering quota_snapshots with off-grid ones.
-        interval = max(1, load_config().poll_interval)
+        interval = max(1, cfg.poll_interval)
         cycle_ts = (int(time.time()) // interval) * interval
-        conn = _db_connect(DB_PATH)
+        conn = _db_connect(db_path)
         try:
             record_quota(conn, source, cycle_ts, normalized)
         finally:
@@ -213,11 +213,41 @@ def _resolve_start_ts(conn, range_str: str, source: str = None) -> int | None:
     return (max_ts - duration) if max_ts else None
 
 
-def create_app() -> FastAPI:
-    app = FastAPI(title="Model Usage Dashboard API", docs_url=None, redoc_url=None)
+def create_app(cfg=None, poller=None) -> FastAPI:
+    """Build the API.
+
+    `cfg` is the single source of truth for configuration. It stays optional
+    so the zero-arg form keeps working (app.py, tests), but the database path
+    is taken from it and closed over here rather than read from a module-level
+    global -- the global was frozen at import time, so a caller pointing at a
+    temp database could still hit the real one.
+
+    `poller`, when given, is owned by the app's lifespan: started on startup
+    and stopped on shutdown. That is the whole point -- the poller used to be
+    stopped from a SIGTERM handler installed in main(), which uvicorn then
+    replaced with its own during startup, so the handler never ran and the
+    poller was killed mid-cycle instead of being asked to stop.
+    """
+    if cfg is None:
+        from config import load_config
+        cfg = load_config()
+    db_path = cfg.db_path
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        if poller is not None:
+            poller.start()
+        try:
+            yield
+        finally:
+            if poller is not None:
+                poller.stop()
+
+    app = FastAPI(title="Model Usage Dashboard API", docs_url=None, redoc_url=None,
+                  lifespan=lifespan)
     app.add_middleware(GZipMiddleware, minimum_size=1024)
 
-    conn = _db_connect(DB_PATH)
+    conn = _db_connect(db_path)
     try:
         init_schema(conn)
     finally:
@@ -276,7 +306,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/usage/latest")
     def api_usage_latest(deltas: bool = Query(False)):
-        conn = _db_connect(DB_PATH)
+        conn = _db_connect(db_path)
         try:
             result = latest_usage(conn, include_model_deltas=deltas)
         finally:
@@ -289,7 +319,7 @@ def create_app() -> FastAPI:
         if not is_valid_source(source):
             return error_response("source_unknown", f"Unknown source: {source}", 404)
 
-        conn = _db_connect(DB_PATH)
+        conn = _db_connect(db_path)
         try:
             result = latest_usage(conn, source=source)
         finally:
@@ -304,7 +334,7 @@ def create_app() -> FastAPI:
         if with_models is None:
             with_models = (range != 'all')
 
-        conn = _db_connect(DB_PATH)
+        conn = _db_connect(db_path)
         try:
             start_ts = _resolve_start_ts(conn, range, source=source)
             return history(conn, source=source, with_models=with_models, start_ts=start_ts)
@@ -316,7 +346,7 @@ def create_app() -> FastAPI:
         if with_models is None:
             with_models = (range != 'all')
 
-        conn = _db_connect(DB_PATH)
+        conn = _db_connect(db_path)
         try:
             start_ts = _resolve_start_ts(conn, range, source=None)
             return history(conn, source=None, with_models=with_models, start_ts=start_ts)
@@ -325,7 +355,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/quota/latest")
     def api_quota_latest(force: bool = False):
-        conn = _db_connect(DB_PATH)
+        conn = _db_connect(db_path)
         try:
             result = latest_quota(conn)
         finally:
@@ -362,7 +392,7 @@ def create_app() -> FastAPI:
         if not is_valid_source(source):
             return error_response("source_unknown", f"Unknown source: {source}", 404)
 
-        conn = _db_connect(DB_PATH)
+        conn = _db_connect(db_path)
         try:
             db_result = latest_quota(conn, source=source)
         finally:
@@ -378,7 +408,7 @@ def create_app() -> FastAPI:
                     # Persist through the same validation path the poller uses,
                     # so the next ordinary page load does not visibly revert to
                     # the older snapshot.
-                    _persist_forced_quota(source, norm)
+                    _persist_forced_quota(db_path, cfg, source, norm)
                     return {source: _annotate(norm, True)}
                 # Refresh failed: hand back the last good snapshot, labelled.
                 if db_result.get(source):
@@ -395,7 +425,7 @@ def create_app() -> FastAPI:
 
     @app.get("/ready")
     def ready():
-        conn = _db_connect(DB_PATH)
+        conn = _db_connect(db_path)
         try:
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) as cnt FROM collection_status WHERE ok=1")
@@ -410,7 +440,7 @@ def create_app() -> FastAPI:
     def get_metrics():
         from integrity import check_integrity
         from config import load_config
-        conn = _db_connect(DB_PATH)
+        conn = _db_connect(db_path)
         try:
             result = metrics(conn)
             cfg = load_config()

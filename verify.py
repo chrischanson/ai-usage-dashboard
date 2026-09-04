@@ -1203,6 +1203,24 @@ if len(lines) <= 3:
 else:
     fail(f'app.py has {len(lines)} non-comment lines (expected <= 3)')
 
+# R8: Config is the source of truth for the DB path. A module-level DB_PATH
+# read at import time meant a caller pointing at a temp database could still
+# reach the real one, so its absence is now part of the contract.
+import db as _db_mod
+if not hasattr(_db_mod, 'DB_PATH'):
+    ok('db.py: no import-time DB_PATH global')
+else:
+    fail('db.py: DB_PATH module global is back; thread Config through instead')
+if hasattr(_db_mod, 'default_db_path') and callable(_db_mod.default_db_path):
+    ok('db.py: default_db_path() resolves the path at call time')
+else:
+    fail('db.py: default_db_path() missing')
+_api_src = open(os.path.join(os.path.dirname(__file__), 'backend', 'api.py')).read()
+if 'def create_app(cfg=None' in _api_src:
+    ok('api.py: create_app() accepts a Config')
+else:
+    fail('api.py: create_app() does not accept a Config')
+
 if 'from .api import create_app' in app_py_content:
     ok('app.py imports create_app from .api')
 else:
@@ -1236,17 +1254,34 @@ checks = [
     ('from db import connect, init_schema', 'imports connect and init_schema from db'),
     ('from poller import Poller', 'imports Poller from poller'),
     ('uvicorn.run', 'calls uvicorn.run()'),
-    ('"api:create_app"', 'references api:create_app'),
-    ('factory=True', 'uses factory=True'),
+    ('create_app(cfg', 'hands the app its Config'),
+    ('Poller(cfg)', 'builds the poller from Config'),
+    ('poller=poller', 'gives the app the poller to own'),
+    ('setup_logging(', 'installs structured logging'),
     ('cfg.host', 'uses cfg.host'),
     ('cfg.port', 'uses cfg.port'),
-    ('signal.signal(signal.SIGTERM', 'handles SIGTERM'),
-    ('signal.signal(signal.SIGINT', 'handles SIGINT'),
-    ('poller.start()', 'starts the poller'),
-    ('poller.stop()', 'stops the poller on shutdown'),
     ('def main():', 'has a main() function'),
     ('if __name__', 'has __main__ guard'),
 ]
+# Signals are uvicorn's job. main.py used to install SIGTERM/SIGINT handlers
+# that called poller.stop(), but uvicorn replaces those during startup, so
+# they never ran and the poller was killed mid-cycle. Assert they are *not*
+# reintroduced, and that shutdown is handled where it now lives instead.
+for pattern, msg in (('signal.signal(signal.SIGTERM', 'SIGTERM handler'),
+                     ('signal.signal(signal.SIGINT', 'SIGINT handler')):
+    if pattern in main_py:
+        fail(f'main.py reinstalls a {msg}; uvicorn owns signals, use the app lifespan')
+    else:
+        ok(f'main.py leaves {msg} to uvicorn')
+
+api_lifespan = open(os.path.join(os.path.dirname(__file__), 'backend', 'api.py')).read()
+for pattern, msg in (('lifespan', 'app declares a lifespan'),
+                     ('poller.start()', 'lifespan starts the poller'),
+                     ('poller.stop()', 'lifespan stops the poller on shutdown')):
+    if pattern in api_lifespan:
+        ok(f'api.py {msg}')
+    else:
+        fail(f'api.py missing: {msg}')
 for pattern, msg in checks:
     if pattern in main_py:
         ok(f'main.py {msg}')

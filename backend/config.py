@@ -1,4 +1,7 @@
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
+import json
+import logging
 import os
 
 
@@ -61,3 +64,48 @@ def load_config() -> Config:
         log_level=ll,
         codex_bin=os.getenv('USAGE_CODEX_BIN', 'codex'),
     )
+
+
+class JsonLogFormatter(logging.Formatter):
+    """One JSON object per line.
+
+    DESIGN specifies structured logs with `source`, `cycle_ts` and
+    `duration_ms`; those arrive as `extra=` on the call and are merged in
+    when present, so a record without them is still valid JSON.
+    """
+
+    _RESERVED = frozenset(vars(logging.LogRecord('', 0, '', 0, '', (), None)))
+    _EXTRA_FIELDS = ('source', 'cycle_ts', 'duration_ms', 'kind', 'error_category')
+
+    def format(self, record: logging.LogRecord) -> str:
+        payload = {
+            'ts': datetime.fromtimestamp(record.created, tz=timezone.utc)
+                          .isoformat(timespec='milliseconds').replace('+00:00', 'Z'),
+            'level': record.levelname,
+            'logger': record.name,
+            'msg': record.getMessage(),
+        }
+        for field in self._EXTRA_FIELDS:
+            value = getattr(record, field, None)
+            if value is not None:
+                payload[field] = value
+        if record.exc_info:
+            # The traceback is one field, not interleaved lines, so a single
+            # log record stays a single parseable object.
+            payload['exc'] = self.formatException(record.exc_info)
+        return json.dumps(payload, default=str)
+
+
+def setup_logging(level: str = 'INFO') -> None:
+    """Install the JSON formatter on the root handler.
+
+    Idempotent: re-running replaces the handler rather than stacking another,
+    so a double call cannot duplicate every line.
+    """
+    root = logging.getLogger()
+    root.setLevel(getattr(logging, str(level).upper(), logging.INFO))
+    for existing in list(root.handlers):
+        root.removeHandler(existing)
+    handler = logging.StreamHandler()
+    handler.setFormatter(JsonLogFormatter())
+    root.addHandler(handler)
