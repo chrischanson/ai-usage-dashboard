@@ -44,6 +44,43 @@ export function renderMeterRow(label, valueText, pct, barColor, refreshStr) {
     `;
 }
 
+// Keys carrying metadata rather than quota data. `_plan` and `_status` are
+// the ones in use today; the prefix test covers anything added later, so a new
+// envelope field cannot turn into a phantom card.
+export function isMetaKey(key) {
+    return typeof key === 'string' && key.startsWith('_');
+}
+
+// Freshness line for a card whose data did not come from a live read.
+export function staleNote(status) {
+    if (!status || status.live) return '';
+    const age = status.age_seconds;
+    let ageStr = '';
+    if (age !== null && age !== undefined) {
+        if (age < 120) ageStr = `${Math.round(age)}s`;
+        else if (age < 7200) ageStr = `${Math.round(age / 60)} min`;
+        else if (age < 172800) ageStr = `${Math.round(age / 3600)} hr`;
+        else ageStr = `${Math.round(age / 86400)} days`;
+    }
+    if (!status.observed_at) {
+        return status.error_category
+            ? `Unavailable (${String(status.error_category).replace(/_/g, ' ')})`
+            : 'No reading recorded yet';
+    }
+    const prefix = status.stale ? 'Stale' : 'Last snapshot';
+    return ageStr ? `${prefix} \u2014 ${ageStr} old` : prefix;
+}
+
+// Codex may report several windows (a primary bucket, its secondary window,
+// and additional metered limit ids). The primary keeps the stable
+// `rate_limit` key and leads; the rest follow in the order the API sent them.
+export function codexLimits(group) {
+    if (!group || typeof group !== 'object') return [];
+    const keys = Object.keys(group).filter(k => !isMetaKey(k));
+    keys.sort((a, b) => (a === 'rate_limit' ? -1 : b === 'rate_limit' ? 1 : 0));
+    return keys.map(k => Object.assign({ _key: k }, group[k]));
+}
+
 export function renderQuota(data, source) {
     const container = document.getElementById('quota-cards');
     const titleEl = document.getElementById('quota-title');
@@ -70,6 +107,8 @@ export function renderQuota(data, source) {
     }
 
     for (const [src, quotaData] of Object.entries(data)) {
+        // A top-level envelope key is metadata about the payload, not a source.
+        if (isMetaKey(src)) continue;
         if (!quotaData || Object.keys(quotaData).length === 0) continue;
 
         if (src === 'opencode') {
@@ -80,10 +119,20 @@ export function renderQuota(data, source) {
             }
         } else if (src === 'codex') {
             const group = quotaData.openai;
-            if (group) {
-                const rateLimit = group.rate_limit || {};
-                const plan = quotaData._plan || 'free';
-                const targetContainer = getCompactColumn();
+            const plan = quotaData._plan || 'free';
+            const targetContainer = getCompactColumn();
+            // `rateLimit` stays the primary bucket so the single-meter card is
+            // unchanged when that is all Codex reports; the extra windows ride
+            // along on the group so additional meters can be drawn beneath it.
+            // `rateLimit` remains the primary bucket -- the renderer's
+            // contract and verify.py's signature check both depend on that --
+            // carrying the sibling windows and the freshness envelope as
+            // metadata rather than widening the call.
+            const rateLimit = Object.assign({}, (group && group.rate_limit) || {}, {
+                _limits: codexLimits(group),
+                _status: quotaData._status,
+            });
+            if (group || quotaData._plan) {
                 renderCodexQuota(targetContainer, rateLimit, plan);
             }
         } else if (src === 'claude') {
@@ -95,7 +144,7 @@ export function renderQuota(data, source) {
         } else {
             const agyPlan = quotaData._plan || 'Free';
             for (const [group, limits] of Object.entries(quotaData)) {
-                if (group === '_plan') continue;
+                if (isMetaKey(group)) continue;
                 const card = document.createElement('div');
                 card.className = 'quota-group';
                 const groupLabel = group.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\bGpt\b/g, 'GPT');
@@ -129,7 +178,7 @@ export function renderAgyQuota(container, data) {
     const card = document.createElement('div');
     card.className = 'quota-group';
 
-    const groupKeys = Object.keys(data).filter(k => k !== '_plan');
+    const groupKeys = Object.keys(data).filter(k => !isMetaKey(k));
     groupKeys.sort((a, b) => {
         if (a.includes('gemini')) return -1;
         if (b.includes('gemini')) return 1;
@@ -251,70 +300,100 @@ function formatCodexPlan(planType) {
     return /plan$/i.test(raw) ? titled : titled + ' Plan';
 }
 
+// Countdown text for one bucket, recomputed from the absolute reset time on
+// every render so a stored snapshot ages honestly instead of freezing a
+// "refreshes in" duration captured when it was written.
+export function codexRefreshText(limit, nowMs) {
+    const now = Math.floor((nowMs === undefined ? Date.now() : nowMs) / 1000);
+    const resetAt = Number(limit.reset_at) || 0;
+    let seconds = Number(limit.refreshes_in || limit.refreshes_in_seconds) || 0;
+    if (resetAt > 0) seconds = Math.max(0, resetAt - now);
+
+    if (seconds <= 0) {
+        // An elapsed reset time means the window has rolled over; the stored
+        // percentage predates that, so promise nothing about the new window.
+        if (resetAt > 0) return 'Window reset \u2014 awaiting next reading';
+        return '';
+    }
+
+    const days = Math.floor(seconds / 86400);
+    const hrs = Math.floor((seconds % 86400) / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    let timeStr;
+    if (days > 0) timeStr = `${days}d ${hrs}h`;
+    else if (hrs > 0) timeStr = `${hrs}h ${mins}m`;
+    else timeStr = `${mins}m`;
+
+    if (resetAt > 0) {
+        const dt = new Date(resetAt * 1000);
+        const formatted = dt.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        return `Resets in ${timeStr} (${formatted})`;
+    }
+    return `Resets in ${timeStr}`;
+}
+
+// Label for one bucket: whatever Codex called it, else the window duration.
+export function codexLimitLabel(limit) {
+    if (limit.limit_label) return String(limit.limit_label);
+    const wm = Number(limit.window_minutes) || 0;
+    if (wm >= 43200) return 'Monthly';
+    if (wm >= 10080) return 'Weekly';
+    if (wm >= 1440) return 'Daily';
+    if (wm >= 60) return `${Math.round(wm / 60)}h window`;
+    if (wm > 0) return `${wm}m window`;
+    return 'Primary Limit';
+}
+
 export function renderCodexQuota(container, rateLimit, planType) {
     const card = document.createElement('div');
     card.className = 'quota-group';
 
     const planLabel = formatCodexPlan(planType);
-    const hasLimit = rateLimit.remaining_pct !== undefined;
+    // The composite container carries the sibling windows; fall back to the
+    // primary bucket alone so a bare rate-limit object still renders.
+    let limits = Array.isArray(rateLimit._limits) ? rateLimit._limits : [];
+    if (!limits.length && rateLimit.remaining_pct !== undefined) {
+        limits = [Object.assign({ _key: 'rate_limit' }, rateLimit)];
+    }
+    const status = rateLimit._status;
+    const note = staleNote(status);
 
-    if (hasLimit) {
-        const pct = clampPct(rateLimit.remaining_pct);
-        const barColor = pct > 50 ? 'green' : pct > 20 ? 'amber' : 'red';
-        const resetAt = rateLimit.reset_at;
-        let seconds = rateLimit.refreshes_in || rateLimit.refreshes_in_seconds || 0;
-        if (resetAt && resetAt > 0) {
-            const nowSec = Math.floor(Date.now() / 1000);
-            seconds = Math.max(0, Math.floor(resetAt - nowSec));
-        }
+    const heading = `<h3>Codex <span class="badge badge-codex">${escapeHtml(planLabel)}</span></h3>`;
+    const noteHtml = note
+        ? `<p class="quota-note" role="status">${escapeHtml(note)}</p>`
+        : '';
 
-        let refreshStr = '';
-        if (seconds > 0) {
-            const days = Math.floor(seconds / 86400);
-            const hrs = Math.floor((seconds % 86400) / 3600);
-            const mins = Math.floor((seconds % 3600) / 60);
+    if (limits.length) {
+        // A single bucket keeps the original one-meter card; extra windows use
+        // the same meter-row layout so the card stays responsive either way.
+        const single = limits.length === 1;
+        const rows = limits.map(limit => {
+            const pct = clampPct(limit.remaining_pct);
+            const barColor = pct > 50 ? 'green' : pct > 20 ? 'amber' : 'red';
+            let label = codexLimitLabel(limit);
+            if (single && label !== 'Primary Limit') label = `Primary Limit (${label})`;
+            let refreshStr = codexRefreshText(limit);
+            if (!refreshStr && pct >= 99.9) refreshStr = 'Quota reset (100% available)';
 
-            let timeStr = '';
-            if (days > 0) {
-                timeStr = `${days}d ${hrs}h`;
-            } else if (hrs > 0) {
-                timeStr = `${hrs}h ${mins}m`;
-            } else {
-                timeStr = `${mins}m`;
-            }
-
-            if (resetAt && resetAt > 0) {
-                const dt = new Date(resetAt * 1000);
-                const formatted = dt.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-                refreshStr = `Resets in ${timeStr} (${formatted})`;
-            } else {
-                refreshStr = `Resets in ${timeStr}`;
-            }
-        } else if (pct >= 99.9) {
-            refreshStr = 'Quota reset (100% available)';
-        }
-
-        let windowLabel = 'Primary Limit';
-        if (rateLimit.window_minutes) {
-            const wm = rateLimit.window_minutes;
-            if (wm >= 43200) windowLabel = 'Primary Limit (Monthly)';
-            else if (wm >= 10080) windowLabel = 'Primary Limit (Weekly)';
-            else if (wm >= 1440) windowLabel = 'Primary Limit (Daily)';
-            else if (wm >= 60) windowLabel = `Primary Limit (${Math.round(wm / 60)}h window)`;
-            else windowLabel = `Primary Limit (${wm}m window)`;
-        }
-
-        card.innerHTML = `
-            <h3>Codex <span class="badge badge-codex">${escapeHtml(planLabel)}</span></h3>
-            ${renderMeterRow(windowLabel, `${pct.toFixed(1)}% remaining`, pct, barColor, refreshStr)}
-        `;
+            const exhausted = limit.limit_reached || pct <= 0;
+            const valueText = exhausted
+                ? `<span class="quota-exhausted">Exhausted</span>`
+                : `${pct.toFixed(1)}% remaining`;
+            return renderMeterRow(label, valueText, pct, exhausted ? 'red' : barColor, refreshStr);
+        }).join('');
+        card.innerHTML = `${heading}${rows}${noteHtml}`;
     } else {
+        // Distinguish "signed in, but Codex reports no meters" from a failed
+        // read showing an older snapshot. Neither is an error state, and
+        // neither should imply that activity will conjure a limit.
+        const message = status && status.error_category
+            ? 'Quota unavailable right now.'
+            : 'This Codex account reports no active quota windows.';
         card.innerHTML = `
-            <h3>Codex <span class="badge badge-codex">${escapeHtml(planLabel)}</span></h3>
+            ${heading}
             <div class="quota-limit">
-                <p style="color: #8a9fc8; font-size: 0.85rem; margin: 0.5rem 0;">
-                    Rate limit details will populate once Codex activity is recorded.
-                </p>
+                <p class="quota-note">${escapeHtml(message)}</p>
+                ${noteHtml}
             </div>
         `;
     }

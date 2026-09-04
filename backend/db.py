@@ -105,6 +105,14 @@ def init_schema(conn: sqlite3.Connection) -> None:
             total REAL,
             remaining_pct REAL,
             refreshes_in_seconds INTEGER,
+            -- v6. `refreshes_in_seconds` is a duration captured at write time,
+            -- so it is already wrong by the time it is read back; `reset_at`
+            -- is the absolute truth the UI counts down from. window_minutes
+            -- and limit_label describe which bucket the row belongs to, which
+            -- a source reporting several windows needs to stay distinguishable.
+            reset_at INTEGER,
+            window_minutes INTEGER,
+            limit_label TEXT,
             UNIQUE(source, cycle_ts, model_group, limit_type)
         )
     ''')
@@ -150,7 +158,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
 
     cursor.execute(
         "INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)",
-        ('schema_version', '5')
+        ('schema_version', '6')
     )
 
     conn.commit()
@@ -234,6 +242,22 @@ def _migrate_schema(conn: sqlite3.Connection) -> None:
         cursor.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '5')")
         conn.commit()
         version = 5
+
+    # v6 widens quota_snapshots with the absolute reset time and the window a
+    # row describes. Purely additive: existing rows keep NULLs and stay
+    # readable, and the columns fill in from the next poll onwards. Guarded by
+    # introspection because init_schema already creates them on a fresh file.
+    if version < 6:
+        cursor.execute("PRAGMA table_info(quota_snapshots)")
+        existing = {r[1] for r in cursor.fetchall()}
+        for column, decl in (('reset_at', 'INTEGER'),
+                             ('window_minutes', 'INTEGER'),
+                             ('limit_label', 'TEXT')):
+            if column not in existing:
+                cursor.execute(f'ALTER TABLE quota_snapshots ADD COLUMN {column} {decl}')
+        cursor.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '6')")
+        conn.commit()
+        version = 6
 
 
 def _table_exists(cursor, name: str) -> bool:
@@ -982,6 +1006,10 @@ def _do_insert_quota(conn, source, cycle_ts, data, plan=None):
 
     if isinstance(data, dict):
         for key, val in data.items():
+            # Underscore-prefixed keys are metadata (`_plan`, and the
+            # freshness envelope the API adds), never quota groups.
+            if isinstance(key, str) and key.startswith('_'):
+                continue
             if not isinstance(val, dict):
                 continue
             for subkey, subval in val.items():
@@ -1010,20 +1038,41 @@ def _do_insert_quota(conn, source, cycle_ts, data, plan=None):
     conn.commit()
 
 
+def _clean_int(value):
+    """Non-negative integer, or None when the value is missing/unusable.
+
+    A quota row with a nonsensical duration is stored as NULL rather than a
+    bogus number: the UI can say "unknown" honestly, but it cannot un-invent a
+    countdown that never existed.
+    """
+    if value is None:
+        return None
+    try:
+        num = int(value)
+    except (TypeError, ValueError):
+        return None
+    return num if num >= 0 else None
+
+
 def _save_quota_row(conn, ts_str, source, cycle_ts, group_name, limit_type, info):
     used = info.get('used', 0.0)
     total = info.get('total', 0.0)
     remaining_pct = info.get('remaining_pct', 0.0)
     refreshes_in = info.get('refreshes_in_seconds', info.get('refreshes_in', 0))
+    reset_at = _clean_int(info.get('reset_at'))
+    window_minutes = _clean_int(info.get('window_minutes'))
+    limit_label = info.get('limit_label') or None
 
     conn.execute('''
         INSERT OR REPLACE INTO quota_snapshots (
             timestamp, source, cycle_ts, model_group, limit_type,
-            used, total, remaining_pct, refreshes_in_seconds
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            used, total, remaining_pct, refreshes_in_seconds,
+            reset_at, window_minutes, limit_label
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         ts_str, source, cycle_ts, group_name, limit_type,
-        used, total, remaining_pct, refreshes_in
+        used, total, remaining_pct, refreshes_in,
+        reset_at, window_minutes, limit_label
     ))
 
 
@@ -1043,6 +1092,17 @@ def latest_quota(conn: sqlite3.Connection, source: str = None) -> dict:
         )
         row = cursor.fetchone()
         if not row:
+            # No limit rows, but the source may still have reported a plan --
+            # an account with no active meters, or one whose quota read failed
+            # while the plan was still readable. Returning the plan alone keeps
+            # the badge correct instead of dropping the card entirely.
+            cursor.execute(
+                "SELECT plan FROM quota_plans WHERE source=? ORDER BY cycle_ts DESC LIMIT 1",
+                (src,)
+            )
+            prow = cursor.fetchone()
+            if prow and prow['plan']:
+                result[src] = {'_plan': prow['plan']}
             continue
         cts = row['cycle_ts']
         cursor.execute(

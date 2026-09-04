@@ -300,7 +300,9 @@ if status == 200:
         else:
             fail('Quota: AGY _plan missing')
         # AGY model groups
-        agy_groups = [k for k in d.get('agy', {}) if k != '_plan']
+        # Underscore-prefixed keys are metadata (_plan, and the _status
+        # freshness envelope), never quota groups.
+        agy_groups = [k for k in d.get('agy', {}) if not k.startswith('_')]
         for expected in ('gemini_models', 'claude_gpt_models'):
             if expected in agy_groups:
                 ok(f'Quota: AGY group "{expected}" present')
@@ -505,7 +507,10 @@ app_py = open(os.path.join(os.path.dirname(__file__), 'backend', 'app.py')).read
 api_py = open(os.path.join(os.path.dirname(__file__), 'backend', 'api.py')).read()
 poller_py = open(os.path.join(os.path.dirname(__file__), 'backend', 'poller.py')).read()
 reg_source = open(os.path.join(os.path.dirname(__file__), 'backend', 'source_registry.py')).read()
-code_source = api_py + app_py + poller_py + reg_source
+# The Codex normalizer now lives in codex_quota.py; source_registry and the
+# YAML provider both delegate to it, so that is where the plan fallback is.
+codex_source = open(os.path.join(os.path.dirname(__file__), 'backend', 'codex_quota.py')).read()
+code_source = api_py + app_py + poller_py + reg_source + codex_source
 if "plan_type" in code_source and "plan" in code_source:
     ok('Codex plan reads from plan_type OR plan')
 else:
@@ -748,7 +753,7 @@ try:
 
     cur = conn.execute("SELECT value FROM meta WHERE key='schema_version'")
     row = cur.fetchone()
-    if row and row['value'] in ('1', '2', '3', '4', '5'):
+    if row and row['value'] in ('1', '2', '3', '4', '5', '6'):
         ok(f'meta has schema_version={row["value"]}')
     else:
         fail(f'schema_version missing or wrong from meta, got: {row}')
@@ -1605,13 +1610,13 @@ if "', '.join(sorted(_VALID_LOG_LEVELS))" in config_py:
 else:
     fail('config.py: error message uses wrong join')
 
-# ── 47. Schema version 5 ──
-heading(47, 'Schema version 5')
+# ── 47. Schema version 6 ──
+heading(47, 'Schema version 6')
 
-if "'schema_version', '5'" in db_py_str:
-    ok('db.py: schema_version set to 5')
+if "'schema_version', '6'" in db_py_str:
+    ok('db.py: schema_version set to 6')
 else:
-    fail('db.py: schema_version not 5')
+    fail('db.py: schema_version not 6')
 
 if 'quota_plans' in db_py_str:
     ok('db.py: quota_plans table for persisted plan badges')

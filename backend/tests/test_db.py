@@ -218,9 +218,9 @@ class DerivationTest(unittest.TestCase):
         self.assertAlmostEqual(models_by_cycle[2800]['cost'], 7.75)
         self.assertAlmostEqual(models_by_cycle[2800]['delta_cost'], 2.50)
 
-    def test_schema_v5_indexes_exist(self):
+    def test_schema_v6_indexes_exist(self):
         row = self.conn.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
-        self.assertEqual(row['value'], '5')
+        self.assertEqual(row['value'], '6')
         cursor = self.conn.execute("SELECT name FROM sqlite_master WHERE type='index'")
         indexes = {r['name'] for r in cursor.fetchall()}
         expected_indexes = {

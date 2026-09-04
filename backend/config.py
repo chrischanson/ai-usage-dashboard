@@ -15,6 +15,11 @@ class Config:
     host: str = '127.0.0.1'
     port: int = 8000
     log_level: str = 'INFO'
+    # The Codex CLI used for `codex app-server --stdio` quota reads. A bare
+    # name is looked up on PATH and then in the usual install locations; a
+    # path is honoured as given. Set USAGE_CODEX_BIN under systemd, where
+    # ~/.local/bin is normally absent from PATH.
+    codex_bin: str = 'codex'
 
 
 _VALID_LOG_LEVELS = frozenset({'DEBUG', 'INFO', 'WARNING', 'ERROR'})
@@ -54,4 +59,5 @@ def load_config() -> Config:
         host=os.getenv('USAGE_HOST', '127.0.0.1'),
         port=_getenv_int('USAGE_PORT', 8000),
         log_level=ll,
+        codex_bin=os.getenv('USAGE_CODEX_BIN', 'codex'),
     )

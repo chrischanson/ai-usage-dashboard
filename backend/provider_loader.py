@@ -12,9 +12,12 @@ Security:
   - subprocess adapters use list argv (no shell=True).
   - HTTP adapters enforce HTTPS (except localhost for testing).
   - SQLite adapters open in read-only mode.
+  - Provider ids (YAML filename stems) are validated against ``^[a-z0-9_-]+$``
+    before use, since they end up verbatim in generated CSS and DOM attributes.
 """
 
 import os
+import re
 import logging
 from typing import Any, Callable, Dict, Optional
 
@@ -32,6 +35,12 @@ from adapters.script_adapter import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Provider/source ids are derived from YAML filenames and flow all the way
+# into generated CSS (class names, custom property names) and DOM attributes
+# in the frontend. Keep them to a conservative, unambiguous slug so a stray
+# character in a filename can never corrupt a stylesheet or an attribute.
+_VALID_ID_RE = re.compile(r'^[a-z0-9_-]+$')
 
 
 # ---------------------------------------------------------------------------
@@ -209,6 +218,17 @@ def _build_parser_factory(usage_config: Dict[str, Any], cfg_obj: Any) -> Callabl
         return parser_factory
 
 
+def _quota_collector_kwargs(cfg_obj: Any) -> Dict[str, Any]:
+    """Configuration passed to every script quota collector."""
+    if cfg_obj is None:
+        return {}
+    return {
+        key: getattr(cfg_obj, key)
+        for key in ('codex_bin', 'network_timeout', 'subprocess_timeout')
+        if hasattr(cfg_obj, key)
+    }
+
+
 def _build_quota_collector(quota_config: Dict[str, Any], cfg_obj: Any) -> Callable:
     """Build a zero-arg callable that fetches raw quota data."""
     type_ = quota_config.get("type")
@@ -217,7 +237,13 @@ def _build_quota_collector(quota_config: Dict[str, Any], cfg_obj: Any) -> Callab
         module_path = quota_config.get("module")
         if not module_path:
             raise ValueError("python_script quota requires 'module' path")
-        return load_script_quota_collector(module_path)
+        collect_fn = load_script_quota_collector(module_path)
+
+        def script_collector():
+            # Script collectors take **kwargs, so configuration reaches them
+            # here rather than each one re-loading config for itself.
+            return collect_fn(**_quota_collector_kwargs(cfg_obj))
+        return script_collector
     else:
         def collector():
             adapter = _create_adapter(quota_config, cfg_obj)
@@ -279,6 +305,16 @@ def load_providers(providers_dir: str, cfg: Any) -> Dict[str, _SourceEntry]:
             continue
 
         source_name = os.path.splitext(filename)[0]
+
+        if not _VALID_ID_RE.match(source_name):
+            logger.warning(
+                "Skipping %s: provider id %r is not a valid slug "
+                "(must match %s) -- this id is used verbatim in generated "
+                "CSS class names and custom properties, so it is restricted "
+                "to lowercase letters, digits, '_' and '-'",
+                filename, source_name, _VALID_ID_RE.pattern,
+            )
+            continue
 
         try:
             with open(filepath, 'r') as f:

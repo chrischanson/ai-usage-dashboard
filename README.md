@@ -30,7 +30,7 @@ If you run multiple AI coding assistants, tracking quota and spend across separa
 - 🍩 **Donut model distribution** chart — see which models consumed the most tokens
 - 🗂️ **Per-source tabs**: All (combined), AGY, Claude, OpenCode, Codex
 - ⏱️ **Time range filters**: 1h / 6h / 1d / 1w / 1m / 3m / all
-- 💳 **Quota bars** with live plan badge for AGY and Claude; cost display for OpenCode; monthly limit for Codex
+- 💳 **Quota bars** with live plan badge for AGY and Claude; cost display for OpenCode; per-window rate limits for Codex (primary/secondary windows plus any additional metered limits it reports)
 - 📱 **Mobile responsive** — container queries plus responsive breakpoints at 1024 px and 640 px
 - ♿ **Accessible** — cycle strip live region, `aria-sort` on sortable columns, `role="meter"` quota meters, ARIA roles, keyboard navigation, `:focus-visible`, `prefers-reduced-motion`
 - 🔒 **Secure by default** — local-only bind (`127.0.0.1`), CSP headers, no secrets logged
@@ -57,6 +57,11 @@ cd backend
 PYTHONPATH=. python3 -m main
 ```
 
+`requirements.txt` pins the exact runtime versions used for deployment;
+`pyproject.toml` declares the same runtime set (`fastapi`, `uvicorn`, `httpx`, `pyyaml`)
+as `>=` ranges plus a `dev` extra for testing. For development, `pip install -e '.[dev]'`
+installs the package and `pytest` together instead of `requirements.txt`.
+
 ---
 
 ## Data Sources
@@ -66,7 +71,7 @@ PYTHONPATH=. python3 -m main
 | **AGY (Antigravity)** | Local conversation `.db` protobuf blobs | Cloud Code RPC + `loadCodeAssist` |
 | **Claude (Claude Code)** | Local `~/.claude/projects/**/*.jsonl` transcripts | Anthropic OAuth usage API (`~/.claude/.credentials.json`) |
 | **OpenCode CLI** | `opencode stats --models` subprocess | Same subprocess (total cost) |
-| **Codex CLI (OpenAI)** | `~/.codex/state_5.sqlite` threads | JWT plan + `logs_2.sqlite` rate-limit events |
+| **Codex CLI (OpenAI)** | `~/.codex/state_5.sqlite` threads | JWT plan + a short-lived `codex app-server --stdio` session (`account/rateLimits/read`) |
 
 Every source is **optional and isolated** — if a source is absent or fails, the rest of the dashboard keeps working.
 
@@ -108,14 +113,24 @@ All settings via environment variables (all have sensible defaults):
 | `USAGE_SUBPROCESS_TIMEOUT` | `20` | Timeout for CLI subprocess calls |
 | `USAGE_NETWORK_TIMEOUT` | `10` | Timeout for network/quota calls |
 | `USAGE_RETENTION_DAYS` | `90` | History pruning window |
-| `USAGE_HOST` | `0.0.0.0` | Bind address — LAN/tailnet-reachable by default, no auth (see Security note below) |
+| `USAGE_HOST` | `127.0.0.1` | Bind address — loopback-only by default (see Security note below) |
 | `USAGE_PORT` | `8000` | Bind port |
 | `USAGE_LOG_LEVEL` | `INFO` | Logging level |
+| `USAGE_CODEX_BIN` | `codex` | Codex CLI used for `codex app-server --stdio` quota reads. A bare name is resolved on `PATH`, then probed at `~/.local/bin/codex` and `/usr/local/bin/codex`; a path (containing `/`) is used as given. |
 
-**Security note:** there is no authentication on any route. This is intentional — the
-dashboard is meant to be reachable from LAN and tailnet devices without a login step. Set
-`USAGE_HOST=127.0.0.1` (and use an SSH tunnel or `tailscale serve` for remote access) if
-you'd rather not expose it, especially on an untrusted network.
+**Security note:** there is no authentication on any route, but the default bind is
+loopback-only (`127.0.0.1`), so nothing off the host can reach it out of the box. Widen
+this deliberately — e.g. `USAGE_HOST=0.0.0.0` to make it LAN/tailnet-reachable — only if
+you have a reason to, and put something in front of it (an SSH tunnel or `tailscale
+serve`) if the network isn't fully trusted.
+
+**Codex CLI under systemd:** the official Codex installer puts the binary in
+`~/.local/bin`, which a systemd unit does not inherit on `PATH`. Set `USAGE_CODEX_BIN`
+explicitly to the full path in `/etc/default/usage-dashboard` (template at
+`install/usage-dashboard.default`) and run `systemctl restart usage-dashboard` after
+changing it — without this, Codex quota degrades to plan-only. `USAGE_NETWORK_TIMEOUT`
+also bounds the whole Codex App Server session (spawn, initialize, and the quota read
+together), not just plain network calls.
 
 ---
 
@@ -159,12 +174,17 @@ Full design decisions: [DESIGN.md](DESIGN.md)
 ## Testing
 
 ```bash
-# 318-check integration suite
+# 322-check integration suite
 PYTHONPATH=backend python3 verify.py
 
-# 127 unit tests
-PYTHONPATH=backend python3 -m unittest discover -s backend/tests
+# 263 unit tests (plus subtests) — install the dev extra first
+pip install -e '.[dev]'   # or: pip install -r requirements-dev.txt
+PYTHONPATH=backend python3 -m pytest -q backend/tests
 ```
+
+A real Codex App Server query (a live `codex app-server --stdio` session against an
+installed CLI) is a manual smoke test only — CI mocks Codex and no test requires a real
+ChatGPT/Codex account.
 
 ---
 
@@ -188,7 +208,7 @@ frontend/
   chart.js, hammer.js, chartjs-plugin-zoom.js  (vendored)
 install/          systemd service + SysVinit scripts
 DESIGN.md         Architecture, data model, API spec, build order
-verify.py         Integration test suite (318 checks)
+verify.py         Integration test suite (322 checks)
 run.sh            Convenience launcher (creates venv, installs deps)
 ```
 

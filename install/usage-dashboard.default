@@ -1,0 +1,33 @@
+# Configuration for the AI Usage Dashboard systemd service.
+# Install to /etc/default/usage-dashboard, then:
+#   sudo systemctl restart usage-dashboard
+#
+# Every setting is optional; the defaults shown are what the service uses if
+# the variable is absent.
+
+# Bind address. The default is loopback-only, which has no authentication in
+# front of it. Only widen this if you have a reason to, and put something in
+# front of it (an SSH tunnel or `tailscale serve`) if you do.
+#USAGE_HOST=127.0.0.1
+#USAGE_PORT=8000
+
+# Path to the Codex CLI, used for `codex app-server --stdio` quota reads.
+# Set this explicitly: systemd units do not inherit a user's ~/.local/bin,
+# where the official Codex installer puts the binary, so leaving it to PATH
+# discovery usually fails under the service even though it works in a shell.
+# Find the right value with: which codex
+#USAGE_CODEX_BIN=/home/YOUR_USER/.local/bin/codex
+
+# Seconds between poll cycles.
+#USAGE_POLL_INTERVAL=600
+
+# Timeouts, in seconds. USAGE_NETWORK_TIMEOUT also bounds the whole Codex App
+# Server session (spawn, initialize and the quota read together).
+#USAGE_NETWORK_TIMEOUT=10
+#USAGE_SUBPROCESS_TIMEOUT=20
+
+# Days of history retained before pruning.
+#USAGE_RETENTION_DAYS=90
+
+# One of DEBUG, INFO, WARNING, ERROR.
+#USAGE_LOG_LEVEL=INFO

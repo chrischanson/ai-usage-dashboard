@@ -43,3 +43,8 @@ implemented_plans/
 # ignore only per-machine local state
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+
+# Python build artifacts (from `pip install .` / `pip install -e .`)
+build/
+dist/
+*.egg-info/

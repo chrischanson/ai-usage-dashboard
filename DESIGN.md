@@ -41,19 +41,23 @@ retry/backoff state on top of it. If a feature here is not required by the
 | **AGY** | Conversation protobuf blobs from `~/.gemini/antigravity-*/conversations/*.db` | Cloud Code API via local RPC (`RetrieveUserQuotaSummary`) + `loadCodeAssist` for plan (`paidTier.name`) |
 | **Claude (Claude Code)** | Local `~/.claude/projects/**/*.jsonl` transcripts | Anthropic OAuth usage API (`~/.claude/.credentials.json`) |
 | **OpenCode** | `opencode stats --models` subprocess output | Same subprocess; total cost extracted |
-| **Codex (OpenAI)** | `~/.codex/state_5.sqlite` threads table | JWT plan (`chatgpt_plan_type`) + billing API + `logs_2.sqlite` rate-limit events |
+| **Codex (OpenAI)** | `~/.codex/state_5.sqlite` threads table | JWT plan (`chatgpt_plan_type`) + a short-lived local `codex app-server --stdio` JSON-RPC session (`account/rateLimits/read`); `logs_2.sqlite` scraping survives only as a deprecated fallback for older Codex releases |
 
 Every source is **optional and isolated**: if a source's files/commands are
 absent or fail, the rest of the system keeps working and reports that source
 as unavailable rather than crashing.
+
+The Codex App Server protocol is documented by the installed binary itself,
+not an external reference: `codex app-server generate-json-schema --out
+<dir>` regenerates it, version-matched to whatever CLI is on the host.
 
 #### API Endpoints
 
 | Endpoint | Method | Returns | Notes |
 |---|---|---|---|
 | `/api/sources` | GET | List of available data sources | Returns `[{name, display_name}]` from source registry |
-| `/api/usage/latest` | GET | Combined latest usage for all sources | Server-aggregated at latest `cycle_ts`; `?deltas=true` adds model deltas; additive `_meta` block carries `{poll_interval_s, latest_cycle_ts, next_cycle_ts}` for the cycle strip |
-| `/api/usage/history` | GET | Combined history across all sources | Server-aggregated per `cycle_ts`; optional `?range=` |
+| `/api/usage/latest` | GET | Latest usage for every source, keyed by source name | Not summed server-side — one raw row per source, same shape as the per-source endpoint; `?deltas=true` adds model deltas; additive `_meta` block carries `{poll_interval_s, latest_cycle_ts, next_cycle_ts}` for the cycle strip |
+| `/api/usage/history` | GET | Combined history across all sources | Server-aggregated per `cycle_ts` (`SUM … GROUP BY`); exists and is exercised by tests, but the frontend's "All" tab does not call it — see *Frontend State Machine* |
 | `/api/usage/{source}/latest` | GET | Per-source usage (`agy`/`claude`/`opencode`/`codex`) | 404 on unknown source |
 | `/api/usage/{source}/history` | GET | Per-source history series | optional `?range=` cap |
 | `/api/quota/latest` | GET | Combined quota with plan labels | Served from DB snapshots by default; `?force=true` triggers live refresh |
@@ -82,7 +86,11 @@ envelope otherwise (see *API Specification*).
 - **AGY**: Model groups with limit bars (`Session 5h` top, `Weekly` bottom). Plan badge dynamic from API (`paidTier.name`).
 - **Claude**: Model groups with limit bars (`Session 5h` top, `Weekly` bottom). Plan badge dynamic.
 - **OpenCode**: Total cost display.
-- **Codex**: Monthly limit % bar + plan badge only. No cost display. Plan from JWT (`chatgpt_plan_type`).
+- **Codex**: One bar per reported window (a primary window, an optional secondary
+  window, and any additional metered `limitId`s), each labelled from its own window
+  duration — a free-plan primary window happens to be 30 days, but the collector makes
+  no monthly assumption. Plan badge only, no cost display. Plan from JWT
+  (`chatgpt_plan_type`).
 
 ### Non-Functional (design targets)
 
@@ -143,11 +151,15 @@ envelope otherwise (see *API Specification*).
 3. `quota.py` performs live enrichment (AGY plan, Codex rate limits) with its
    own timeouts; on failure the API serves the last snapshot marked `stale`.
 4. `db.py` prunes rows older than the retention window once per cycle.
-5. `api.py` reads from the DB. For the "All" view it aggregates across sources
-   at each `cycle_ts` (`SUM … GROUP BY cycle_ts`); per-source endpoints return
-   raw rows. Quota endpoints re-run live enrichment with snapshot fallback.
-   The frontend never aggregates across sources.
-6. The frontend fetches on load and every 60s, recomputes locally on
+5. `api.py` reads from the DB. `/api/usage/history` (no source) aggregates
+   across sources at each `cycle_ts` (`SUM … GROUP BY cycle_ts`); per-source
+   endpoints, and `/api/usage/latest` (no source), return raw per-source rows
+   without summing. Quota endpoints re-run live enrichment with snapshot
+   fallback.
+6. The frontend's "All" tab fetches every source's `latest`/`history` in
+   parallel (driven by the source registry, not hardcoded names) and sums
+   them client-side — see *Frontend State Machine*. It fetches on load and
+   every 60s, recomputes locally on
    range/mode changes (no extra API calls), and shows loading/error/empty/
    stale states.
 
@@ -204,8 +216,13 @@ idempotent — a re-run of the same cycle replaces, not duplicates.
   `cache_read`, `cache_write`, `cost`. Unique `(source, cycle_ts, model_name)`.
 - **quota_snapshots**: one row per model group per limit type per cycle.
   `source`, `cycle_ts`, `model_group`, `limit_type`, `used`, `total`,
-  `remaining_pct`, `refreshes_in_seconds`. Unique `(source, cycle_ts,
-  model_group, limit_type)`.
+  `remaining_pct`, `refreshes_in_seconds`, plus (schema v6) `reset_at`,
+  `window_minutes`, `limit_label`. `refreshes_in_seconds` is a duration
+  captured at write time, so it is already wrong by the time it is read back;
+  `reset_at` is the absolute Unix-seconds timestamp the UI counts down from
+  instead. `window_minutes`/`limit_label` identify which bucket a row
+  describes, which matters once a source (Codex) reports more than one
+  window. Unique `(source, cycle_ts, model_group, limit_type)`.
 - **quota_plans** (schema v5): the plan/tier a source reports, one row per
   cycle. `source`, `cycle_ts`, `timestamp`, `plan`. Unique `(source, cycle_ts)`.
   It is a scalar, so it cannot live in `quota_snapshots`' model_group/limit_type
@@ -229,15 +246,22 @@ cheap `DELETE WHERE cycle_ts < now - retention`) to bound DB growth.
   `try/except`. A failure writes a `collection_status` row and never aborts
   the cycle.
 - **Timeouts where hangs happen**: subprocess calls (`opencode stats`) use
-  `subprocess.run(timeout=…)`; network calls (quota RPC, billing API) use a
-  request timeout. Local SQLite reads rely on `busy_timeout`. No artificial
-  timeout wrappers around plain file reads.
+  `subprocess.run(timeout=…)`; network calls (quota RPC) use a request
+  timeout; the Codex App Server session (`codex app-server --stdio`) uses a
+  single wall-clock deadline covering spawn, initialize, and the quota read
+  together (`USAGE_NETWORK_TIMEOUT`). Local SQLite reads rely on
+  `busy_timeout`. No artificial timeout wrappers around plain file reads.
 - **No backoff state**: the 10-minute interval is the rate limiter. A failing
   source is simply retried next cycle.
 - **Partial writes**: each source's usage rows are written in their own
   transaction; a failed source writes only a status row.
-- **Quota fallback**: if `quota.collect()` returns `None`/raises, the API
-  serves the last `quota_snapshots` row annotated `stale: true`.
+- **Quota fallback**: `api.py`'s `_get_cached_quota`/`_annotate` helpers attach a
+  per-source `_status` envelope (`live`, `observed_at`, `age_seconds`, `stale`,
+  and `error_category` when a read failed) to every quota response. A failed
+  read is never cached as a success, and a forced (`?force=true`) refresh that
+  fails returns the last persisted `quota_snapshots` row marked `stale: true`
+  instead of an empty object — a live source never blanks out in front of the
+  user.
 - **Lifecycle**: the poller runs in a background thread with a
   `threading.Event` so `main.py` stops it cleanly on SIGTERM.
 - **Data Integrity Monitor**: If a source fails to report during a cycle, a Data Integrity Monitor carries forward the preceding valid record for that source (along with its model usage and quota snapshots), keeping the time-series contiguous.
@@ -289,11 +313,12 @@ parser, no extra dependency):
 | `USAGE_DB_PATH` | `backend/usage.db` | SQLite location |
 | `USAGE_POLL_INTERVAL` | `600` | Seconds between polls |
 | `USAGE_SUBPROCESS_TIMEOUT` | `20` | Timeout for CLI subprocess calls |
-| `USAGE_NETWORK_TIMEOUT` | `10` | Timeout for quota/network calls |
+| `USAGE_NETWORK_TIMEOUT` | `10` | Timeout for quota/network calls; also bounds the whole Codex App Server session (spawn, initialize, and the quota read together) |
 | `USAGE_RETENTION_DAYS` | `90` | History pruning window |
-| `USAGE_HOST` | `0.0.0.0` | Bind host — intentionally LAN/tailnet-reachable, no auth (see Security below); set to `127.0.0.1` to restrict to the host only |
+| `USAGE_HOST` | `127.0.0.1` | Bind host — loopback-only by default; there is still no auth on any route (see Security below), so widen this deliberately, e.g. `USAGE_HOST=0.0.0.0` for LAN/tailnet reach |
 | `USAGE_PORT` | `8000` | Bind port |
 | `USAGE_LOG_LEVEL` | `INFO` | Logging level |
+| `USAGE_CODEX_BIN` | `codex` | Codex CLI for `codex app-server --stdio` quota reads. A bare name resolves on `PATH`, then `~/.local/bin/codex` and `/usr/local/bin/codex`; a path is used as given. Must be set explicitly under systemd — see `install/usage-dashboard.default`. |
 
 Invalid values fail fast on load with a clear message.
 
@@ -345,12 +370,15 @@ range (1h/6h/…)   → filters cached history, recomputes overview (no fetch)
 mode (total/rate) → toggles chart stack↔line + uses model_deltas (no fetch)
 ```
 
-The "All" tab fetches `/api/usage/history` and `/api/usage/latest` (server-
-aggregated). Per-source tabs fetch `/api/usage/{source}/history` and
-`/api/usage/{source}/latest`. The frontend never sums across sources — that
-is the API's job. `cachedHistory` and `cachedLatestOverview` are cleared on
-tab switch. Range and mode changes recompute locally from cached data without
-extra API calls.
+The "All" tab does not call the combined `/api/usage/history` endpoint. It
+fetches `/api/usage/{source}/history` and `/api/usage/{source}/latest` for
+every registered source in parallel (source names come from the registry via
+`getSourceNames()`, not a hardcoded list) and sums/merges them client-side —
+aligning history on the latest timestamp every source has reported, so a
+lagging source can't understate the total. Per-source tabs fetch the same
+`{source}/history` and `{source}/latest` endpoints directly, unsummed.
+`cachedHistory` and `cachedLatestOverview` are cleared on tab switch. Range
+and mode changes recompute locally from cached data without extra API calls.
 
 ### UX States (all required)
 
@@ -385,13 +413,14 @@ extra API calls.
   'unsafe-inline'`. Chart.js is vendored locally so no CDN/SRI is needed.
 - Request validation: `{source}` validated against the enum; `limit` bounded.
 - Subprocess calls use argument lists (no shell).
-- **No authentication, bound to `0.0.0.0`** — this is an intentional, owner-accepted
-  posture: the dashboard is meant to be reachable from any LAN device and the
-  tailnet without a login step. There is nothing route-specific gating access;
-  anyone who can reach the host on port 8000 can read usage/quota data and
-  `/metrics`. If this host ever sits on a network you don't fully trust, put it
-  behind a reverse proxy with auth, or bind `USAGE_HOST=127.0.0.1` and reach it
-  via an SSH tunnel / `tailscale serve` instead.
+- **No authentication, bound to `127.0.0.1` by default** — there is nothing
+  route-specific gating access; anyone who can reach the bound host and port
+  can read usage/quota data and `/metrics`. The loopback-only default means
+  nothing off the host can reach it out of the box. Widen this deliberately
+  only if you have a reason to: set `USAGE_HOST=0.0.0.0` (or a specific LAN
+  address) to make it LAN/tailnet-reachable, and put it behind a reverse
+  proxy with auth, or an SSH tunnel / `tailscale serve`, if the network isn't
+  fully trusted.
 
 ## Publishing to GitHub
 
@@ -448,9 +477,12 @@ release.
 
 Two layers, each runnable independently:
 
-1. **Unit tests** (`unittest`, stdlib) in `backend/tests/` — pure functions,
-   parser fixtures, and `db.py` round-trips against a temp SQLite file. Fast,
-   no network. Parser fixtures live in `backend/tests/fixtures/`.
+1. **Unit tests** (`pytest`) in `backend/tests/` — pure functions, parser
+   fixtures, and `db.py` round-trips against a temp SQLite file. Fast, no
+   network. Parser fixtures live in `backend/tests/fixtures/`. Install the
+   `dev` extra (`pip install -e '.[dev]'`, or `pip install -r
+   requirements-dev.txt`) to get `pytest` alongside the pinned runtime deps.
+   263 tests (plus subtests) as of this writing; CI runs this exact suite.
 2. **`verify.py`** — end-to-end verifier covering server health, HTML
    structure, JS functions, CSS rules, all API endpoints, accessibility, and
    regressions (XSS escaping, cache clearing on tab switch, data-relative date
@@ -463,15 +495,19 @@ Two layers, each runnable independently:
 
    The `a11y` group computes the contrast ratio of the defined color tokens so
    AA compliance is checked, not just asserted. Default run executes all
-   groups. Keep and extend the existing 146 checks to cover the new
-   robustness/UX/a11y items.
+   groups: 322 checks as of this writing.
+
+A real Codex App Server query (spawning `codex app-server --stdio` against an
+installed CLI and reading a live account's rate limits) is a manual smoke
+test only. Neither layer above depends on it — CI mocks Codex, and no test
+requires a real ChatGPT/Codex account.
 
 ### Commands
 
 ```bash
-PYTHONPATH=backend python3 -m unittest discover -s backend/tests   # unit
-PYTHONPATH=backend python3 verify.py                               # full E2E
-PYTHONPATH=backend python3 verify.py --group api                   # one group
+PYTHONPATH=backend python3 -m pytest -q backend/tests   # unit
+PYTHONPATH=backend python3 verify.py                    # full E2E
+PYTHONPATH=backend python3 verify.py --group api        # one group
 ```
 
 ## Build Order & Milestones (for Agents)
@@ -519,15 +555,14 @@ downstream agents stay aligned.
 7. **Time range relative to data** — filtering uses the data's own latest
    `cycle_ts`, not `Date.now()`, preventing empty charts from clock skew or
    paused collection.
-8. **Shared cycle timestamp + server-side aggregation** — all sources in a
-   poll cycle share one `cycle_ts` (interval-floored). The API aggregates
-   across sources for the "All" view (`SUM … GROUP BY cycle_ts`); the
-   frontend never sums across sources. This eliminates the client-side
-   timestamp alignment and cross-source aggregation that precise per-source
-   timestamps would require, and yields a cleanly bucketed time series.
+8. **Shared cycle timestamp** — all sources in a poll cycle share one
+   `cycle_ts` (interval-floored), so every source's rows for a cycle land on
+   the same bucket with no client-side timestamp alignment needed. `db.py`
+   also exposes a server-aggregated `/api/usage/history` (`SUM … GROUP BY
+   cycle_ts`), but the "All" tab does not currently use it — see *Frontend
+   State Machine* for what it actually fetches and how it combines sources.
 9. **Client-side range/mode filtering** — history is cached after one fetch;
-   range and mode changes recompute locally without extra API calls. The
-   "All" view is fetched pre-aggregated from the API.
+   range and mode changes recompute locally without extra API calls.
 10. **Lightweight by construction** — stdlib + FastAPI + uvicorn, Chart.js
     vendored. No ORM, no migrations framework, no frontend framework. Single
     process, single SQLite file with idempotent schema and per-cycle pruning.

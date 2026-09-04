@@ -202,7 +202,22 @@ export async function fetchQuota(force = false) {
         console.error('fetchQuota error:', e);
         const container = document.getElementById('quota-cards');
         if (container) {
-            container.innerHTML = '<div class="empty-state"><p>Failed to retrieve quota data.</p></div>';
+            // The request itself failed, so there is no fresher data to show.
+            // Cards already on screen stay -- they are the last known good
+            // reading, and blanking them loses information the user had.
+            const hasCards = container.querySelector('.quota-group');
+            if (hasCards) {
+                let note = container.querySelector('.quota-fetch-error');
+                if (!note) {
+                    note = document.createElement('p');
+                    note.className = 'quota-note quota-fetch-error';
+                    note.setAttribute('role', 'status');
+                    container.prepend(note);
+                }
+                note.textContent = 'Could not refresh — showing the last loaded values.';
+            } else {
+                container.innerHTML = '<div class="empty-state"><p>Failed to retrieve quota data.</p></div>';
+            }
         }
     }
 }

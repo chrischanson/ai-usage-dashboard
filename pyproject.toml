@@ -11,7 +11,24 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.100.0",
     "uvicorn>=0.20.0",
+    "httpx>=0.28.1",
+    "pyyaml>=6.0.2",
 ]
+
+[project.optional-dependencies]
+dev = ["pytest>=9.1.1"]
+
+# Explicit package discovery. This is a flat layout with several non-package
+# top-level directories (frontend/, install/, todo/, run/), which setuptools
+# refuses to guess at -- without this, `pip install .` fails at build time with
+# "Multiple top-level packages discovered in a flat-layout" before it ever gets
+# as far as installing dependencies. Only `backend` and its subpackages are
+# importable Python; everything else is served, deployed or authored, not
+# imported. Note the app itself still runs with `backend` on the path
+# (`PYTHONPATH=backend python3 -m main`), so its modules import each other as
+# top-level names; installing the distribution is for dependencies and tooling.
+[tool.setuptools.packages.find]
+include = ["backend*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["backend"]

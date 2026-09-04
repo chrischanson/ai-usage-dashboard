@@ -13,6 +13,12 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+# Configuration lives in /etc/default/usage-dashboard (see
+# install/usage-dashboard.default for a template). USAGE_CODEX_BIN belongs
+# there: Codex quota is read by running `codex app-server --stdio`, and the
+# official installer puts that binary in ~/.local/bin, which is NOT on the
+# PATH systemd gives a unit. Without it, Codex quota degrades to plan-only.
+# Changing the file requires `systemctl restart usage-dashboard` to take effect.
 EnvironmentFile=-/etc/default/usage-dashboard
 ExecStart=PROJECT_DIR/venv/bin/python3 -m main
 WorkingDirectory=PROJECT_DIR/backend

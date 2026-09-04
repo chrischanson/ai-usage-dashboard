@@ -60,11 +60,34 @@ def _lock_for(source: str) -> threading.Lock:
         return lock
 
 
+# How stale a persisted snapshot may be before the UI should say so. Three
+# poll intervals: one missed cycle is normal jitter, three is a real problem.
+_STALE_AFTER_SECONDS = 1800
+
+
+def _is_live_result(raw) -> bool:
+    """True only for a fetch that actually produced quota data.
+
+    A hard `error` is a failure. So is `quota_error`, which means the plan was
+    readable but the quota read itself failed -- useful to display, but not a
+    successful live reading and never cacheable as one.
+    """
+    if not isinstance(raw, dict) or not raw:
+        return False
+    return 'error' not in raw and 'quota_error' not in raw
+
+
 def _get_cached_quota(source: str, fetcher, force: bool = False):
+    """Fetch a source's raw quota, memoized for _QUOTA_TTL_SECONDS.
+
+    Returns `(raw, live)`. A failed fetch is never written to the cache: doing
+    so would pin an error in front of good data for the whole TTL, and would
+    make the next forced refresh a no-op.
+    """
     now = time.time()
     cached = _quota_cache.get(source)
     if not force and cached and (now - cached[0]) < _QUOTA_TTL_SECONDS:
-        return cached[1]
+        return cached[1], True
 
     # Cache stampede guard: on expiry, every concurrent request for this
     # source would otherwise run the (slow: subprocess/network) fetcher and
@@ -74,15 +97,94 @@ def _get_cached_quota(source: str, fetcher, force: bool = False):
     with lock:
         cached = _quota_cache.get(source)
         if not force and cached and (time.time() - cached[0]) < _QUOTA_TTL_SECONDS:
-            return cached[1]
+            return cached[1], True
         try:
             raw = fetcher()
         except Exception:
             raw = None
         if raw is None:
             raw = {'error': 'fetch failed'}
-        _quota_cache[source] = (time.time(), raw)
-        return raw
+        if _is_live_result(raw):
+            _quota_cache[source] = (time.time(), raw)
+            return raw, True
+        return raw, False
+
+
+def _error_category(raw) -> str | None:
+    """The collector's own safe failure category, if it supplied one."""
+    if not isinstance(raw, dict):
+        return None
+    category = raw.get('error_category')
+    if category:
+        return str(category)
+    if 'error' in raw or 'quota_error' in raw:
+        return 'unavailable'
+    return None
+
+
+def _persist_forced_quota(source: str, normalized: dict) -> None:
+    """Store a manually forced reading so it survives the next page load.
+
+    Best-effort: a write failure here must not turn a successful live read
+    into an API error, since the caller already has the data in hand.
+    """
+    try:
+        from db import record_quota
+        from config import load_config
+        # Snap to the poller's cycle grid so a forced read updates the current
+        # cycle's row instead of littering quota_snapshots with off-grid ones.
+        interval = max(1, load_config().poll_interval)
+        cycle_ts = (int(time.time()) // interval) * interval
+        conn = _db_connect(DB_PATH)
+        try:
+            record_quota(conn, source, cycle_ts, normalized)
+        finally:
+            conn.close()
+    except Exception:
+        pass
+
+
+def _observed_at(source_data) -> int:
+    """Newest cycle_ts among a stored source's limit rows, or 0."""
+    newest = 0
+    if not isinstance(source_data, dict):
+        return newest
+    for key, group in source_data.items():
+        if isinstance(key, str) and key.startswith('_'):
+            continue
+        if not isinstance(group, dict):
+            continue
+        for row in group.values():
+            if isinstance(row, dict):
+                try:
+                    newest = max(newest, int(row.get('cycle_ts') or 0))
+                except (TypeError, ValueError):
+                    continue
+    return newest
+
+
+def _annotate(source_data: dict, live: bool, error_category: str = None) -> dict:
+    """Attach the freshness envelope the frontend uses to explain a card.
+
+    Kept under an underscore-prefixed key so it travels with the source it
+    describes without being mistaken for a quota group. Renderers and the DB
+    writer both skip `_`-prefixed keys.
+    """
+    if not isinstance(source_data, dict):
+        return source_data
+    # A live reading was observed now; a stored one carries its cycle.
+    observed_at = int(time.time()) if live else _observed_at(source_data)
+    age = max(0, int(time.time()) - observed_at) if observed_at else None
+    status = {
+        'live': bool(live),
+        'observed_at': observed_at or None,
+        'age_seconds': age,
+        'stale': bool(not live and (age is None or age > _STALE_AFTER_SECONDS)),
+    }
+    if error_category:
+        status['error_category'] = error_category
+    source_data['_status'] = status
+    return source_data
 
 
 _RANGE_SECONDS = {
@@ -239,11 +341,20 @@ def create_app() -> FastAPI:
                     for src, entry in sources.items() if entry.quota_collector
                 }
                 for src, fut in futures.items():
-                    raw = fut.result()
+                    raw, live = fut.result()
                     entry = sources[src]
                     norm = entry.quota_normalizer(raw) if (entry and entry.quota_normalizer and raw) else None
-                    if norm:
+                    # A failed refresh must never replace good persisted data
+                    # with an empty object; the stored snapshot stands, marked
+                    # stale, so the card degrades instead of blanking.
+                    if norm and live:
                         result[src] = norm
+                        _annotate(result[src], True)
+                    elif src in result:
+                        _annotate(result[src], False, _error_category(raw))
+        for src, data in result.items():
+            if isinstance(data, dict) and '_status' not in data:
+                _annotate(data, False)
         return result
 
     @app.get("/api/quota/{source}/latest")
@@ -261,11 +372,21 @@ def create_app() -> FastAPI:
             from source_registry import get_source
             entry = get_source(source)
             if entry and entry.quota_collector:
-                raw = _get_cached_quota(source, entry.quota_collector, True)
+                raw, live = _get_cached_quota(source, entry.quota_collector, True)
                 norm = entry.quota_normalizer(raw) if (entry.quota_normalizer and raw) else None
-                if norm:
-                    return {source: norm}
+                if norm and live:
+                    # Persist through the same validation path the poller uses,
+                    # so the next ordinary page load does not visibly revert to
+                    # the older snapshot.
+                    _persist_forced_quota(source, norm)
+                    return {source: _annotate(norm, True)}
+                # Refresh failed: hand back the last good snapshot, labelled.
+                if db_result.get(source):
+                    return {source: _annotate(db_result[source], False, _error_category(raw))}
+                return {source: _annotate({}, False, _error_category(raw))}
 
+        if db_result.get(source):
+            _annotate(db_result[source], False)
         return db_result or {}
 
     @app.get("/health")

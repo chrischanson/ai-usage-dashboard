@@ -163,10 +163,26 @@ class Poller:
         start = time.time()
         try:
             quota = collector()
+            # A collector may succeed partially: the plan is readable but the
+            # quota read itself failed. That is reported as `quota_error`, so
+            # the plan can still be persisted while the cycle is recorded as a
+            # quota failure rather than a false success.
+            partial_error = quota.get('quota_error') if isinstance(quota, dict) else None
+            category = quota.get('error_category') if isinstance(quota, dict) else None
             if quota and 'error' not in quota:
                 entry = get_source(source)
                 normalized = entry.quota_normalizer(quota) if (entry and entry.quota_normalizer) else quota
                 record_quota(conn, source, cycle_ts, normalized)
+                if partial_error:
+                    fail_count = self._quota_fail_counts.get(source, 0) + 1
+                    self._quota_fail_counts[source] = fail_count
+                    logger.warning("quota poll degraded for source=%s: %s", source, partial_error)
+                    # record_quota writes an ok=1 status row at the data layer;
+                    # overwrite it so the degraded cycle is not logged as clean.
+                    record_status(conn, source, 'quota', cycle_ts, False,
+                                  category or 'fetch failed',
+                                  (time.time() - start) * 1000)
+                    return
             else:
                 raw_error = quota.get('error', 'empty result') if quota else 'empty result'
                 fail_count = self._quota_fail_counts.get(source, 0) + 1
@@ -179,8 +195,15 @@ class Poller:
                     )
                 else:
                     logger.warning("quota poll failed for source=%s: %s", source, raw_error)
-                record_status(conn, source, 'quota', cycle_ts, False,
-                              raw_error if raw_error == 'empty result' else 'fetch failed',
+                # Prefer the collector's own safe failure category over the
+                # blanket 'fetch failed', which says nothing diagnosable.
+                if category:
+                    status_error = category
+                elif raw_error == 'empty result':
+                    status_error = raw_error
+                else:
+                    status_error = 'fetch failed'
+                record_status(conn, source, 'quota', cycle_ts, False, status_error,
                               (time.time() - start) * 1000)
                 return
             self._quota_fail_counts[source] = 0
@@ -201,7 +224,8 @@ class Poller:
 
     def _collect_codex_quota(self):
         from codex_quota import fetch_codex_quota
-        return fetch_codex_quota()
+        return fetch_codex_quota(codex_bin=self.cfg.codex_bin,
+                                 timeout=self.cfg.network_timeout)
 
     def _collect_claude_quota(self):
         from claude_quota import fetch_claude_quota

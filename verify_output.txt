@@ -3,15 +3,13 @@
 
 
 ── [1] Server process ──
-  [31mFAIL[0m PID file /tmp/dashboard.pid not found
+  [32mPASS[0m Server running (PID 2498285)
 
 ── [2] Frontend HTML ──
   [32mPASS[0m Tab label says "All"
   [32mPASS[0m Old "Combined (All)" label removed
   [32mPASS[0m Tab data-source="combined" present
-  [32mPASS[0m Tab data-source="agy" present
-  [32mPASS[0m Tab data-source="opencode" present
-  [32mPASS[0m Tab data-source="codex" present
+  [32mPASS[0m Dynamic provider tabs rendered in JS
   [32mPASS[0m Time range buttons present
   [32mPASS[0m Chart controls removed from chart container
   [32mPASS[0m Time range button data-range="1h"
@@ -50,16 +48,16 @@
 ── [4] CSS ──
   [32mPASS[0m .source-combined class
   [32mPASS[0m .source-agy class
-  [32mPASS[0m Combined 5-column grid with OpenCode half-width
+  [32mPASS[0m Charts row: history beside the donut
   [32mPASS[0m AGY 2-column grid
-  [32mPASS[0m Responsive breakpoint at 900px
-  [32mPASS[0m Responsive breakpoint at 600px
+  [32mPASS[0m Responsive breakpoint at 1024px
+  [32mPASS[0m Container queries drive component reflow
   [32mPASS[0m AGY badge style
   [32mPASS[0m OpenCode badge style
   [32mPASS[0m Codex badge style
-  [32mPASS[0m Green quota bar
-  [32mPASS[0m Amber quota bar
-  [32mPASS[0m Red quota bar
+  [32mPASS[0m Quota meter: ok ticks
+  [32mPASS[0m Quota meter: warn ticks
+  [32mPASS[0m Quota meter: danger ticks
   [32mPASS[0m Stats row layout
   [32mPASS[0m Stats overview section
   [32mPASS[0m Time range button style
@@ -82,17 +80,17 @@
   [32mPASS[0m Usage/codex: data present
 
 ── [7] API: Model deltas ──
-  [32mPASS[0m Usage/latest without deltas: agy.models has 8 items
-  [32mPASS[0m Usage/latest without deltas: opencode.models has 9 items
-  [32mPASS[0m Usage/latest without deltas: codex.models has 3 items
-  [32mPASS[0m Usage/latest with deltas: agy.model_deltas has 8 items
-  [32mPASS[0m Usage/latest with deltas: opencode.model_deltas has 9 items
-  [32mPASS[0m Usage/latest with deltas: codex.model_deltas has 3 items
+  [32mPASS[0m Usage/latest without deltas: agy.models has 26 items
+  [32mPASS[0m Usage/latest without deltas: opencode.models has 17 items
+  [32mPASS[0m Usage/latest without deltas: codex.models has 8 items
+  [32mPASS[0m Usage/latest with deltas: agy.model_deltas has 26 items
+  [32mPASS[0m Usage/latest with deltas: opencode.model_deltas has 17 items
+  [32mPASS[0m Usage/latest with deltas: codex.model_deltas has 8 items
 
 ── [8] API: Usage history ──
-  [32mPASS[0m History/agy: 1082 data points
-  [32mPASS[0m History/opencode: 1082 data points
-  [32mPASS[0m History/codex: 1082 data points
+  [32mPASS[0m History/agy: 9816 data points
+  [32mPASS[0m History/opencode: 9823 data points
+  [32mPASS[0m History/codex: 9655 data points
 
 ── [9] API: Combined quota ──
   [32mPASS[0m Quota: agy present
@@ -101,28 +99,28 @@
   [32mPASS[0m Quota: AGY plan="Gemini Code Assist"
   [32mPASS[0m Quota: AGY group "gemini_models" present
   [32mPASS[0m Quota: AGY group "claude_gpt_models" present
-  [32mPASS[0m Quota: AGY.gemini_models.weekly_limit.used=16.668945999999995
-  [32mPASS[0m Quota: AGY.gemini_models.weekly_limit.total=100.0
-  [32mPASS[0m Quota: AGY.gemini_models.weekly_limit.remaining_pct=83.33105400000001
-  [32mPASS[0m Quota: AGY.gemini_models.weekly_limit.refreshes_in_seconds=567749
-  [32mPASS[0m Quota: AGY.gemini_models.five_hour_limit.used=0.0
-  [32mPASS[0m Quota: AGY.gemini_models.five_hour_limit.total=100.0
-  [32mPASS[0m Quota: AGY.gemini_models.five_hour_limit.remaining_pct=100.0
-  [32mPASS[0m Quota: AGY.gemini_models.five_hour_limit.refreshes_in_seconds=17896
-  [32mPASS[0m Quota: AGY.claude_gpt_models.weekly_limit.used=100.0
-  [32mPASS[0m Quota: AGY.claude_gpt_models.weekly_limit.total=100.0
-  [32mPASS[0m Quota: AGY.claude_gpt_models.weekly_limit.remaining_pct=0.0
-  [32mPASS[0m Quota: AGY.claude_gpt_models.weekly_limit.refreshes_in_seconds=152493
   [32mPASS[0m Quota: AGY.claude_gpt_models.five_hour_limit.used=0.0
   [32mPASS[0m Quota: AGY.claude_gpt_models.five_hour_limit.total=100.0
   [32mPASS[0m Quota: AGY.claude_gpt_models.five_hour_limit.remaining_pct=100.0
-  [32mPASS[0m Quota: AGY.claude_gpt_models.five_hour_limit.refreshes_in_seconds=17896
-  [32mPASS[0m Quota: OpenCode cost=$5.25
+  [32mPASS[0m Quota: AGY.claude_gpt_models.five_hour_limit.refreshes_in_seconds=17986
+  [32mPASS[0m Quota: AGY.claude_gpt_models.weekly_limit.used=33.54810499999999
+  [32mPASS[0m Quota: AGY.claude_gpt_models.weekly_limit.total=100.0
+  [32mPASS[0m Quota: AGY.claude_gpt_models.weekly_limit.remaining_pct=66.45189500000001
+  [32mPASS[0m Quota: AGY.claude_gpt_models.weekly_limit.refreshes_in_seconds=286353
+  [32mPASS[0m Quota: AGY.gemini_models.five_hour_limit.used=3.98849
+  [32mPASS[0m Quota: AGY.gemini_models.five_hour_limit.total=100.0
+  [32mPASS[0m Quota: AGY.gemini_models.five_hour_limit.remaining_pct=96.01151
+  [32mPASS[0m Quota: AGY.gemini_models.five_hour_limit.refreshes_in_seconds=14181
+  [32mPASS[0m Quota: AGY.gemini_models.weekly_limit.used=16.08334
+  [32mPASS[0m Quota: AGY.gemini_models.weekly_limit.total=100.0
+  [32mPASS[0m Quota: AGY.gemini_models.weekly_limit.remaining_pct=83.91666
+  [32mPASS[0m Quota: AGY.gemini_models.weekly_limit.refreshes_in_seconds=528981
+  [32mPASS[0m Quota: OpenCode cost=$12.97
   [32mPASS[0m Quota: Codex plan="free"
-  [32mPASS[0m Quota: Codex rate_limit.remaining_pct=0.0
-  [32mPASS[0m Quota: Codex rate_limit.used=100.0
+  [32mPASS[0m Quota: Codex rate_limit.remaining_pct=6.0
+  [32mPASS[0m Quota: Codex rate_limit.used=94.0
   [32mPASS[0m Quota: Codex rate_limit.total=100.0
-  [32mPASS[0m Quota: Codex rate_limit.refreshes_in_seconds=1368424
+  [32mPASS[0m Quota: Codex rate_limit.refreshes_in_seconds=976510
 
 ── [10] API: Per-source quota ──
   [32mPASS[0m Quota/agy: data present
@@ -131,20 +129,24 @@
 
 ── [11] Codex: JWT plan extraction ──
   [32mPASS[0m Codex: plan_type="free" from JWT
-  [32mPASS[0m Codex: 21 sessions, 30,989,442 tokens
-  [32mPASS[0m Codex: primary_used_pct=100.0 from logs
+  [32mPASS[0m Codex: 34 sessions, 40,027,960 tokens
+  [32mPASS[0m Codex: primary_used_pct=94.0 from logs
 
 ── [12] AGY: plan extraction ──
   [32mPASS[0m AGY: plan="Gemini Code Assist" from Cloud Code API
 
 ── [13] Frontend load ──
   [32mPASS[0m index.html serves correctly
-  [32mPASS[0m app.js serves correctly
+  [32mPASS[0m js/main.js serves correctly
   [32mPASS[0m index.css serves correctly
 
-── [14] Regression: Sessions/Messages layout ──
-  [32mPASS[0m Sessions/Messages uses card-row flex layout
-  [32mPASS[0m total-messages is not a <p> (uses card-row)
+── [14] Overview: one card per metric ──
+  [32mPASS[0m Overview: total-sessions has its own card
+  [32mPASS[0m Overview: total-messages has its own card
+  [32mPASS[0m Overview: input-tokens has its own card
+  [32mPASS[0m Overview: output-tokens has its own card
+  [32mPASS[0m Overview: cache-reads has its own card
+  [32mPASS[0m Overview: total-cost has its own card
 
 ── [15] Regression: XSS prevention ──
   [32mPASS[0m escapeHtml function defined
@@ -164,8 +166,8 @@
 
 ── [18] Regression: Mobile responsive ──
   [32mPASS[0m Mobile breakpoint at 640px
-  [32mPASS[0m Mobile: card-row CSS defined
-  [32mPASS[0m Mobile: card-sep CSS defined
+  [32mPASS[0m Mobile: overview card grid defined
+  [32mPASS[0m Mobile: overview grid sets explicit rows
   [32mPASS[0m Mobile: Tabs horizontally scrollable on mobile
   [32mPASS[0m Mobile: Charts section mobile override
 
@@ -192,13 +194,14 @@
   [32mPASS[0m Model chart is doughnut type
 
 ── [24] Regression: Chart sizing ──
-  [32mPASS[0m Charts use natural aspect ratio
+  [32mPASS[0m Charts fill their panel (maintainAspectRatio disabled)
+  [32mPASS[0m Chart panels have a definite height, so the canvas is bounded
 
 ── [25] Regression: Combined chart timestamp matching ──
   [32mPASS[0m Combined chart uses forward-fill timestamp matching
-  [32mPASS[0m Combined chart has MS_TOLERANCE tolerance window
+  [32mPASS[0m No bounded forward-fill window (cumulative counters carry indefinitely)
   [32mPASS[0m No exact timestamp === match in combined chart
-  [32mPASS[0m buildFilledLookup returns null when outside tolerance window
+  [32mPASS[0m buildFilledLookup carries the last reading and skips pre-first-observation
 
 ── [26] Regression: Model panel respects time range ──
   [32mPASS[0m computeModelsFromHistory function exists
@@ -223,7 +226,7 @@
   [32mPASS[0m row_factory set to sqlite3.Row
   [32mPASS[0m init_schema() creates collection_status table
   [32mPASS[0m init_schema() creates meta table
-  [32mPASS[0m meta has schema_version=3
+  [32mPASS[0m meta has schema_version=6
   [32mPASS[0m record_status() inserts row correctly
   [32mPASS[0m record_status() stores error text on failure
   [32mPASS[0m prune() removes old rows but keeps one anchor per source
@@ -397,8 +400,7 @@
   [32mPASS[0m api.py: source_unknown error response
 
 ── [44] Claude in frontend ──
-  [32mPASS[0m HTML: Claude tab present
-  [32mPASS[0m HTML: tab-claude id present
+  [32mPASS[0m providers/claude.yaml present
   [32mPASS[0m JS: Claude source handled
   [32mPASS[0m JS: renderClaudeQuota function present
   [32mPASS[0m JS: Claude badge class used
@@ -411,10 +413,10 @@
 ── [46] R9: Config error message ──
   [32mPASS[0m config.py: error message uses ", ".join()
 
-── [47] Schema version 3 ──
-  [32mPASS[0m db.py: schema_version set to 3
+── [47] Schema version 6 ──
+  [32mPASS[0m db.py: schema_version set to 6
+  [32mPASS[0m db.py: quota_plans table for persisted plan badges
   [32mPASS[0m db.py: _migrate_schema function present
 
-[1m=== Results: 318 passed, 1 failed ===[0m
+[1m=== Results: 322 passed, 0 failed ===[0m
 
-  [31mPID file /tmp/dashboard.pid not found[0m

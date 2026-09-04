@@ -16,8 +16,20 @@ fi
 source ../venv/bin/activate
 
 if [[ "$NEW_VENV" == "1" || "$1" == "--update-deps" ]]; then
-    # Install dependencies (suppress externally-managed-environment warning inside venv)
-    pip install -q -r ../requirements.txt 2>&1 | grep -v "externally-managed" || true
+    # Install dependencies. The externally-managed-environment warning is noise
+    # inside a venv, so it is filtered from the output -- but a real pip failure
+    # must abort rather than leave a half-installed environment behind.
+    #
+    # `if ! VAR=$(...)` is deliberate: a bare `VAR=$(...)` assignment is subject
+    # to `set -e`, so the script would exit on failure before reaching any error
+    # handling, and piping pip straight into grep would hide its exit status.
+    if ! PIP_OUTPUT=$(pip install -q -r ../requirements.txt 2>&1); then
+        [ -n "$PIP_OUTPUT" ] && printf '%s\n' "$PIP_OUTPUT" | grep -v "externally-managed"
+        echo "run.sh: pip install failed; the virtualenv at ../venv may be incomplete." >&2
+        echo "run.sh: fix the error above, then re-run with --update-deps." >&2
+        exit 1
+    fi
+    [ -n "$PIP_OUTPUT" ] && printf '%s\n' "$PIP_OUTPUT" | grep -v "externally-managed"
 fi
 
 RUN_DIR="$SCRIPT_DIR/run"
