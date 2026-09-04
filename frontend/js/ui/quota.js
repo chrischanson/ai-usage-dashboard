@@ -259,7 +259,26 @@ export function renderAgyQuota(container, data) {
     }
 
     const planBadge = ` <span class="badge badge-agy">${escapeHtml(agyPlan)}</span>`;
-    card.innerHTML = `<h3>Antigravity${planBadge}</h3>${sectionsHtml}`;
+
+    // Antigravity is a desktop editor, so its local quota RPC is simply gone
+    // whenever the app is closed. Say so plainly instead of showing a bare
+    // card, and label an aged snapshot rather than letting it read as current.
+    const status = data._status;
+    let noteHtml = '';
+    if (!sectionsHtml) {
+        const reason = status && status.error_category === 'not_running'
+            ? 'Antigravity isn\u2019t running, so live quota isn\u2019t available.'
+            : status && status.error_category
+                ? 'Quota unavailable right now.'
+                : 'No quota windows reported.';
+        noteHtml = `<div class="quota-limit"><p class="quota-note">${escapeHtml(reason)}</p></div>`;
+    }
+    const freshness = staleNote(status);
+    if (freshness) {
+        noteHtml += `<p class="quota-note" role="status">${escapeHtml(freshness)}</p>`;
+    }
+
+    card.innerHTML = `<h3>Antigravity${planBadge}</h3>${sectionsHtml}${noteHtml}`;
     container.appendChild(card);
 }
 

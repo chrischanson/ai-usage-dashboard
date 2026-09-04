@@ -8,9 +8,12 @@ remaining quota info shown by AGY's /usage command.
 The language server exposes a Connect RPC endpoint:
   /exa.language_server_pb.LanguageServerService/RetrieveUserQuotaSummary
 """
+import ipaddress
 import json
 import os
 import re
+import socket
+import struct
 import subprocess
 import urllib.request
 import ssl
@@ -23,102 +26,211 @@ from datetime import datetime, timezone
 
 CLOUD_CODE_ENDPOINT = 'https://daily-cloudcode-pa.googleapis.com'
 QUOTA_RPC_PATH = '/exa.language_server_pb.LanguageServerService/RetrieveUserQuotaSummary'
-_FALLBACK_PORTS = [41969, 36465, 44953]
+
+# Executable name *prefixes* that serve the quota RPC. Matched against a
+# candidate process's real executable (/proc/<pid>/exe) or its kernel `comm`,
+# never against its command line -- see _detect_language_server_pids.
+#
+# Prefixes, not exact names, because the installed binaries vary by edition:
+#   /opt/antigravity/Antigravity-x64/antigravity
+#   /opt/antigravity-ide/Antigravity-IDE/antigravity-ide
+#   /opt/antigravity/Antigravity-x64/resources/bin/language_server
+#   ~/.local/bin/agy
+# An exact-name list rejected `antigravity-ide` outright.
+_LS_EXE_PREFIXES = ('language_server', 'antigravity', 'agy')
+
+# Patterns handed to pgrep to *nominate* candidates. Nomination is cheap and
+# deliberately loose; every candidate is then verified by executable identity
+# and by actually owning a listening loopback socket. `-x` matches the kernel
+# `comm`, which is capped at 15 characters, so the long legacy binary name has
+# to be nominated via `-f`.
+_LS_PGREP_PATTERNS = (
+    ('-f', 'language_server_linux_x64'),
+    ('-f', 'language_server'),
+    ('-x', 'agy'),
+    ('-x', 'antigravity'),
+    ('-x', 'antigravity-ide'),
+)
+
+# Kernel socket tables, as a constant so tests can point at fixtures.
+_PROC_NET_FILES = ("/proc/net/tcp", "/proc/net/tcp6")
+
+# There is deliberately no fallback port list and no "scan whatever is
+# listening" path. Both used to exist, and both were actively harmful: when
+# process detection failed, the collector POSTed a quota RPC body at every
+# local listening port above 1024 -- unrelated services, and even
+# non-loopback addresses on this host's Tailscale interface. An unidentifiable
+# language server is reported as unavailable instead.
+
+
+def _process_exe_name(pid):
+    """The executable name behind a pid, or '' if it cannot be determined."""
+    try:
+        return os.path.basename(os.readlink(f"/proc/{pid}/exe"))
+    except Exception:
+        pass
+    try:
+        with open(f"/proc/{pid}/comm") as f:
+            return f.read().strip()
+    except Exception:
+        return ''
+
+
+def _is_language_server_exe(name):
+    """Whether an executable name is one the quota RPC is served by."""
+    if not name:
+        return False
+    for prefix in _LS_EXE_PREFIXES:
+        if name.startswith(prefix):
+            return True
+        # `comm` is capped at 15 characters, so a longer executable name
+        # arrives truncated. Only consider that for names long enough to be
+        # unambiguous -- otherwise a short unrelated name like 'ant' would
+        # pass as a truncation of 'antigravity'.
+        if len(name) >= 10 and prefix.startswith(name):
+            return True
+    return False
+
+
+def _own_pid_lineage():
+    """This process and its ancestors, which must never be treated as matches.
+
+    `pgrep -f` matches on the command line, so the poller's own python process
+    -- and the shell that launched it, whose command line quotes this module's
+    patterns -- can nominate themselves.
+    """
+    lineage = set()
+    pid = os.getpid()
+    for _ in range(12):  # bounded: never walk a cycle or a deep tree forever
+        if pid <= 1 or pid in lineage:
+            break
+        lineage.add(pid)
+        try:
+            with open(f"/proc/{pid}/stat") as f:
+                # field 4 is ppid; the comm field may contain spaces, so read
+                # past its closing paren rather than splitting the whole line.
+                stat = f.read()
+            pid = int(stat[stat.rindex(')') + 1:].split()[1])
+        except Exception:
+            break
+    return lineage
 
 
 def _detect_language_server_pids():
-    """Find all PIDs for the language server or AGY process using safe pgrep.
+    """PIDs of processes that actually serve the quota RPC.
 
-    Newer versions of Antigravity embed the language server (and its quota
-    RPC endpoint) directly in the ``agy`` binary, so we also look for that
-    process when the legacy ``language_server`` binary isn't running.
+    Candidates are nominated with pgrep and then *verified* against their real
+    executable. The previous implementation trusted `pgrep -f` directly, which
+    matches any process whose command line merely contains the pattern -- in
+    practice the poller's own shell -- and a false positive there sent port
+    detection down its indiscriminate fallback path, producing a burst of
+    doomed requests to unrelated local services.
     """
-    # Legacy: separate language_server binary
-    for pattern in ('language_server_linux_x64', 'language_server'):
+    excluded = _own_pid_lineage()
+    pids = []
+    for flag, pattern in _LS_PGREP_PATTERNS:
         try:
-            out = subprocess.check_output(['pgrep', '-f', pattern], timeout=2)
-            pids = [int(p) for p in out.decode().strip().split() if p.isdigit()]
-            if pids:
-                return pids
+            out = subprocess.check_output(['pgrep', flag, pattern], timeout=2)
         except Exception:
-            pass
-    # Modern: AGY embeds the language server; use -x for exact binary match
-    # to avoid matching shell scripts or unrelated processes.
+            continue
+        for token in out.decode().split():
+            if not token.isdigit():
+                continue
+            pid = int(token)
+            if pid in excluded or pid in pids:
+                continue
+            if _is_language_server_exe(_process_exe_name(pid)):
+                pids.append(pid)
+    return pids
+
+
+def _socket_inodes_for_pids(pids):
+    """Inodes of every socket held by the given pids."""
+    inodes = set()
+    for pid in pids:
+        fd_dir = f"/proc/{pid}/fd"
+        try:
+            entries = os.listdir(fd_dir)
+        except Exception:
+            continue
+        for fd in entries:
+            try:
+                link = os.readlink(os.path.join(fd_dir, fd))
+            except Exception:
+                continue
+            if link.startswith("socket:["):
+                inodes.add(link[8:-1])
+    return inodes
+
+
+def _decode_proc_net_address(hex_addr):
+    """Decode a /proc/net/tcp{,6} local address into an ip_address, or None.
+
+    The hex is a sequence of little-endian 32-bit words, so it cannot simply
+    be read left to right.
+    """
     try:
-        out = subprocess.check_output(['pgrep', '-x', 'agy'], timeout=2)
-        pids = [int(p) for p in out.decode().strip().split() if p.isdigit()]
-        if pids:
-            return pids
+        if len(hex_addr) == 8:
+            return ipaddress.ip_address(
+                socket.inet_ntop(socket.AF_INET,
+                                 struct.pack('<I', int(hex_addr, 16))))
+        if len(hex_addr) == 32:
+            raw = b''.join(struct.pack('<I', int(hex_addr[i:i + 8], 16))
+                           for i in range(0, 32, 8))
+            return ipaddress.ip_address(socket.inet_ntop(socket.AF_INET6, raw))
     except Exception:
-        pass
-    return []
+        return None
+    return None
 
 
 def _detect_language_server_ports():
-    """Dynamically detect loopback ports matched to the language server PIDs."""
+    """Loopback ports on which the language server is listening.
+
+    Returns [] when no language server can be identified -- which is the
+    normal state whenever Antigravity simply is not running. Callers must
+    treat that as "unavailable", not as an error, and must not guess a port:
+    the RPC body is POSTed to whatever answers, so a wrong port means sending
+    a request to an unrelated service.
+    """
     pids = _detect_language_server_pids()
     if not pids:
-        return _FALLBACK_PORTS
+        return []
 
-    # Find the inodes of all sockets owned by our language server PIDs
-    inodes = set()
-    for pid in pids:
-        try:
-            fd_dir = f"/proc/{pid}/fd"
-            if os.path.exists(fd_dir):
-                for fd in os.listdir(fd_dir):
-                    try:
-                        link = os.readlink(os.path.join(fd_dir, fd))
-                        if link.startswith("socket:["):
-                            inodes.add(link[8:-1])
-                    except Exception:
-                        pass
-        except Exception:
-            pass
+    inodes = _socket_inodes_for_pids(pids)
+    if not inodes:
+        return []
 
     ports = []
-    # Read /proc/net/tcp and tcp6 for listening loopback sockets matching these inodes
-    for net_file in ("/proc/net/tcp", "/proc/net/tcp6"):
+    for net_file in _PROC_NET_FILES:
         try:
-            if not os.path.exists(net_file):
-                continue
             with open(net_file, "r") as f:
                 lines = f.readlines()
-            for line in lines[1:]:
-                parts = line.strip().split()
-                if len(parts) >= 10:
-                    state = parts[3]
-                    inode = parts[9]
-                    # State "0A" is TCP_LISTEN
-                    if state == "0A" and inode in inodes:
-                        local_addr = parts[1]
-                        if ":" in local_addr:
-                            ip_hex, port_hex = local_addr.split(":")
-                            try:
-                                ports.append(int(port_hex, 16))
-                            except ValueError:
-                                pass
         except Exception:
-            pass
-
-    # Use ss -tln (without -p) as fallback
-    if not ports:
-        try:
-            ss_out = subprocess.check_output(['ss', '-tln'], timeout=2).decode('utf-8', errors='ignore')
-            for line in ss_out.splitlines():
-                parts = line.split()
-                for part in parts:
-                    if ':' in part:
-                        try:
-                            p = int(part.split(':')[-1])
-                            if p > 1024 and p not in (8000, 9222):
-                                ports.append(p)
-                        except ValueError:
-                            pass
-        except Exception:
-            pass
-
-    return list(set(ports)) if ports else _FALLBACK_PORTS
+            continue
+        for line in lines[1:]:
+            parts = line.split()
+            if len(parts) < 10:
+                continue
+            state, inode, local = parts[3], parts[9], parts[1]
+            # "0A" is TCP_LISTEN.
+            if state != "0A" or inode not in inodes:
+                continue
+            if ":" not in local:
+                continue
+            ip_hex, port_hex = local.rsplit(":", 1)
+            address = _decode_proc_net_address(ip_hex)
+            # Loopback only. The old code parsed the address and then threw it
+            # away, so a port bound to a routable interface was treated as a
+            # local RPC endpoint.
+            if address is None or not address.is_loopback:
+                continue
+            try:
+                port = int(port_hex, 16)
+            except ValueError:
+                continue
+            if port and port not in ports:
+                ports.append(port)
+    return ports
 
 
 def _detect_csrf_token():
@@ -150,12 +262,29 @@ def _parse_iso_time(t_str):
         return 0
 
 
-def _try_connect_rpc(port, csrf_token=None, timeout=3):
+def _short_reason(exc):
+    """A compact, non-identifying description of a failed request."""
+    reason = getattr(exc, 'reason', None)
+    text = str(reason if reason is not None else exc) or type(exc).__name__
+    code = getattr(exc, 'code', None)
+    if code:
+        text = f'HTTP {code}'
+    text = ' '.join(str(text).split())
+    home = os.path.expanduser('~')
+    if home and home != '/':
+        text = text.replace(home, '~')
+    return text[:80]
+
+
+def _try_connect_rpc(port, csrf_token=None, timeout=3, errors=None):
     """Try to call the RetrieveUserQuotaSummary RPC on the given port.
 
     *csrf_token* is optional: the legacy language_server binary required it,
     but newer AGY builds embed the RPC endpoint directly and accept requests
     without a CSRF token.
+
+    *errors*, when given, collects a short reason per failed attempt so the
+    caller can report why rather than just that.
     """
     # Try HTTP first, then HTTPS if needed
     for proto in ('http', 'https'):
@@ -186,7 +315,13 @@ def _try_connect_rpc(port, csrf_token=None, timeout=3):
         try:
             with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
                 return json.loads(resp.read().decode('utf-8'))
-        except Exception:
+        except Exception as e:
+            # Keep the first real reason. Reporting "connection refused" or
+            # "403" instead of a generic failure is the difference between a
+            # diagnosable log line and the blanket 'fetch failed' that hid
+            # this collector's actual behaviour for weeks.
+            if errors is not None and len(errors) < 4:
+                errors.append(f'{proto}: {_short_reason(e)}')
             continue
     raise Exception(f"Failed to connect to RPC on port {port}")
 
@@ -255,17 +390,49 @@ def fetch_agy_quota(network_timeout=None):
     raw_data = None
     ports = _detect_language_server_ports()
     if not ports:
-        return {'error': 'No AGY/language-server ports detected', 'plan': plan}
+        # No usable endpoint. This is an ordinary, expected state -- Antigravity
+        # is a desktop editor, not a service, so it is closed much of the time
+        # -- and it is reported as unavailable with its own category rather
+        # than as a collection error. `quota_error` (not `error`) keeps the
+        # plan, so the dashboard's badge and its last snapshot survive instead
+        # of the card disappearing.
+        #
+        # `ports`, not the pid list, is the gate: a caller (or a test) that
+        # supplies a port should reach the RPC regardless. The pid lookup only
+        # sharpens the message.
+        if _detect_language_server_pids():
+            return {
+                'plan': plan,
+                'quota_error': ('Antigravity is running but is not listening for its '
+                                'quota RPC on loopback.'),
+                'error_category': 'rpc_port_unavailable',
+            }
+        return {
+            'plan': plan,
+            'quota_error': 'Antigravity is not running, so its local quota RPC is unavailable.',
+            'error_category': 'not_running',
+        }
+
+    errors = []
     for port in ports:
         try:
-            raw_data = _try_connect_rpc(port, csrf_token, **rpc_kwargs)
+            raw_data = _try_connect_rpc(port, csrf_token, errors=errors, **rpc_kwargs)
             if raw_data:
                 break
-        except Exception:
+        except Exception as e:
+            errors.append(_short_reason(e))
             continue
 
     if not raw_data or 'response' not in raw_data:
-        return {'error': 'Failed to fetch quota from local RPC', 'plan': plan}
+        detail = '; '.join(dict.fromkeys(errors)) if errors else 'no response body'
+        return {
+            'plan': plan,
+            'quota_error': (
+                f'Antigravity is running but its quota RPC did not answer on '
+                f'{len(ports)} loopback port(s): {detail}'
+            ),
+            'error_category': 'rpc_unavailable',
+        }
 
     formatted = {}
     try:
@@ -301,4 +468,8 @@ def fetch_agy_quota(network_timeout=None):
         formatted['plan'] = plan
         return formatted
     except Exception as e:
-        return {'error': f'Failed to parse raw quota data: {e}', 'plan': plan}
+        return {
+            'plan': plan,
+            'quota_error': f'Failed to parse quota data from Antigravity: {_short_reason(e)}',
+            'error_category': 'parse_error',
+        }

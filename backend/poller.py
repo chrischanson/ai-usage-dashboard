@@ -14,6 +14,17 @@ from util import parse_iso_seconds
 
 logger = logging.getLogger(__name__)
 
+# Quota failure categories that mean "this source isn't there right now",
+# rather than "something is broken". Antigravity and the Codex CLI are
+# user-facing tools, not services, so their local endpoints are legitimately
+# absent much of the time. These are logged at info level however often they
+# recur; the collection_status row records the failure regardless.
+_EXPECTED_UNAVAILABLE = frozenset({
+    'not_running',
+    'rpc_port_unavailable',
+    'binary_not_found',
+})
+
 
 class Poller:
     """The only writer of usage data. Each cycle it hands every parser's
@@ -160,6 +171,11 @@ class Poller:
                           (time.time() - start) * 1000)
 
     def _poll_quota_source(self, conn, cycle_ts, source, collector):
+        """Collect one source's quota for this cycle.
+
+        A source that reports `quota_error` succeeded partially: something
+        (usually the plan) is still worth storing, but the quota read failed.
+        """
         start = time.time()
         try:
             quota = collector()
@@ -176,7 +192,16 @@ class Poller:
                 if partial_error:
                     fail_count = self._quota_fail_counts.get(source, 0) + 1
                     self._quota_fail_counts[source] = fail_count
-                    logger.warning("quota poll degraded for source=%s: %s", source, partial_error)
+                    # Some sources are legitimately absent much of the time --
+                    # Antigravity is a desktop editor, not a service, so its
+                    # local RPC is gone whenever the app is closed. Warning
+                    # about that every cycle trains the reader to ignore the
+                    # log; it is reported at info level instead. The status row
+                    # still records the failure either way.
+                    if category in _EXPECTED_UNAVAILABLE:
+                        logger.info("quota unavailable for source=%s: %s", source, partial_error)
+                    else:
+                        logger.warning("quota poll degraded for source=%s: %s", source, partial_error)
                     # record_quota writes an ok=1 status row at the data layer;
                     # overwrite it so the degraded cycle is not logged as clean.
                     record_status(conn, source, 'quota', cycle_ts, False,

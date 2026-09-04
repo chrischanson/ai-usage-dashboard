@@ -1,7 +1,12 @@
 def collect(**kwargs):
     from quota_parser import fetch_agy_quota
-    from config import load_config
-    return fetch_agy_quota(network_timeout=load_config().network_timeout)
+    # provider_loader passes configuration through; fall back to loading it
+    # here for any caller that invokes collect() directly.
+    timeout = kwargs.get('network_timeout')
+    if timeout is None:
+        from config import load_config
+        timeout = load_config().network_timeout
+    return fetch_agy_quota(network_timeout=timeout)
 
 def normalize(raw):
     if not raw or 'error' in raw:

@@ -142,7 +142,14 @@ class TestAgyNetworkTimeoutWiring(unittest.TestCase):
              patch.object(quota_parser, '_try_connect_rpc', side_effect=Exception('stop')) as mock_rpc:
             quota_parser.fetch_agy_quota(network_timeout=42)
             mock_plan.assert_called_once_with(timeout=42)
-            mock_rpc.assert_called_once_with(1234, 'tok', timeout=42)
+            # Asserted field by field rather than as an exact signature: the
+            # collector also passes an `errors` accumulator so a failed probe
+            # can report why. The point of this test is the timeout.
+            mock_rpc.assert_called_once()
+            args, kwargs = mock_rpc.call_args
+            self.assertEqual(args, (1234, 'tok'))
+            self.assertEqual(kwargs.get('timeout'), 42)
+            self.assertIsInstance(kwargs.get('errors'), list)
 
     def test_no_timeout_arg_preserves_historical_defaults(self):
         # Callers that don't pass network_timeout (back-compat) must not
@@ -156,7 +163,13 @@ class TestAgyNetworkTimeoutWiring(unittest.TestCase):
              patch.object(quota_parser, '_try_connect_rpc', side_effect=Exception('stop')) as mock_rpc:
             quota_parser.fetch_agy_quota()
             mock_plan.assert_called_once_with()
-            mock_rpc.assert_called_once_with(1234, 'tok')
+            mock_rpc.assert_called_once()
+            args, kwargs = mock_rpc.call_args
+            self.assertEqual(args, (1234, 'tok'))
+            # No timeout kwarg at all, so the module's own historical
+            # per-call default still applies.
+            self.assertNotIn('timeout', kwargs)
+            self.assertIsInstance(kwargs.get('errors'), list)
 
 
 if __name__ == '__main__':

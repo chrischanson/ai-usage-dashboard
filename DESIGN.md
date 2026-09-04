@@ -38,7 +38,7 @@ retry/backoff state on top of it. If a feature here is not required by the
 
 | Source | Usage Data | Quota Data |
 |---|---|---|
-| **AGY** | Conversation protobuf blobs from `~/.gemini/antigravity-*/conversations/*.db` | Cloud Code API via local RPC (`RetrieveUserQuotaSummary`) + `loadCodeAssist` for plan (`paidTier.name`) |
+| **AGY** | Conversation protobuf blobs from `~/.gemini/antigravity-*/conversations/*.db` | Cloud Code API via local RPC (`RetrieveUserQuotaSummary`) + `loadCodeAssist` for plan (`paidTier.name`). The RPC endpoint belongs to Antigravity itself, so it exists only while the app is running: the language server is located by verifying a candidate process's executable and then taking only its **listening loopback** sockets. No port is ever guessed — an unidentifiable endpoint is reported as `not_running`/`rpc_port_unavailable` rather than probed for. Usage collection is unaffected, since it reads files. |
 | **Claude (Claude Code)** | Local `~/.claude/projects/**/*.jsonl` transcripts | Anthropic OAuth usage API (`~/.claude/.credentials.json`) |
 | **OpenCode** | `opencode stats --models` subprocess output | Same subprocess; total cost extracted |
 | **Codex (OpenAI)** | `~/.codex/state_5.sqlite` threads table | JWT plan (`chatgpt_plan_type`) + a short-lived local `codex app-server --stdio` JSON-RPC session (`account/rateLimits/read`); `logs_2.sqlite` scraping survives only as a deprecated fallback for older Codex releases |
