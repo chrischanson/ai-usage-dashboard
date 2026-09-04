@@ -117,6 +117,7 @@ All settings via environment variables (all have sensible defaults):
 | `USAGE_PORT` | `8000` | Bind port |
 | `USAGE_LOG_LEVEL` | `INFO` | Logging level |
 | `USAGE_CODEX_BIN` | `codex` | Codex CLI used for `codex app-server --stdio` quota reads. A bare name is resolved on `PATH`, then probed at `~/.local/bin/codex` and `/usr/local/bin/codex`; a path (containing `/`) is used as given. |
+| `USAGE_FORCE_MIN_INTERVAL` | `10` | Minimum seconds between live quota collections for one source, however many `?force=true` refreshes arrive. Forced refresh bypasses the read cache, so it is the only route that spawns a subprocess and calls an upstream API on demand; the floor keeps that bounded. Attempts are counted, not just successes, so a failing source cannot be hammered either. |
 
 **Security note:** there is no authentication on any route, but the default bind is
 loopback-only (`127.0.0.1`), so nothing off the host can reach it out of the box. Widen
@@ -177,7 +178,7 @@ Full design decisions: [DESIGN.md](DESIGN.md)
 # 328-check integration suite
 PYTHONPATH=backend python3 verify.py
 
-# 305 unit tests (plus subtests) — install the dev extra first
+# 311 unit tests (plus subtests) — install the dev extra first
 pip install -e '.[dev]'   # or: pip install -r requirements-dev.txt
 PYTHONPATH=backend python3 -m pytest -q backend/tests
 ```

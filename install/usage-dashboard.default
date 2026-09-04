@@ -21,6 +21,12 @@
 # Seconds between poll cycles.
 #USAGE_POLL_INTERVAL=600
 
+# Minimum seconds between live quota collections for one source, however many
+# `?force=true` refreshes arrive. Forced refresh bypasses the read cache, so it
+# is the only route that spawns a subprocess and calls an upstream API on
+# demand; this floor keeps that bounded.
+#USAGE_FORCE_MIN_INTERVAL=10
+
 # Timeouts, in seconds. USAGE_NETWORK_TIMEOUT also bounds the whole Codex App
 # Server session (spawn, initialize and the quota read together).
 #USAGE_NETWORK_TIMEOUT=10

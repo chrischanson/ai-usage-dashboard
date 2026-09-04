@@ -319,6 +319,7 @@ parser, no extra dependency):
 | `USAGE_PORT` | `8000` | Bind port |
 | `USAGE_LOG_LEVEL` | `INFO` | Logging level |
 | `USAGE_CODEX_BIN` | `codex` | Codex CLI for `codex app-server --stdio` quota reads. A bare name resolves on `PATH`, then `~/.local/bin/codex` and `/usr/local/bin/codex`; a path is used as given. Must be set explicitly under systemd — see `install/usage-dashboard.default`. |
+| `USAGE_FORCE_MIN_INTERVAL` | `10` | Minimum seconds between live quota collections for one source, however many `?force=true` refreshes arrive. Forced refresh bypasses the read cache, so it is the only route that spawns a subprocess and calls an upstream API on demand; the floor keeps that bounded. Attempts are counted, not just successes, so a failing source cannot be hammered either. |
 
 Invalid values fail fast on load with a clear message.
 
@@ -482,7 +483,7 @@ Two layers, each runnable independently:
    network. Parser fixtures live in `backend/tests/fixtures/`. Install the
    `dev` extra (`pip install -e '.[dev]'`, or `pip install -r
    requirements-dev.txt`) to get `pytest` alongside the pinned runtime deps.
-   305 tests (plus subtests) as of this writing; CI runs this exact suite.
+   311 tests (plus subtests) as of this writing; CI runs this exact suite.
 2. **`verify.py`** — end-to-end verifier covering server health, HTML
    structure, JS functions, CSS rules, all API endpoints, accessibility, and
    regressions (XSS escaping, cache clearing on tab switch, data-relative date

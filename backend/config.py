@@ -23,6 +23,11 @@ class Config:
     # path is honoured as given. Set USAGE_CODEX_BIN under systemd, where
     # ~/.local/bin is normally absent from PATH.
     codex_bin: str = 'codex'
+    # Minimum seconds between live quota collections for one source, however
+    # many `?force=true` refreshes arrive. Forced refresh is the only route
+    # that spawns a subprocess and calls an upstream API on demand, so it
+    # needs a floor even though it deliberately bypasses the read cache.
+    force_min_interval: int = 10
 
 
 _VALID_LOG_LEVELS = frozenset({'DEBUG', 'INFO', 'WARNING', 'ERROR'})
@@ -63,6 +68,7 @@ def load_config() -> Config:
         port=_getenv_int('USAGE_PORT', 8000),
         log_level=ll,
         codex_bin=os.getenv('USAGE_CODEX_BIN', 'codex'),
+        force_min_interval=_getenv_int('USAGE_FORCE_MIN_INTERVAL', 10),
     )
 
 

@@ -64,6 +64,9 @@ class _CodexQuotaFreshnessBase(unittest.TestCase):
         self.cfg = dataclasses.replace(load_config(), db_path=self.db_path)
 
         api._quota_cache.clear()
+        # Also module state: the forced-refresh floor would otherwise carry
+        # from one test into the next and throttle its first refresh.
+        api._last_fetch_attempt.clear()
 
         self.entry = source_registry.get_source('codex')
         self.assertIsNotNone(self.entry, 'codex source entry missing from registry')
@@ -75,6 +78,9 @@ class _CodexQuotaFreshnessBase(unittest.TestCase):
     def tearDown(self):
         self.entry.quota_collector = self._orig_collector
         api._quota_cache.clear()
+        # Also module state: the forced-refresh floor would otherwise carry
+        # from one test into the next and throttle its first refresh.
+        api._last_fetch_attempt.clear()
         try:
             os.unlink(self.db_path)
         except OSError:
@@ -201,3 +207,73 @@ class TestPayloadSafety(_CodexQuotaFreshnessBase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestForceRefreshThrottle(_CodexQuotaFreshnessBase):
+    """`?force=true` bypasses the read cache by design, which makes it the one
+    route that spawns a subprocess and calls an upstream API on demand. A floor
+    between live attempts stops a caller who can reach the port from driving
+    one spawn per request."""
+
+    def _counting_collector(self, result):
+        calls = []
+
+        def collector():
+            calls.append(time.time())
+            return result
+        return collector, calls
+
+    def test_repeated_forces_collect_once(self):
+        collector, calls = self._counting_collector(_fake_raw_success(used_pct=50.0))
+        self.entry.quota_collector = collector
+        for _ in range(10):
+            self.assertEqual(
+                self.client.get('/api/quota/codex/latest?force=true').status_code, 200)
+        self.assertEqual(len(calls), 1, 'the floor did not collapse repeated refreshes')
+
+    def test_throttled_response_still_returns_live_data(self):
+        collector, _calls = self._counting_collector(_fake_raw_success(used_pct=50.0))
+        self.entry.quota_collector = collector
+        self.client.get('/api/quota/codex/latest?force=true')
+        body = self.client.get('/api/quota/codex/latest?force=true').json()['codex']
+        # Cached under the floor is at most force_min_interval old, so it is
+        # honestly live -- pressing Refresh twice must not degrade the card.
+        self.assertTrue(body['_status']['live'])
+        self.assertIn('openai', body)
+
+    def test_failing_collector_is_throttled_too(self):
+        # The important case: failures are never cached, so keying the floor
+        # off the cache alone would leave exactly this path unthrottled.
+        collector, calls = self._counting_collector(
+            {'error': 'Codex App Server timed out', 'error_category': 'timeout'})
+        self.entry.quota_collector = collector
+        for _ in range(10):
+            self.assertEqual(
+                self.client.get('/api/quota/codex/latest?force=true').status_code, 200)
+        self.assertEqual(len(calls), 1, 'a failing source can still be hammered')
+
+    def test_throttled_with_no_snapshot_invents_nothing(self):
+        collector, _calls = self._counting_collector(
+            {'error': 'boom', 'error_category': 'timeout'})
+        self.entry.quota_collector = collector
+        self.client.get('/api/quota/codex/latest?force=true')
+        body = self.client.get('/api/quota/codex/latest?force=true').json()['codex']
+        self.assertFalse(body['_status']['live'])
+        self.assertEqual(body['_status']['error_category'], 'rate_limited')
+        self.assertEqual([k for k in body if not k.startswith('_')], [])
+
+    def test_attempt_allowed_again_once_the_floor_expires(self):
+        collector, calls = self._counting_collector(_fake_raw_success(used_pct=50.0))
+        self.entry.quota_collector = collector
+        self.client.get('/api/quota/codex/latest?force=true')
+        self.assertEqual(len(calls), 1)
+        api._last_fetch_attempt['codex'] = time.time() - (self.cfg.force_min_interval + 1)
+        self.client.get('/api/quota/codex/latest?force=true')
+        self.assertEqual(len(calls), 2)
+
+    def test_unforced_reads_never_collect(self):
+        collector, calls = self._counting_collector(_fake_raw_success(used_pct=50.0))
+        self.entry.quota_collector = collector
+        for _ in range(5):
+            self.client.get('/api/quota/codex/latest')
+        self.assertEqual(len(calls), 0, 'an ordinary read must serve the snapshot')

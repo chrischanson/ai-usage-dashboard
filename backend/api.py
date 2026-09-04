@@ -44,6 +44,18 @@ def _agy_quota_to_api(raw: dict) -> dict:
 _quota_cache: dict = {}
 _QUOTA_TTL_SECONDS = 60
 
+# Floor between *live collection attempts* for one source, however many forced
+# refreshes arrive. `?force=true` deliberately bypasses the TTL, which makes it
+# the one route that spawns a subprocess (`codex app-server`) and calls an
+# upstream API with the user's credentials on demand -- so without a floor, a
+# caller who can reach the port can drive one process spawn per request.
+#
+# Attempts are tracked, not successes: a failing source is never cached (a
+# cached failure would pin an error in front of good data), so keying off the
+# cache alone would leave exactly the failing case unthrottled.
+_FORCE_MIN_INTERVAL_SECONDS = 10
+_last_fetch_attempt: dict = {}
+
 # Endpoints are sync `def` routes, so FastAPI runs each request in a
 # threadpool worker -> concurrent requests are real concurrent threads, not
 # coroutines on one loop, and a plain threading.Lock is the right primitive.
@@ -78,13 +90,22 @@ def _is_live_result(raw) -> bool:
     return 'error' not in raw and 'quota_error' not in raw
 
 
-def _get_cached_quota(source: str, fetcher, force: bool = False):
+def _get_cached_quota(source: str, fetcher, force: bool = False,
+                      min_interval: float = None):
     """Fetch a source's raw quota, memoized for _QUOTA_TTL_SECONDS.
 
     Returns `(raw, live)`. A failed fetch is never written to the cache: doing
     so would pin an error in front of good data for the whole TTL, and would
     make the next forced refresh a no-op.
+
+    A forced refresh skips the TTL but not `min_interval`: within that floor of
+    the last attempt it serves what it already has rather than collecting
+    again. Recently cached data is still returned as live -- it is at most
+    `min_interval` old -- so a user pressing Refresh twice sees real data, not
+    an error.
     """
+    if min_interval is None:
+        min_interval = _FORCE_MIN_INTERVAL_SECONDS
     now = time.time()
     cached = _quota_cache.get(source)
     if not force and cached and (now - cached[0]) < _QUOTA_TTL_SECONDS:
@@ -99,6 +120,17 @@ def _get_cached_quota(source: str, fetcher, force: bool = False):
         cached = _quota_cache.get(source)
         if not force and cached and (time.time() - cached[0]) < _QUOTA_TTL_SECONDS:
             return cached[1], True
+
+        # Throttle floor. Checked inside the lock so queued concurrent forced
+        # requests see the attempt the winner just made.
+        since_attempt = time.time() - _last_fetch_attempt.get(source, 0.0)
+        if force and since_attempt < min_interval:
+            if cached:
+                return cached[1], True
+            return {'error': 'refresh rate limited',
+                    'error_category': 'rate_limited'}, False
+
+        _last_fetch_attempt[source] = time.time()
         try:
             raw = fetcher()
         except Exception:
@@ -367,7 +399,8 @@ def create_app(cfg=None, poller=None) -> FastAPI:
             sources = get_all_sources()
             with ThreadPoolExecutor(max_workers=len(sources)) as executor:
                 futures = {
-                    src: executor.submit(_get_cached_quota, src, entry.quota_collector, True)
+                    src: executor.submit(_get_cached_quota, src, entry.quota_collector,
+                                         True, cfg.force_min_interval)
                     for src, entry in sources.items() if entry.quota_collector
                 }
                 for src, fut in futures.items():
@@ -402,7 +435,8 @@ def create_app(cfg=None, poller=None) -> FastAPI:
             from source_registry import get_source
             entry = get_source(source)
             if entry and entry.quota_collector:
-                raw, live = _get_cached_quota(source, entry.quota_collector, True)
+                raw, live = _get_cached_quota(source, entry.quota_collector, True,
+                                              cfg.force_min_interval)
                 norm = entry.quota_normalizer(raw) if (entry.quota_normalizer and raw) else None
                 if norm and live:
                     # Persist through the same validation path the poller uses,
