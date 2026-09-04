@@ -177,7 +177,7 @@ Full design decisions: [DESIGN.md](DESIGN.md)
 # 322-check integration suite
 PYTHONPATH=backend python3 verify.py
 
-# 263 unit tests (plus subtests) — install the dev extra first
+# 294 unit tests (plus subtests) — install the dev extra first
 pip install -e '.[dev]'   # or: pip install -r requirements-dev.txt
 PYTHONPATH=backend python3 -m pytest -q backend/tests
 ```

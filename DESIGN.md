@@ -2,10 +2,10 @@
 
 ## Goal
 
-Track token usage, session stats, and quota limits across three LLM coding
-agents — **Antigravity (AGY CLI/IDE)**, **OpenCode CLI**, and **Codex CLI
-(OpenAI)** — and surface them in a single, real-time dashboard that works well
-on desktop and mobile.
+Track token usage, session stats, and quota limits across four LLM coding
+agents — **Antigravity (AGY CLI/IDE)**, **Claude (Claude Code)**, **OpenCode
+CLI**, and **Codex CLI (OpenAI)** — and surface them in a single, real-time
+dashboard that works well on desktop and mobile.
 
 The system is a **local, lightweight, robust** monitoring tool: one process,
 one SQLite file, a small set of dependencies. It must run unattended for weeks
@@ -482,7 +482,7 @@ Two layers, each runnable independently:
    network. Parser fixtures live in `backend/tests/fixtures/`. Install the
    `dev` extra (`pip install -e '.[dev]'`, or `pip install -r
    requirements-dev.txt`) to get `pytest` alongside the pinned runtime deps.
-   263 tests (plus subtests) as of this writing; CI runs this exact suite.
+   294 tests (plus subtests) as of this writing; CI runs this exact suite.
 2. **`verify.py`** — end-to-end verifier covering server health, HTML
    structure, JS functions, CSS rules, all API endpoints, accessibility, and
    regressions (XSS escaping, cache clearing on tab switch, data-relative date
@@ -517,6 +517,12 @@ depends only on the *contracts* of earlier modules.
 
 | # | Milestone | Modules | Acceptance Criteria | Verify |
 |---|---|---|---|---|
+> The **Verification** column below records the tooling each milestone was
+> built and accepted against. The suite has since moved to `pytest` (several
+> test modules use pytest-style classes that `unittest discover` cannot
+> collect), so treat that column as history, not as the command to run today —
+> see *Testing & Verification Strategy* above for the current one.
+
 | **M1** | Config + DB | `config.py`, `db.py` | Env overrides; invalid value fails fast; JSON logs; schema idempotent; pragmas applied; `UNIQUE(source, cycle_ts)` enforced; insert/read round-trips; `latest_usage(None, ts)` aggregates across sources; prune removes only old rows | `unittest discover` (config, db) |
 | **M2** | Parsers | `parsers/base.py`, `opencode.py`, `agy.py`, `codex.py` | Each parses its fixture to the expected tuple; missing files/commands raise `SourceUnavailable` (no crash) | `unittest` parser tests |
 | **M3** | Quota enrichment | `quota.py` | Mock RPC → snapshot; timeout → `None`; no secrets in output | `unittest` quota test |
@@ -748,8 +754,12 @@ interval that's supposed to be the rate limiter, and the quota-formatting
 logic is duplicated between `api.py` and `poller.py`.
 **Fix**: one shared "collect + normalize" function per source used by both;
 in the API, wrap it in a small in-process TTL cache (≥60 s) and fall back to
-the last snapshot with an explicit `stale: true` marker (DESIGN specifies
-this marker; today nothing sets it).
+the last snapshot with an explicit `stale: true` marker.
+**Status: done.** `source_registry` supplies one collector/normalizer pair per
+source to both poller and API; `_get_cached_quota` is the 60 s TTL cache with
+a per-source stampede lock, and it never caches a failure as a success. The
+stale marker is the per-source `_status` envelope (`live`, `observed_at`,
+`age_seconds`, `stale`, `error_category`), which every quota card renders.
 
 #### R7. Copy-pasted per-source routes → add a source registry
 Eight near-identical handlers for three sources (soon four). Unknown sources
