@@ -81,6 +81,26 @@ export function codexLimits(group) {
     return keys.map(k => Object.assign({ _key: k }, group[k]));
 }
 
+// The footer every quota card shares: an optional explanation of why a card
+// has no meters, then the freshness line. Centralised so a stale reading looks
+// the same whichever source produced it -- the point of a stale badge is that
+// it is recognisable, and four hand-rolled variants would defeat that.
+export function quotaFooterHtml(status, emptyMessage) {
+    let html = '';
+    if (emptyMessage) {
+        html += `<div class="quota-limit"><p class="quota-note">${escapeHtml(emptyMessage)}</p></div>`;
+    }
+    // With no prior reading at all there is no age to report, and the empty
+    // message has already said why the card is bare -- adding "Unavailable"
+    // underneath it just says the same thing twice.
+    const suppressFreshness = emptyMessage && !(status && status.observed_at);
+    const freshness = suppressFreshness ? '' : staleNote(status);
+    if (freshness) {
+        html += `<p class="quota-note" role="status">${escapeHtml(freshness)}</p>`;
+    }
+    return html;
+}
+
 export function renderQuota(data, source) {
     const container = document.getElementById('quota-cards');
     const titleEl = document.getElementById('quota-title');
@@ -115,7 +135,7 @@ export function renderQuota(data, source) {
             const group = quotaData.opencode;
             if (group) {
                 const cost = group.total_cost || {};
-                renderOpenCodeCost(getCompactColumn(), cost);
+                renderOpenCodeCost(getCompactColumn(), cost, quotaData._status);
             }
         } else if (src === 'codex') {
             const group = quotaData.openai;
@@ -167,6 +187,15 @@ export function renderQuota(data, source) {
                 const planBadge = src === 'agy' ? ` <span class="badge badge-agy">${escapeHtml(agyPlan)}</span>` : '';
                 card.innerHTML = `<h3>${escapeHtml(groupLabel)}${planBadge}</h3>${limitsHtml}`;
                 container.appendChild(card);
+            }
+            // A YAML-defined provider renders one card per group, so the
+            // freshness line goes after them rather than being repeated.
+            const genericFooter = quotaFooterHtml(quotaData._status, '');
+            if (genericFooter) {
+                const footer = document.createElement('div');
+                footer.className = 'quota-footer';
+                footer.innerHTML = genericFooter;
+                container.appendChild(footer);
             }
         }
     }
@@ -264,36 +293,37 @@ export function renderAgyQuota(container, data) {
     // whenever the app is closed. Say so plainly instead of showing a bare
     // card, and label an aged snapshot rather than letting it read as current.
     const status = data._status;
-    let noteHtml = '';
+    let reason = '';
     if (!sectionsHtml) {
-        const reason = status && status.error_category === 'not_running'
+        reason = status && status.error_category === 'not_running'
             ? 'Antigravity isn\u2019t running, so live quota isn\u2019t available.'
             : status && status.error_category
                 ? 'Quota unavailable right now.'
                 : 'No quota windows reported.';
-        noteHtml = `<div class="quota-limit"><p class="quota-note">${escapeHtml(reason)}</p></div>`;
-    }
-    const freshness = staleNote(status);
-    if (freshness) {
-        noteHtml += `<p class="quota-note" role="status">${escapeHtml(freshness)}</p>`;
     }
 
-    card.innerHTML = `<h3>Antigravity${planBadge}</h3>${sectionsHtml}${noteHtml}`;
+    card.innerHTML = `<h3>Antigravity${planBadge}</h3>${sectionsHtml}`
+        + quotaFooterHtml(status, reason);
     container.appendChild(card);
 }
 
-export function renderOpenCodeCost(container, cost) {
-    const spent = cost.used || 0;
+export function renderOpenCodeCost(container, cost, status) {
+    const hasCost = cost && cost.used !== undefined && cost.used !== null;
+    const spent = (cost && cost.used) || 0;
     const card = document.createElement('div');
     card.className = 'quota-group';
-    card.innerHTML = `
-        <h3>OpenCode <span class="badge badge-opencode">Free Tier</span></h3>
+    const costHtml = hasCost ? `
         <div class="quota-limit">
             <div class="quota-limit-header">
                  <span class="quota-limit-label">Total Cost</span>
                  <span class="quota-limit-value">$${spent.toFixed(2)}</span>
             </div>
         </div>
+    ` : '';
+    card.innerHTML = `
+        <h3>OpenCode <span class="badge badge-opencode">Free Tier</span></h3>
+        ${costHtml}
+        ${quotaFooterHtml(status, hasCost ? '' : 'No cost recorded yet.')}
     `;
     container.appendChild(card);
 }
@@ -375,12 +405,7 @@ export function renderCodexQuota(container, rateLimit, planType) {
         limits = [Object.assign({ _key: 'rate_limit' }, rateLimit)];
     }
     const status = rateLimit._status;
-    const note = staleNote(status);
-
     const heading = `<h3>Codex <span class="badge badge-codex">${escapeHtml(planLabel)}</span></h3>`;
-    const noteHtml = note
-        ? `<p class="quota-note" role="status">${escapeHtml(note)}</p>`
-        : '';
 
     if (limits.length) {
         // A single bucket keeps the original one-meter card; extra windows use
@@ -400,7 +425,7 @@ export function renderCodexQuota(container, rateLimit, planType) {
                 : `${pct.toFixed(1)}% remaining`;
             return renderMeterRow(label, valueText, pct, exhausted ? 'red' : barColor, refreshStr);
         }).join('');
-        card.innerHTML = `${heading}${rows}${noteHtml}`;
+        card.innerHTML = `${heading}${rows}${quotaFooterHtml(status, '')}`;
     } else {
         // Distinguish "signed in, but Codex reports no meters" from a failed
         // read showing an older snapshot. Neither is an error state, and
@@ -408,13 +433,7 @@ export function renderCodexQuota(container, rateLimit, planType) {
         const message = status && status.error_category
             ? 'Quota unavailable right now.'
             : 'This Codex account reports no active quota windows.';
-        card.innerHTML = `
-            ${heading}
-            <div class="quota-limit">
-                <p class="quota-note">${escapeHtml(message)}</p>
-                ${noteHtml}
-            </div>
-        `;
+        card.innerHTML = `${heading}${quotaFooterHtml(status, message)}`;
     }
     container.appendChild(card);
 }
@@ -476,7 +495,9 @@ export function renderClaudeQuota(container, data, wide) {
 
     card.innerHTML = `
         <h3>Claude <span class="badge badge-claude">${escapeHtml(plan)}</span></h3>
-        ${limitsHtml || '<p style="color: #8a9fc8; font-size: 0.85rem; margin: 0.5rem 0;">Claude quota data will appear once authenticated.</p>'}
+        ${limitsHtml}
+        ${quotaFooterHtml(data._status,
+            limitsHtml ? '' : 'Claude quota data will appear once authenticated.')}
     `;
     container.appendChild(card);
 }

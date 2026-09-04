@@ -973,6 +973,12 @@
         letter-spacing: 0.01em;
     }
 
+    /* Footer wrapper for providers whose card is split per group, so the
+       freshness line sits under the set rather than inside one of them. */
+    .quota-footer {
+        grid-column: 1 / -1;
+    }
+
     /* Error Banner — flat surface-2 with danger left edge */
     .error-banner {
         display: flex;
