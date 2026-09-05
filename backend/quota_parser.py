@@ -93,26 +93,35 @@ def _is_language_server_exe(name):
 
 
 def _own_pid_lineage():
-    """This process and its ancestors, which must never be treated as matches.
+    """This process and its launcher shells/subprocesses that must not be nominated.
 
     `pgrep -f` matches on the command line, so the poller's own python process
     -- and the shell that launched it, whose command line quotes this module's
     patterns -- can nominate themselves.
+
+    We never add a language server / editor process to the exclusion set: if the
+    poller is executed from inside an Antigravity integrated terminal or an
+    `agy` session, the editor is an ancestor and is the very process serving
+    the quota RPC.
     """
     lineage = set()
     pid = os.getpid()
+    lineage.add(pid)
     for _ in range(12):  # bounded: never walk a cycle or a deep tree forever
-        if pid <= 1 or pid in lineage:
-            break
-        lineage.add(pid)
         try:
             with open(f"/proc/{pid}/stat") as f:
                 # field 4 is ppid; the comm field may contain spaces, so read
                 # past its closing paren rather than splitting the whole line.
                 stat = f.read()
-            pid = int(stat[stat.rindex(')') + 1:].split()[1])
+            ppid = int(stat[stat.rindex(')') + 1:].split()[1])
         except Exception:
             break
+        if ppid <= 1 or ppid in lineage:
+            break
+        if _is_language_server_exe(_process_exe_name(ppid)):
+            break
+        lineage.add(ppid)
+        pid = ppid
     return lineage
 
 

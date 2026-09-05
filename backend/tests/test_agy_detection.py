@@ -88,6 +88,62 @@ class TestPidDetection(unittest.TestCase):
     def test_lineage_contains_self(self):
         self.assertIn(os.getpid(), q._own_pid_lineage())
 
+    def test_lineage_does_not_exclude_language_server_ancestor(self):
+        # When poller runs inside an Antigravity terminal / agy CLI session,
+        # an ancestor process is the editor itself (e.g. agy or antigravity).
+        # _own_pid_lineage must not add it to the exclusion set.
+        current_pid = os.getpid()
+        parent_pid = 50000
+        grandparent_pid = 40000
+
+        def fake_open(path, *args, **kwargs):
+            if path == f"/proc/{current_pid}/stat":
+                return mock.mock_open(read_data=f"{current_pid} (python3) S {parent_pid} 1 1")()
+            if path == f"/proc/{parent_pid}/stat":
+                return mock.mock_open(read_data=f"{parent_pid} (bash) S {grandparent_pid} 1 1")()
+            if path == f"/proc/{grandparent_pid}/stat":
+                return mock.mock_open(read_data=f"{grandparent_pid} (agy) S 1 1 1")()
+            raise FileNotFoundError(path)
+
+        def fake_exe(pid):
+            if pid == current_pid:
+                return 'python3'
+            if pid == parent_pid:
+                return 'bash'
+            if pid == grandparent_pid:
+                return 'agy'
+            return ''
+
+        with mock.patch('builtins.open', side_effect=fake_open), \
+             mock.patch.object(q, '_process_exe_name', side_effect=fake_exe):
+            lineage = q._own_pid_lineage()
+            self.assertIn(current_pid, lineage)
+            self.assertIn(parent_pid, lineage)
+            self.assertNotIn(grandparent_pid, lineage)
+
+    def test_ancestor_language_server_detected(self):
+        # A running language server that happens to be an ancestor process must
+        # be detected and accepted as a candidate pid.
+        current_pid = os.getpid()
+        parent_pid = 50000
+
+        def fake_open(path, *args, **kwargs):
+            if path == f"/proc/{current_pid}/stat":
+                return mock.mock_open(read_data=f"{current_pid} (python3) S {parent_pid} 1 1")()
+            raise FileNotFoundError(path)
+
+        def fake_exe(pid):
+            if pid == current_pid:
+                return 'python3'
+            if pid == parent_pid:
+                return 'agy'
+            return ''
+
+        with mock.patch('builtins.open', side_effect=fake_open), \
+             mock.patch.object(q, '_process_exe_name', side_effect=fake_exe), \
+             mock.patch.object(q.subprocess, 'check_output', return_value=f'{parent_pid}\n'.encode()):
+            self.assertEqual(q._detect_language_server_pids(), [parent_pid])
+
     def test_pgrep_missing_is_not_fatal(self):
         with mock.patch.object(q.subprocess, 'check_output',
                                side_effect=FileNotFoundError('no pgrep')):
