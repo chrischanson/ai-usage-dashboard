@@ -323,6 +323,42 @@ parser, no extra dependency):
 
 Invalid values fail fast on load with a clear message.
 
+## Frontend Design Identity
+
+Recorded here because the reasoning is not recoverable from the CSS: the tokens
+say *what* the colours are, not *why*.
+
+The page is a **meter for metered resources** — tokens in, tokens out, cost
+accruing, quotas draining. Its closest relatives are the utility smart-meter and
+the mission-control telemetry console, not a SaaS marketing dashboard. Every
+visual decision follows from that:
+
+- **Direction: warm graphite telemetry console with phosphor-amber signalling.**
+  The look it replaced was near-black navy with blue/purple glassmorphism and a
+  gradient headline — the generic "AI SaaS dark dashboard", which could have
+  been any product.
+- **Why this isn't just another dark-plus-accent default.** The base is a *warm
+  neutral* graphite with no blue cast; the accent is amber rather than
+  acid-green or vermilion; the per-source hues are semantically required, since
+  each agent keeps its own identity colour; and the personality is carried by
+  the mono data typography and meter-hardware motifs rather than by the accent.
+- **Typography as instrument readout.** IBM Plex Mono with `tabular-nums` for
+  every number on the page (KPIs, table cells, axis ticks, quota readouts, the
+  countdown); IBM Plex Sans for UI prose; the wordmark is a letterspaced mono
+  console label, not a marketing headline. Fluid `clamp()` scale, so type never
+  jumps at a breakpoint.
+- **Quota as physical meter.** Segmented ticks with a `--danger` tail past 90%,
+  rather than a generic rounded progress bar.
+- **Motion is one orchestrated moment**, not scattered effects: the cycle-strip
+  sweep, collapsing to a static countdown under `prefers-reduced-motion`. Card
+  hover brightens the border only — no translate lift. A source-switch View
+  Transition was considered and deliberately dropped (see the commit retiring
+  the UI uplift plan): tab switching already repaints from cached state inside a
+  frame budget.
+
+Chart.js reads its colours from these tokens once via `getComputedStyle` at
+init and passes them into `Chart.defaults`, so charts and UI cannot drift apart.
+
 ## Frontend Architecture
 
 **Modular ES6 architecture** loaded as native modules (no build step):
