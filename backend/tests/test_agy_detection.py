@@ -276,7 +276,8 @@ class TestFetchReporting(unittest.TestCase):
         with mock.patch.object(q, '_detect_agy_plan', return_value='X'), \
              mock.patch.object(q, '_detect_csrf_token', return_value=None), \
              mock.patch.object(q, '_detect_language_server_ports', return_value=[4321]), \
-             mock.patch.object(q, '_try_connect_rpc', side_effect=boom):
+             mock.patch.object(q, '_try_connect_rpc', side_effect=boom), \
+             mock.patch.object(q, '_try_agy_cli_quota', return_value=None):
             r = q.fetch_agy_quota(network_timeout=5)
         self.assertEqual(r['error_category'], 'rpc_unavailable')
         # The generic 'fetch failed' that hid this for weeks is gone.

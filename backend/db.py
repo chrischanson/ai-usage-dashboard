@@ -843,6 +843,15 @@ def _derive_model_rows(model_rows: list, only_cycle: int = None, start_ts: int =
 
 def _derived_source_history(conn: sqlite3.Connection, source: str, with_models: bool = True,
                             latest_only: bool = False, start_ts: int = None) -> list:
+    # NOTE: start_ts filters which rows are materialized, not which rows are
+    # read. Cumulative totals use clamped deltas (a counter drop contributes
+    # 0 and self-heals), so the total at any cycle depends on every prior
+    # cycle — there is no SQL-level lower bound that preserves correctness.
+    # Rows below start_ts therefore still contribute their deltas via the
+    # arithmetic-only path in _derive_usage_rows/_derive_model_rows (no dict
+    # alloc), and only the requested window is materialized. At 90-day
+    # retention (~13k rows/source) this walk is single-digit milliseconds;
+    # the hot per-minute path (latest_usage) bypasses it via _latest_cache.
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM usage_history WHERE source=? ORDER BY cycle_ts ASC', (source,))
     rows = _derive_usage_rows(cursor.fetchall(), last_only=latest_only, start_ts=start_ts)
@@ -1026,7 +1035,8 @@ def _do_insert_quota(conn, source, cycle_ts, data, plan=None):
                     if has_deep_nesting:
                         for limit_type, info in subval.items():
                             if isinstance(info, dict):
-                                _save_quota_row(conn, ts_str, key, cycle_ts, subkey, limit_type, info)
+                                group = f"{key}.{subkey}" if key else subkey
+                                _save_quota_row(conn, ts_str, source, cycle_ts, group, limit_type, info)
                     else:
                         _save_quota_row(conn, ts_str, source, cycle_ts, key, subkey, subval)
     elif isinstance(data, list):

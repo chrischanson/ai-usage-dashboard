@@ -33,7 +33,8 @@ def _make_opencode_parser():
     from config import load_config
     # Route the process-wide subprocess_timeout config through instead of
     # relying on OpenCodeParser's own hardcoded default.
-    return OpenCodeParser(timeout=load_config().subprocess_timeout)
+    cfg = load_config()
+    return OpenCodeParser(timeout=cfg.subprocess_timeout, opencode_bin=cfg.opencode_bin)
 
 
 def _make_agy_parser():

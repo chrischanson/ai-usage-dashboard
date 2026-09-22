@@ -224,8 +224,22 @@ class AgyParser(Parser):
 
     def parse(self, state: dict = None) -> ParserResult:
         db_dirs = [d for d in [self.conv_dir, self.ide_conv_dir] if os.path.isdir(d)]
-        db_files = []
+        # Deduplicate directories that resolve to the same inode (e.g.
+        # antigravity-cli/conversations and antigravity-ide/conversations are
+        # often hard-linked to the same directory).
+        seen_dir_ids = set()
+        unique_dirs = []
         for d in db_dirs:
+            try:
+                st = os.stat(d)
+                dir_id = (st.st_dev, st.st_ino)
+            except OSError:
+                continue
+            if dir_id not in seen_dir_ids:
+                seen_dir_ids.add(dir_id)
+                unique_dirs.append(d)
+        db_files = []
+        for d in unique_dirs:
             db_files.extend(glob.glob(os.path.join(d, '*.db')))
 
         if not db_files:

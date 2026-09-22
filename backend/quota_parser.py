@@ -371,6 +371,135 @@ def _detect_agy_plan(timeout=5):
         return 'Gemini Code Assist'
 
 
+def _find_agy_bin():
+    """Locate the agy CLI binary, or None if it cannot be found."""
+    for candidate in (
+        os.path.expanduser('~/.local/bin/agy'),
+        '/usr/local/bin/agy',
+    ):
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+    # Bare name — resolved on $PATH by subprocess
+    import shutil
+    if shutil.which('agy'):
+        return 'agy'
+    return None
+
+
+def _try_agy_cli_quota(network_timeout=None):
+    """Invoke ``agy -p "/usage"`` and parse its text output into the same
+    dict format that the RPC path produces.
+
+    Returns None if the binary isn't found or the command fails; callers
+    fall through to the existing error path in that case.
+
+    Sample output being parsed::
+
+        Quota:
+        Gemini Models          Weekly Limit Remaining     0%        2026-09-23T02:51:31Z
+        Gemini Models          Five Hour Limit Remaining  disabled
+        Claude and GPT models  Weekly Limit Remaining     40%       2026-09-26T22:15:05Z
+        Claude and GPT models  Five Hour Limit Remaining  38%       2026-09-21T20:48:26Z
+    """
+    agy_bin = _find_agy_bin()
+    if agy_bin is None:
+        return None
+
+    timeout = max(10, int(network_timeout or 10))
+    try:
+        proc = subprocess.run(
+            [agy_bin, '-p', '/usage', f'--print-timeout={timeout}s'],
+            capture_output=True, text=True,
+            timeout=timeout + 5,
+        )
+        output = proc.stdout
+    except Exception:
+        return None
+
+    if not output or 'Remaining' not in output:
+        return None
+
+    return _parse_agy_cli_output(output)
+
+
+def _parse_agy_cli_output(output):
+    """Parse the text table emitted by ``agy -p "/usage"`` into the standard
+    quota dict.
+
+    The output is tab-separated with this layout::
+
+        Gemini Models\tWeekly Limit Remaining\t0%\t2026-09-23T02:51:31Z
+        Gemini Models\tFive Hour Limit Remaining\tdisabled\t
+        Claude and GPT models\tWeekly Limit Remaining\t40%\t2026-09-26T22:15:05Z
+
+    Interactive mode may prepend a ``Quota:`` header and use aligned spaces
+    instead of tabs; the parser handles both.
+    """
+    formatted = {}
+
+    for line in output.splitlines():
+        line = line.strip()
+        if not line or 'Remaining' not in line:
+            continue
+
+        # Try tab-separated first (print mode), then fall back to multi-space
+        if '\t' in line:
+            parts = [p.strip() for p in line.split('\t')]
+        else:
+            parts = [p.strip() for p in re.split(r'\s{2,}', line)]
+
+        if len(parts) < 3:
+            continue
+
+        group_raw = parts[0]
+        bucket_raw = parts[1]       # e.g. "Weekly Limit Remaining"
+        value_raw = parts[2]        # e.g. "0%" or "disabled"
+        reset_raw = parts[3] if len(parts) > 3 else ''
+
+        if 'Remaining' not in bucket_raw:
+            continue
+        # Strip " Remaining" suffix for bucket name
+        bucket_name = bucket_raw.replace(' Remaining', '').strip()
+
+        # Map group names to canonical keys
+        gl = group_raw.lower()
+        if 'gemini' in gl:
+            group_key = 'gemini_models'
+        elif 'claude' in gl or 'gpt' in gl:
+            group_key = 'claude_gpt_models'
+        else:
+            group_key = gl.replace(' ', '_')
+
+        bl = bucket_name.lower()
+        if 'weekly' in bl:
+            limit_key = 'weekly_limit'
+        elif '5' in bl or 'five' in bl or 'hour' in bl:
+            limit_key = 'five_hour_limit'
+        else:
+            limit_key = bl.replace(' ', '_').lower()
+
+        if value_raw.lower() == 'disabled':
+            remaining_pct = 100.0
+        else:
+            try:
+                remaining_pct = float(value_raw.rstrip('%'))
+            except ValueError:
+                continue
+
+        refreshes_in = _parse_iso_time(reset_raw)
+
+        formatted.setdefault(group_key, {})[limit_key] = {
+            'used': 100.0 - remaining_pct,
+            'total': 100.0,
+            'remaining_pct': remaining_pct,
+            'refreshes_in': refreshes_in,
+        }
+
+    if not formatted:
+        return None
+    return formatted
+
+
 def fetch_agy_quota(network_timeout=None):
     """
     Fetch remaining quota from AGY and format it for database storage.
@@ -433,6 +562,15 @@ def fetch_agy_quota(network_timeout=None):
             continue
 
     if not raw_data or 'response' not in raw_data:
+        # The local RPC failed — likely because the new monolithic agy binary
+        # requires a CSRF token that it does not expose externally. Fall back
+        # to invoking `agy -p "/usage"` which prints the same quota info and
+        # authenticates internally.
+        cli_result = _try_agy_cli_quota(network_timeout)
+        if cli_result is not None:
+            cli_result.setdefault('plan', plan)
+            return cli_result
+
         detail = '; '.join(dict.fromkeys(errors)) if errors else 'no response body'
         return {
             'plan': plan,

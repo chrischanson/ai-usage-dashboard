@@ -149,10 +149,12 @@ class TestOpenCodeParserContent(unittest.TestCase):
         self.assertEqual(result.models, [])
 
     def test_malformed_content(self):
+        # Non-empty output with none of the known section headers means the
+        # CLI changed its format — surfaced as a distinct failure rather
+        # than a quiet empty result (see OpenCodeParser._parse_content).
         content = "some random text\nwithout any sections\n"
-        result = self.parser._parse_content(content)
-        self.assertIsInstance(result, ParserResult)
-        self.assertEqual(result.sessions, 0)
+        with self.assertRaises(SourceUnavailable):
+            self.parser._parse_content(content)
 
     def test_parse_number_k(self):
         val = self.parser._parse_number("626.2K")

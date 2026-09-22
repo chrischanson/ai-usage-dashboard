@@ -31,8 +31,17 @@ import threading
 import time
 
 AUTH_PATH = os.path.expanduser('~/.codex/auth.json')
-CODEX_DB = os.path.expanduser('~/.codex/state_5.sqlite')
-CODEX_LOGS = os.path.expanduser('~/.codex/logs_2.sqlite')
+# Version-stamped DB names (state_5.sqlite, logs_2.sqlite) change across
+# Codex releases — resolve via glob so a CLI upgrade doesn't silently break
+# usage parsing and token telemetry. Imported from the parser module so the
+# two cannot drift apart.
+try:
+    from parsers.codex import resolve_state_db, resolve_logs_db, get_thread_stats
+    CODEX_DB = resolve_state_db()
+    CODEX_LOGS = resolve_logs_db()
+except Exception:  # pragma: no cover - import-time fallback only
+    CODEX_DB = os.path.expanduser('~/.codex/state_5.sqlite')
+    CODEX_LOGS = os.path.expanduser('~/.codex/logs_2.sqlite')
 
 # Fallback locations probed when `codex` is not on PATH. A systemd unit does
 # not normally inherit a user's ~/.local/bin, which is where the official
@@ -487,15 +496,26 @@ def _parse_logs_for_limits():
     this always returns None. It is retained only as a compatibility path for
     older releases that did embed the JSON, and is consulted after the App
     Server, never before.
+
+    Gated behind USAGE_CODEX_LEGACY_LOGS=1: the fallback is a full LIKE scan
+    over the logs DB on exactly the failure path where things are already
+    slow, so it stays off unless explicitly requested.
     """
-    if not os.path.exists(CODEX_LOGS):
+    if os.getenv('USAGE_CODEX_LEGACY_LOGS', '0') != '1':
+        return None
+    try:
+        from parsers.codex import resolve_logs_db as _resolve_logs
+        logs_db = _resolve_logs()
+    except Exception:
+        logs_db = CODEX_LOGS
+    if not os.path.exists(logs_db):
         return None
     conn = None
     try:
         # mode=ro: these DBs are WAL-mode and need read-write access to their
         # -shm sidecar to open at all; the systemd unit grants that via
         # ReadWritePaths on ~/.codex (see install/usage-dashboard.service).
-        conn = sqlite3.connect(f'file:{CODEX_LOGS}?mode=ro', uri=True)
+        conn = sqlite3.connect(f'file:{logs_db}?mode=ro', uri=True)
         cursor = conn.execute(
             "SELECT feedback_log_body FROM logs WHERE feedback_log_body LIKE '%rate_limits%' OR feedback_log_body LIKE '%rateLimits%' ORDER BY id DESC LIMIT 50"
         )
@@ -591,35 +611,40 @@ def _get_token_stats():
     This is usage telemetry, not a quota: it says how many tokens local
     threads consumed, and nothing about the subscription allowance. It is
     never used to derive or estimate a limit.
+
+    Shares the parser's single-query, per-cycle cache (parsers.codex
+    .get_thread_stats) so usage + quota don't open state_*.sqlite twice.
     """
-    if not os.path.exists(CODEX_DB):
-        return None
     try:
-        # mode=ro: see _parse_logs_for_limits above.
-        conn = sqlite3.connect(f'file:{CODEX_DB}?mode=ro', uri=True)
-        cursor = conn.cursor()
+        from parsers.codex import get_thread_stats as _shared_stats, resolve_state_db as _resolve_state
         try:
-            cursor.execute("SELECT model, tokens_used FROM threads")
-            rows = cursor.fetchall()
-        except sqlite3.OperationalError:
+            state_db = _resolve_state(CODEX_DB)
+        except Exception:
+            state_db = CODEX_DB
+        try:
+            grouped, _, _ = _shared_stats(state_db)
+        except Exception:
             return None
-        finally:
-            conn.close()
+        if not grouped:
+            return None
+        model_sessions = {}
+        total_tokens = 0
+        total_sessions = 0
+        for model, sessions, tokens in grouped:
+            tokens = tokens or 0
+            sessions = sessions or 0
+            # get_thread_stats groups by model; expand back to per-thread
+            # counts for the legacy {total_sessions, model_sessions} shape.
+            model_sessions[model] = model_sessions.get(model, 0) + sessions
+            total_sessions += sessions
+            total_tokens += tokens
+        return {
+            'total_sessions': total_sessions,
+            'total_tokens': total_tokens,
+            'model_sessions': model_sessions,
+        }
     except Exception:
         return None
-    if not rows:
-        return None
-    model_sessions = {}
-    total_tokens = 0
-    for model, tokens in rows:
-        tokens = tokens or 0
-        model_sessions[model] = model_sessions.get(model, 0) + 1
-        total_tokens += tokens
-    return {
-        'total_sessions': len(rows),
-        'total_tokens': total_tokens,
-        'model_sessions': model_sessions,
-    }
 
 
 # --- Public entry point --------------------------------------------------

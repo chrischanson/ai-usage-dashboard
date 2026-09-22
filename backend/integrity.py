@@ -304,13 +304,17 @@ def check_integrity(conn: sqlite3.Connection, poll_interval: int = 600, since_cy
 
     # 2. Status pairing: every usage row must have a collection_status row
     # (the write layer enforces this, so a violation means external writes).
+    # Bounded to scan_floor like checks #1/#3: /metrics passes a 2-day
+    # watermark every 60s, so a full-history NOT EXISTS on every call is
+    # O(entire database) forever for no new signal.
     cursor.execute('''
         SELECT COUNT(*) FROM usage_history h
-        WHERE NOT EXISTS (
+        WHERE h.cycle_ts >= ?
+          AND NOT EXISTS (
             SELECT 1 FROM collection_status s
             WHERE s.source = h.source AND s.kind = 'usage' AND s.cycle_ts = h.cycle_ts
         )
-    ''')
+    ''', (scan_floor,))
     unpaired = cursor.fetchone()[0]
     checks['rows_missing_status'] = unpaired
     if unpaired:
@@ -353,6 +357,11 @@ def check_integrity(conn: sqlite3.Connection, poll_interval: int = 600, since_cy
     # (e.g. codex) can go dark for hours without ever tripping it. One
     # GROUP BY gets every source's newest cycle in a single scan; the global
     # newest is just the max of those, no second full-table aggregate needed.
+    # Intentionally NOT bounded by since_cycle: bounding would hide exactly
+    # the stale sources this check exists to catch (a source with no rows in
+    # the window would vanish from the result instead of reporting stale).
+    # This stays cheap regardless: MAX(cycle_ts) per source is served by the
+    # idx_usage_history_source_ts index, not a full-table walk.
     cursor.execute("SELECT source, MAX(cycle_ts) AS newest FROM usage_history GROUP BY source")
     per_source_newest = {r['source']: r['newest'] for r in cursor.fetchall()}
     newest = max(per_source_newest.values()) if per_source_newest else None
