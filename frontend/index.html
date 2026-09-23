@@ -6,9 +6,9 @@
     <title>Model Usage Dashboard</title>
     <meta name="description" content="Live model usage and quota dashboard for Antigravity, OpenCode, Codex, and Claude">
     <link rel="stylesheet" href="index.css?v=4">
-    <script src="chart.js"></script>
-    <script src="hammer.js"></script>
-    <script src="chartjs-plugin-zoom.js"></script>
+    <script src="chart.js" defer></script>
+    <script src="hammer.js" defer></script>
+    <script src="chartjs-plugin-zoom.js" defer></script>
 </head>
 <body>
     <div class="container">
@@ -109,8 +109,8 @@
                         <h2>Historical Token Usage</h2>
                         <p class="chart-tip">Scroll to zoom, drag to pan, or double-click to reset.</p>
                         <div class="mode-toggle" role="group" aria-label="Chart mode">
-                            <button class="mode-btn active" data-mode="total" aria-label="Total mode, stacked area chart">Total</button>
-                            <button class="mode-btn" data-mode="rate" aria-label="Rate mode, individual line graphs">Rate</button>
+                            <button class="mode-btn" data-mode="total" aria-label="Total mode, stacked area chart">Total</button>
+                            <button class="mode-btn active" data-mode="rate" aria-label="Rate mode, individual line graphs">Rate</button>
                         </div>
                     </div>
                     <div class="chart-canvas">

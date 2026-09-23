@@ -153,7 +153,7 @@ if status == 200:
         ('renderOpenCodeCost(', 'OpenCode cost rendering function'),
         ('renderCodexQuota(', 'Codex quota rendering function'),
         ("timeRange: 'all'", 'timeRange state variable'),
-        ("mode: 'total'", 'mode state variable'),
+        ("mode: 'rate'", 'mode state variable'),
         ('cachedHistory: null', 'cachedHistory variable'),
         ('state.cachedHistory =', 'Caches history data after fetch'),
         ('filterByTimeRange(data, range)',

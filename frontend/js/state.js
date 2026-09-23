@@ -2,7 +2,7 @@ export const state = {
   sources: [],
   currentSource: 'combined',
   timeRange: 'all',
-  mode: 'total',
+  mode: 'rate',
   cachedHistory: null,
   cachedLatestOverview: null,
   cachedModelData: null,
